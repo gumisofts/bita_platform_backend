@@ -1,0 +1,13 @@
+myhosts:
+  hosts:
+    a:
+      ansible_host: 172.25.0.2
+    b:
+      ansible_host: 172.25.0.3
+    c:
+      ansible_host: 172.25.0.4
+    aws:
+      ansible_host: 13.60.156.50
+  vars:
+    ansible_user: ubuntu
+    ansible_ssh_pass: test
