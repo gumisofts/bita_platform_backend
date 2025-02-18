@@ -5,6 +5,7 @@ from datetime import timedelta
 
 load_dotenv("config/app.env")
 load_dotenv("config/.env")
+load_dotenv()
 env = os.getenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -184,5 +185,7 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-EMAIL_URL = env("NOTIFICATION_API_URL") + "/api/send-single-email/"
-NOTIFICATION_API_KEY = env("NOTIFICATION_API_KEY")
+# EMAIL_URL = env("NOTIFICATION_API_URL") + "/api/send-single-email/"
+# TODO Remove these
+EMAIL_URL = ""
+NOTIFICATION_API_KEY = ""

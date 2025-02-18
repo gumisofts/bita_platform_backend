@@ -22,6 +22,7 @@ from .views import (
     EmployeeInvitationAcceptView,
 )
 from channels.routing import URLRouter
+from accounts.consumers import TestConsumer
 
 auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])
 
