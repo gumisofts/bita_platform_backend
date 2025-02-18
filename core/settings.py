@@ -20,7 +20,7 @@ ALLOWED_HOSTS = [
 
 CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
 
-AUTH_USER_MODEL = "account.User"
+AUTH_USER_MODEL = "accounts.User"
 INSTALLED_APPS = [
     "daphne",
     "django.contrib.admin",
@@ -29,7 +29,11 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "account",
+    "rest_framework",
+    "drf_spectacular",
+    "rest_framework_simplejwt",
+    "drf_spectacular_sidecar",
+    "accounts",
 ]
 
 MIDDLEWARE = [
@@ -68,7 +72,7 @@ ASGI_APPLICATION = "core.asgi.app"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    "default": {
+    "prod": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("POSTGRES_DB", "dev"),
         "USER": env("POSTGRES_USER", "dev"),
@@ -78,7 +82,7 @@ DATABASES = {
         "CONN_MAX_AGE": None,
         "OPTIONS": {"sslmode": env("POSTGRES_SSL_MODE")},
     },
-    "dev": {
+    "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     },
@@ -128,12 +132,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,
 }
 
 EMAIL_USE_SSL = True
@@ -171,3 +178,11 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     "REDOC_DIST": "SIDECAR",
 }
+
+AUTHENTICATION_BACKENDS = [
+    "accounts.backends.EmailOrPhoneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+EMAIL_URL = env("NOTIFICATION_API_URL") + "/api/send-single-email/"
+NOTIFICATION_API_KEY = env("NOTIFICATION_API_KEY")
