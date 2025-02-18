@@ -1,11 +1,21 @@
 from rest_framework.permissions import BasePermission
 from .models import Business, Employee, EmployeeBusiness
+from rest_framework.permissions import SAFE_METHODS
+
+
+# if self.action == "list":
+#             self.permission_classes = [IsAuthenticated, IsAdminUser]
+#         elif self.action in ["retrieve", "update", "partial_update", "destroy"]:
+#             self.permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
 
 class IsOwnerOrAdmin(BasePermission):
     """
     Only allow owners of an object or admin users to edit or delete it.
     """
+
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.is_superuser
 
     def has_object_permission(self, request, view, obj):
         if hasattr(obj, "created_by"):

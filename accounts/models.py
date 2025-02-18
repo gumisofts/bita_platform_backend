@@ -2,7 +2,6 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import RegexValidator
 from .manager import CustomUserManager
-from django.conf import settings
 import uuid
 
 
@@ -41,13 +40,14 @@ class User(TimeStampedModel, AbstractUser):
 
 class Business(TimeStampedModel):
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="businesses",
     )
     name = models.CharField(max_length=255)
     address = models.TextField()
     category = models.CharField(max_length=255)
+    # Files and Images
 
     def __str__(self):
         return self.name
@@ -67,7 +67,7 @@ class Supplier(TimeStampedModel):
     email = models.EmailField()
     address = models.TextField()
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="suppliers",
         null=True,
@@ -100,7 +100,7 @@ class Customer(TimeStampedModel):
     email = models.EmailField()
     address = models.TextField()
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="customers",
         null=True,
@@ -118,33 +118,35 @@ class Customer(TimeStampedModel):
         return f"{self.first_name} {self.last_name}"
 
 
-class Employee(User):
+# User
+# Role and Permissions
+
+
+class EmployeeBusiness(models.Model):
+    employee = models.ForeignKey(User, on_delete=models.CASCADE)
+    business = models.ForeignKey(Business, on_delete=models.CASCADE)
     ROLE_CHOICES = [
-        ("Manager", "Manager"),
-        ("Sales", "Sales"),
-        ("Admin", "Admin"),
+        ("manager", "Manager"),
+        ("salesman", "Sales"),
+        ("admin", "Admin"),
+        ("owner", "Owner"),
     ]
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="created_employees",
-        null=True,
-        blank=True,
-    )
+    role = models.CharField(choices=ROLE_CHOICES, max_length=255, default="salesman")
 
     def __str__(self):
-        return f"{self.email} - {self.role}"
+        return f"{self.employee.email} - {self.role}"
+
+
+#
 
 
 class EmployeeInvitation(TimeStampedModel):
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     email = models.EmailField()
-    first_name = models.CharField(max_length=255)
-    last_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=15)
-    role = models.CharField(max_length=10, choices=Employee.ROLE_CHOICES)
+    role = models.CharField(max_length=10, choices=EmployeeBusiness.ROLE_CHOICES)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="employee_invitations",
     )
@@ -157,9 +159,3 @@ class EmployeeInvitation(TimeStampedModel):
 
     def __str__(self):
         return f"Invitation for {self.email} - Accepted: {self.accepted}"
-
-
-class EmployeeBusiness(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    business = models.ForeignKey(Business, on_delete=models.CASCADE)
-    role = models.CharField(max_length=10, choices=Employee.ROLE_CHOICES)

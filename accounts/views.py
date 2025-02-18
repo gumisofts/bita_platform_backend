@@ -29,7 +29,7 @@ from .permissions import (
     EmployeeRetrievePermission,
     IsNonEmployeeUser,
 )
-from .models import EmployeeBusiness, User, Supplier, Customer, Business, Employee
+from .models import EmployeeBusiness, User, Supplier, Customer, Business
 from django.shortcuts import render
 from rest_framework_simplejwt.tokens import AccessToken
 import requests
@@ -512,3 +512,9 @@ class EmployeeInvitationAcceptView(generics.GenericAPIView):
 
 def api_documentation(request):
     return render(request, "index.html")
+
+
+# Password Change
+# Invitation to Business
+# Login
+# Signup
