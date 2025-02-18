@@ -29,7 +29,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "auth",
+    "account",
 ]
 
 MIDDLEWARE = [
@@ -68,7 +68,7 @@ ASGI_APPLICATION = "core.asgi.app"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    "dev": {
+    "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("POSTGRES_DB", "dev"),
         "USER": env("POSTGRES_USER", "dev"),
@@ -78,7 +78,7 @@ DATABASES = {
         "CONN_MAX_AGE": None,
         "OPTIONS": {"sslmode": env("POSTGRES_SSL_MODE")},
     },
-    "default": {
+    "dev": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     },
