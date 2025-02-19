@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+     <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #007BFF; /* Changed to blue */
+            color: #ffffff;
+            padding: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .content h2 {
+            margin-top: 0;
+            font-size: 20px;
+            color: #007BFF; /* Changed to blue */
+        }
+        .content p {
+            font-size: 16px;
+            line-height: 1.5;
+            margin: 20px 0;
+        }
+        .footer {
+            background-color: #f1f1f1;
+            padding: 15px 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        .footer a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style></head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>GumiApps</h1>
+            <!-- <p>Empowering Your Ideas</p> -->
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <h2>{{ subject }}</h2>
+            <p>{{ message }}</p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Need assistance? <a href="mailto:support@gumiapps.com">Contact Support</a></p>
+            <p>© 2024 GumiApps. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
