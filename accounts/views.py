@@ -21,13 +21,11 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from .permissions import (
-    IsOwnerOrAdmin,
-    IsBusinessOwnerOrAdmin,
-    EmployeeCreatePermission,
-    EmployeeUpdatePermission,
-    EmployeeDeletePermission,
-    EmployeeRetrievePermission,
-    IsNonEmployeeUser,
+    hasCustomerPermission,
+    hasEmployeeInvitePermission,
+    hasSupplierPermission,
+    hasUserPermission,
+    hasEmployeePermission,
 )
 from .models import EmployeeBusiness, User, Supplier, Customer, Business
 from django.shortcuts import render
@@ -39,6 +37,7 @@ from .serializers import (
     EmployeeInvitationSerializer,
 )  # create one for invitation if needed
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample
+from rest_framework.exceptions import ParseError
 
 User = get_user_model()
 
@@ -89,13 +88,7 @@ User = get_user_model()
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-
-    def get_permissions(self):
-        if self.action == "list":
-            self.permission_classes = [IsAuthenticated, IsAdminUser]
-        elif self.action in ["retrieve", "update", "partial_update", "destroy"]:
-            self.permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
-        return super().get_permissions()
+    permission_classes = [hasUserPermission]
 
 
 @extend_schema_view(
@@ -213,9 +206,15 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     ),
 )
 class SupplierViewSet(viewsets.ModelViewSet):
-    queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, hasSupplierPermission]
+
+    def get_queryset(self):
+        business_id = self.request.query_params.get("business")
+        if business_id:
+            return Supplier.objects.filter(business_id=business_id)
+        # If no business id is provided, return an empty queryset.
+        raise ParseError("Missing required parameter: business")
 
 
 @extend_schema_view(
@@ -245,9 +244,15 @@ class SupplierViewSet(viewsets.ModelViewSet):
     ),
 )
 class CustomerViewSet(viewsets.ModelViewSet):
-    queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, hasCustomerPermission]
+
+    def get_queryset(self):
+        business_id = self.request.query_params.get("business")
+        if business_id:
+            return Customer.objects.filter(business_id=business_id)
+        # If no business id is provided, return an empty queryset.
+        raise ParseError("Missing required parameter: business")
 
 
 @extend_schema_view(
@@ -312,20 +317,19 @@ class BusinessViewSet(viewsets.ModelViewSet):
     ),
 )
 class EmployeeViewSet(viewsets.ModelViewSet):
-    queryset = Employee.objects.all()
+    queryset = User.objects.all()
     serializer_class = EmployeeSerializer
-    http_method_names = ["get", "put", "patch", "delete", "head", "options"]
+    http_method_names = ["get", "patch", "delete", "head", "options"]
+    permission_classes = [IsAuthenticated, hasEmployeePermission]
 
-    def get_permissions(self):
-        if self.action in ["update", "partial_update"]:
-            self.permission_classes = [IsAuthenticated, EmployeeUpdatePermission]
-        elif self.action == "destroy":
-            self.permission_classes = [IsAuthenticated, EmployeeDeletePermission]
-        elif self.action == "retrieve":
-            self.permission_classes = [IsAuthenticated, EmployeeRetrievePermission]
-        else:
-            self.permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
-        return super().get_permissions()
+    def get_queryset(self):
+        business_id = self.request.query_params.get("business")
+        if not business_id:
+            raise ParseError("Missing required parameter: business")
+        employee_ids = EmployeeBusiness.objects.filter(
+            business_id=business_id
+        ).values_list("employee_id", flat=True)
+        return User.objects.filter(id__in=employee_ids)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -416,10 +420,10 @@ class EmployeeInvitationCreateView(generics.CreateAPIView):
     """
 
     serializer_class = EmployeeInvitationSerializer
-    permission_classes = [IsAuthenticated, EmployeeCreatePermission]
+    permission_classes = [IsAuthenticated, hasEmployeeInvitePermission]
 
     def perform_create(self, serializer):
-        invitation = serializer.save(created_by=self.request.user)
+        invitation = serializer.save()
         # Construct the acceptance URL. Adjust BASE_URL as appropriate.
         request = self.request
         acceptance_link = f"{request.scheme}://{request.get_host()}/employee/invite/accept/{invitation.token}/"
@@ -464,11 +468,11 @@ class EmployeeInvitationAcceptView(generics.GenericAPIView):
             )
 
         # Check if an employee with the invitation email already exists.
-        if Employee.objects.filter(email=invitation.email).exists():
-            employee = Employee.objects.get(email=invitation.email)
+        if User.objects.filter(email=invitation.email).exists():
+            employee = User.objects.get(email=invitation.email)
         else:
             # Create the employee using invitation data with a temporary password.
-            employee = Employee.objects.create_user(
+            employee = User.objects.create_user(
                 email=invitation.email,
                 phone=invitation.phone,
                 password="password",
@@ -477,11 +481,8 @@ class EmployeeInvitationAcceptView(generics.GenericAPIView):
             employee=employee,
             business=invitation.business,
             role=invitation.role,
+            created_by=invitation.created_by,
         )
-        employee.first_name = invitation.first_name
-        employee.last_name = invitation.last_name
-        employee.created_by = invitation.created_by
-        employee.save()
 
         # Mark invitation as accepted.
         invitation.accepted = True

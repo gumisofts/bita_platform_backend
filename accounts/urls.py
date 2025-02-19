@@ -28,9 +28,9 @@ auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
-router.register(r"suppliers", SupplierViewSet)
-router.register(r"customers", CustomerViewSet)
-router.register(r"employees", EmployeeViewSet)
+router.register(r"suppliers", SupplierViewSet, basename="supplier")
+router.register(r"customers", CustomerViewSet, basename="customer")
+router.register(r"employees", EmployeeViewSet, basename="employee")
 router.register(r"businesses", BusinessViewSet)
 
 urlpatterns = [

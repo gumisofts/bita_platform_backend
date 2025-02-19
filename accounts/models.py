@@ -123,15 +123,20 @@ class Customer(TimeStampedModel):
 
 
 class EmployeeBusiness(models.Model):
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="hires",
+    )
     employee = models.ForeignKey(User, on_delete=models.CASCADE)
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
     ROLE_CHOICES = [
-        ("manager", "Manager"),
-        ("salesman", "Sales"),
-        ("admin", "Admin"),
-        ("owner", "Owner"),
+        (1, 1),
+        (2, 2),
+        (3, 3),
+        (4, 4),
     ]
-    role = models.CharField(choices=ROLE_CHOICES, max_length=255, default="salesman")
+    role = models.IntegerField(choices=ROLE_CHOICES)
 
     def __str__(self):
         return f"{self.employee.email} - {self.role}"
