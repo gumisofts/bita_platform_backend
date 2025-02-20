@@ -21,6 +21,7 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from .permissions import (
+    hasBusinessPermission,
     hasCustomerPermission,
     hasEmployeeInvitePermission,
     hasSupplierPermission,
@@ -284,15 +285,12 @@ class CustomerViewSet(viewsets.ModelViewSet):
 class BusinessViewSet(viewsets.ModelViewSet):
     queryset = Business.objects.all()
     serializer_class = BusinessSerializer
+    permission_classes = [IsAuthenticated, hasBusinessPermission]
 
-    def get_permissions(self):
-        if self.action == "list":
-            self.permission_classes = [IsAuthenticated, IsAdminUser]
-        elif self.action == "create":
-            self.permission_classes = [IsAuthenticated, IsNonEmployeeUser]
-        else:
-            self.permission_classes = [IsAuthenticated, IsBusinessOwnerOrAdmin]
-        return super().get_permissions()
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return Business.objects.all()
+        return Business.objects.filter(owner=self.request.user)
 
 
 @extend_schema_view(

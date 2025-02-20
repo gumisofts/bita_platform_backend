@@ -53,8 +53,6 @@ class hasCustomerPermission(BasePermission):
             )
         except EmployeeBusiness.DoesNotExist:
             return False
-        if not request_business:
-            return False
         if request_business.role < 3 or request.user.is_superuser:
             return True
         return False
@@ -100,3 +98,17 @@ class hasEmployeeInvitePermission(BasePermission):
             return True
         if request_business.role < 3 or request.user.is_superuser:
             return True
+
+
+class hasBusinessPermission(BasePermission):
+    def has_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        if view.action in ["list", "create"]:
+            return True
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        if view.action in ["partial_update", "update", "destroy", "retrieve"]:
+            return obj.owner == request.user or request.user.is_superuser
+        return False
