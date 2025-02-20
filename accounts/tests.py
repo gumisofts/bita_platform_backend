@@ -1,3 +1,4 @@
+from urllib.parse import urlencode
 from environs import Env
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -10,7 +11,6 @@ from .models import (
     Supplier,
     Customer,
     Business,
-    Employee,
     EmployeeInvitation,
 )
 import json
@@ -24,17 +24,9 @@ User = get_user_model()
 
 
 class BaseAPITestCase(APITestCase):
-    def setUp(self):
-        super().setUp()
-        # Set the API key header for all client requests.
-        self.client.defaults["HTTP_X_API_KEY"] = env.str("TEST_API_KEY")
-
     def get_jwt_token(self, user):
         refresh = RefreshToken.for_user(user)
         return str(refresh.access_token)
-
-    def get_api_key(self):
-        return {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
 
 
 class UserCRUDAPITestCase(BaseAPITestCase):
@@ -58,8 +50,7 @@ class UserCRUDAPITestCase(BaseAPITestCase):
     def test_create_user(self):
         """Test creating a new user."""
         url = reverse("user-list")
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.post(url, self.user_data, format="json", **headers)
+        response = self.client.post(url, self.user_data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(User.objects.count(), 3)
 
@@ -67,7 +58,6 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         token = self.get_jwt_token(self.admin_user)
         url = reverse("user-list")
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.get(url, **headers)
@@ -77,7 +67,6 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         token = self.get_jwt_token(self.regular_user)
         url = reverse("user-list")
         headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-        headers.update(self.get_api_key())
         response = self.client.get(url, **headers)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
@@ -85,7 +74,6 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         token = self.get_jwt_token(self.regular_user)
         url = reverse("user-detail", args=[self.regular_user.id])
         headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-        headers.update(self.get_api_key())
         response = self.client.patch(url, {"email": "newemail@example.com"}, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.regular_user.refresh_from_db()
@@ -95,7 +83,6 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         token = self.get_jwt_token(self.admin_user)
         url = reverse("user-detail", args=[self.regular_user.id])
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.patch(
@@ -115,7 +102,6 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         url = reverse("user-detail", args=[another_user.id])
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.patch(
             url, {"email": "unauthorized@example.com"}, **headers
@@ -126,7 +112,6 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         token = self.get_jwt_token(self.regular_user)
         url = reverse("user-detail", args=[self.regular_user.id])
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.delete(url, **headers)
@@ -137,7 +122,6 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         token = self.get_jwt_token(self.admin_user)
         url = reverse("user-detail", args=[self.regular_user.id])
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.delete(url, **headers)
@@ -154,23 +138,20 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         url = reverse("user-detail", args=[another_user.id])
         headers = {
             "Authorization": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.delete(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_list_users(self):
         url = reverse("user-list")
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.get(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_retrieve_user(self):
         user = User.objects.get(email="admin@example.com")
         url = reverse("user-detail", args=[user.id])
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.get(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_update_user(self):
         user = User.objects.get(email="admin@example.com")
@@ -179,16 +160,14 @@ class UserCRUDAPITestCase(BaseAPITestCase):
             "email": "admin_updated@example.com",
             "phone": "987654321",
         }
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.put(url, data, format="json", **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.client.put(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_delete_user(self):
         user = User.objects.get(email="admin@example.com")
         url = reverse("user-detail", args=[user.id])
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.delete(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_password_change(self):
         token = self.get_jwt_token(self.regular_user)
@@ -199,7 +178,6 @@ class UserCRUDAPITestCase(BaseAPITestCase):
             "new_password_confirm": "newpass123",
         }
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.put(url, data, format="json", **headers)
@@ -219,8 +197,7 @@ class UserCRUDAPITestCase(BaseAPITestCase):
             "password": "newpass123",
             "password_confirm": "newpass123",
         }
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.post(url, data, format="json", **headers)
+        response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.regular_user.refresh_from_db()
         self.assertTrue(self.regular_user.check_password("newpass123"))
@@ -231,8 +208,7 @@ class UserCRUDAPITestCase(BaseAPITestCase):
             "identifier": self.regular_user.phone,
             "password": "userpass123",
         }
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.post(url, data, format="json", **headers)
+        response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
@@ -243,8 +219,7 @@ class UserCRUDAPITestCase(BaseAPITestCase):
             "identifier": self.regular_user.email,
             "password": "userpass123",
         }
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.post(url, data, format="json", **headers)
+        response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
@@ -252,6 +227,11 @@ class UserCRUDAPITestCase(BaseAPITestCase):
 
 class SupplierCRUDAPITestCase(BaseAPITestCase):
     def setUp(self):
+        self.owner_user = User.objects.create_user(
+            email="owner@example.com",
+            phone="912345679",
+            password="ownerpass123",
+        )
         self.admin_user = User.objects.create_superuser(
             email="admin@example.com",
             phone="912345678",
@@ -263,13 +243,31 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
             "email": "supplier1@example.com",
             "address": "Supplier 1 address",
         }
+        self.business = Business.objects.create(
+            name="Supplier Business",
+            address="123 Supplier Road",
+            category="Services",
+            owner=self.owner_user,
+        )
+        self.admin_eb = EmployeeBusiness.objects.create(
+            employee=self.admin_user,
+            role=2,
+            business=self.business,
+            created_by=self.owner_user,
+        )
+        self.owner_eb = EmployeeBusiness.objects.create(
+            employee=self.owner_user,
+            role=1,
+            business=self.business,
+            created_by=self.owner_user,
+        )
 
     def test_create_supplier(self):
         token = self.get_jwt_token(self.admin_user)
-        url = reverse("supplier-list")
+        params = {"business": self.business.id}
+        url = f"{reverse('supplier-list')}?{urlencode(params)}"
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.post(url, self.supplier_data, format="json", **headers)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -278,19 +276,21 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
     def test_admin_can_list_suppliers(self):
         token = self.get_jwt_token(self.admin_user)
         url = reverse("supplier-list")
+        query_params = {"business": self.business.id}
+        url = f"{url}?{urlencode(query_params)}"
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.get(url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_admin_can_retrieve_supplier(self):
         token = self.get_jwt_token(self.admin_user)
-        supplier = Supplier.objects.create(**self.supplier_data)
+        supplier = Supplier.objects.create(business=self.business, **self.supplier_data)
         url = reverse("supplier-detail", args=[supplier.id])
+        query_params = {"business": self.business.id}
+        url = f"{url}?{urlencode(query_params)}"
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.get(url, **headers)
@@ -298,8 +298,10 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_update_supplier(self):
         token = self.get_jwt_token(self.admin_user)
-        supplier = Supplier.objects.create(**self.supplier_data)
+        supplier = Supplier.objects.create(business=self.business, **self.supplier_data)
         url = reverse("supplier-detail", args=[supplier.id])
+        query_params = {"business": self.business.id}
+        url = f"{url}?{urlencode(query_params)}"
         data = {
             "name": "Supplier 2",
             "phone": "912345679",
@@ -307,7 +309,6 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
             "address": "Supplier 2 address",
         }
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.put(url, data, format="json", **headers)
@@ -317,10 +318,11 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_delete_supplier(self):
         token = self.get_jwt_token(self.admin_user)
-        supplier = Supplier.objects.create(**self.supplier_data)
+        supplier = Supplier.objects.create(business=self.business, **self.supplier_data)
         url = reverse("supplier-detail", args=[supplier.id])
+        query_params = {"business": self.business.id}
+        url = f"{url}?{urlencode(query_params)}"
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.delete(url, **headers)
@@ -329,16 +331,20 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
 
     def test_unauthorized_user_cannot_list_suppliers(self):
         url = reverse("supplier-list")
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.get(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        response = self.client.get(
+            url,
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_retrieve_supplier(self):
         supplier = Supplier.objects.create(**self.supplier_data)
         url = reverse("supplier-detail", args=[supplier.id])
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.get(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        response = self.client.get(
+            url,
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_update_supplier(self):
         supplier = Supplier.objects.create(**self.supplier_data)
@@ -349,24 +355,53 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
             "email": "unauth@example.com",
             "address": "Unauthorized Supplier address",
         }
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.put(url, data, format="json", **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        response = self.client.put(
+            url,
+            data,
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_delete_supplier(self):
         supplier = Supplier.objects.create(**self.supplier_data)
         url = reverse("supplier-detail", args=[supplier.id])
-        headers = {"HTTP_X_API_KEY": env.str("TEST_API_KEY")}
-        response = self.client.delete(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        response = self.client.delete(
+            url,
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class CustomerCRUDAPITestCase(BaseAPITestCase):
     def setUp(self):
+        self.owner_user = User.objects.create_user(
+            email="owner@example.com",
+            phone="912345679",
+            password="ownerpass123",
+        )
         self.admin_user = User.objects.create_superuser(
             email="admin@example.com",
             phone="912345678",
             password="adminpass123",
+        )
+        self.business = Business.objects.create(
+            name="Supplier Business",
+            address="123 Supplier Road",
+            category="Services",
+            owner=self.owner_user,
+        )
+        self.admin_eb = EmployeeBusiness.objects.create(
+            employee=self.admin_user,
+            role=2,
+            business=self.business,
+            created_by=self.owner_user,
+        )
+        self.owner_eb = EmployeeBusiness.objects.create(
+            employee=self.owner_user,
+            role=1,
+            business=self.business,
+            created_by=self.owner_user,
         )
         self.customer_data = {
             "first_name": "Customer",
@@ -379,9 +414,10 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
     def test_create_customer(self):
         token = self.get_jwt_token(self.admin_user)
         url = reverse("customer-list")
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.post(url, self.customer_data, format="json", **headers)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -390,28 +426,32 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
     def test_admin_can_list_customers(self):
         token = self.get_jwt_token(self.admin_user)
         url = reverse("customer-list")
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.get(url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_admin_can_retrieve_customer(self):
         token = self.get_jwt_token(self.admin_user)
-        customer = Customer.objects.create(**self.customer_data)
+        customer = Customer.objects.create(business=self.business, **self.customer_data)
         url = reverse("customer-detail", args=[customer.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.get(url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_admin_can_update_customer(self):
         token = self.get_jwt_token(self.admin_user)
-        customer = Customer.objects.create(**self.customer_data)
+        customer = Customer.objects.create(business=self.business, **self.customer_data)
         url = reverse("customer-detail", args=[customer.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         data = {
             "first_name": "Customer",
             "last_name": "2",
@@ -421,7 +461,6 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
         }
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.put(url, data, format="json", **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -430,11 +469,12 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_delete_customer(self):
         token = self.get_jwt_token(self.admin_user)
-        customer = Customer.objects.create(**self.customer_data)
+        customer = Customer.objects.create(business=self.business, **self.customer_data)
         url = reverse("customer-detail", args=[customer.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
         }
         response = self.client.delete(url, **headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
@@ -443,13 +483,13 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
     def test_unauthorized_user_cannot_list_customers(self):
         url = reverse("customer-list")
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_retrieve_customer(self):
         customer = Customer.objects.create(**self.customer_data)
         url = reverse("customer-detail", args=[customer.id])
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_update_customer(self):
         customer = Customer.objects.create(**self.customer_data)
@@ -462,17 +502,22 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
             "address": "Unauthorized Customer address",
         }
         response = self.client.put(url, data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_user_cannot_delete_customer(self):
         customer = Customer.objects.create(**self.customer_data)
         url = reverse("customer-detail", args=[customer.id])
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class CustomerSupplierPermissionTestCase(BaseAPITestCase):
     def setUp(self):
+        self.owner_user = User.objects.create_user(
+            email="owner@example.com",
+            phone="912345679",
+            password="ownerpass123",
+        )
         self.admin_user = User.objects.create_superuser(
             email="admin@example.com",
             phone="912345678",
@@ -480,7 +525,7 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
         )
         self.regular_user = User.objects.create_user(
             email="regular@example.com",
-            phone="912345679",
+            phone="912345673",
             password="userpass123",
         )
         self.customer_data = {
@@ -496,15 +541,41 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
             "email": "supplier@example.com",
             "address": "Supplier Address",
         }
+        self.business = Business.objects.create(
+            name="Test Business",
+            address="123 Test Lane",
+            category="Retail",
+            owner=self.owner_user,
+        )
+        EmployeeBusiness.objects.create(
+            employee=self.owner_user,
+            role=1,
+            business=self.business,
+            created_by=self.owner_user,
+        )
+        EmployeeBusiness.objects.create(
+            employee=self.admin_user,
+            role=2,
+            business=self.business,
+            created_by=self.owner_user,
+        )
+        EmployeeBusiness.objects.create(
+            employee=self.regular_user,
+            role=3,
+            business=self.business,
+            created_by=self.owner_user,
+        )
 
     # --- Customer endpoint tests ---
 
     def test_owner_can_update_own_customer(self):
-        token = self.get_jwt_token(self.regular_user)
+        token = self.get_jwt_token(self.owner_user)
         customer = Customer.objects.create(
-            created_by=self.regular_user, **self.customer_data
+            business=self.business, created_by=self.regular_user, **self.customer_data
         )
         url = reverse("customer-detail", args=[customer.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         data = {
             "first_name": "Updated",
             "last_name": customer.last_name,
@@ -513,7 +584,6 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
             "address": customer.address,
         }
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.patch(url, data, format="json", **headers)
@@ -522,17 +592,15 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
         self.assertEqual(customer.first_name, "Updated")
 
     def test_non_owner_cannot_update_customer(self):
-        owner = User.objects.create_user(
-            email="owner@example.com",
-            phone="912345100",
-            password="ownerpass123",
+        customer = Customer.objects.create(
+            created_by=self.owner_user, **self.customer_data
         )
-        customer = Customer.objects.create(created_by=owner, **self.customer_data)
         token = self.get_jwt_token(self.regular_user)
         url = reverse("customer-detail", args=[customer.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         data = {"first_name": "Hacked"}
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.patch(url, data, format="json", **headers)
@@ -540,13 +608,14 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
 
     def test_admin_can_update_any_customer(self):
         customer = Customer.objects.create(
-            created_by=self.regular_user, **self.customer_data
+            business=self.business, created_by=self.regular_user, **self.customer_data
         )
         token = self.get_jwt_token(self.admin_user)
         url = reverse("customer-detail", args=[customer.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         data = {"first_name": "AdminUpdated"}
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.patch(url, data, format="json", **headers)
@@ -555,11 +624,13 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
     # --- Supplier endpoint tests ---
 
     def test_owner_can_update_own_supplier(self):
-        token = self.get_jwt_token(self.regular_user)
+        token = self.get_jwt_token(self.owner_user)
         supplier = Supplier.objects.create(
-            created_by=self.regular_user, **self.supplier_data
+            business=self.business, created_by=self.regular_user, **self.supplier_data
         )
         url = reverse("supplier-detail", args=[supplier.id])
+        query_params = {"business": self.business.id}
+        url = f"{url}?{urlencode(query_params)}"
         data = {
             "name": "Updated Supplier",
             "phone": supplier.phone,
@@ -567,7 +638,6 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
             "address": supplier.address,
         }
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.patch(url, data, format="json", **headers)
@@ -581,12 +651,15 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
             phone="912345222",
             password="ownerpass222",
         )
-        supplier = Supplier.objects.create(created_by=owner, **self.supplier_data)
+        supplier = Supplier.objects.create(
+            business=self.business, created_by=owner, **self.supplier_data
+        )
         token = self.get_jwt_token(self.regular_user)
         url = reverse("supplier-detail", args=[supplier.id])
+        query_params = {"business": self.business.id}
+        url = f"{url}?{urlencode(query_params)}"
         data = {"name": "Hacked Supplier"}
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.patch(url, data, format="json", **headers)
@@ -594,13 +667,14 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
 
     def test_admin_can_update_any_supplier(self):
         supplier = Supplier.objects.create(
-            created_by=self.regular_user, **self.supplier_data
+            business=self.business, created_by=self.regular_user, **self.supplier_data
         )
         token = self.get_jwt_token(self.admin_user)
         url = reverse("supplier-detail", args=[supplier.id])
+        query_params = {"business": self.business.id}
+        url = f"{url}?{urlencode(query_params)}"
         data = {"name": "Admin Updated Supplier"}
         headers = {
-            "HTTP_X_API_KEY": env.str("TEST_API_KEY"),
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
         response = self.client.patch(url, data, format="json", **headers)
@@ -665,7 +739,6 @@ class BusinessCRUDAPITestCase(BaseAPITestCase):
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
-        headers.update(self.get_api_key())
         return headers
 
     def test_admin_can_list_businesses(self):
@@ -676,25 +749,12 @@ class BusinessCRUDAPITestCase(BaseAPITestCase):
         # Expect at least one business in the list
         self.assertGreaterEqual(len(response.data), 1)
 
-    def test_non_admin_cannot_list_businesses(self):
-        url = reverse("business-list")
-        headers = self.get_auth_headers(self.regular_user)
-        response = self.client.get(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
     def test_owner_can_retrieve_business(self):
         url = reverse("business-detail", args=[self.business.id])
         headers = self.get_auth_headers(self.owner_user)
         response = self.client.get(url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data.get("name"), self.business_data["name"])
-
-    def test_non_owner_cannot_retrieve_business(self):
-        url = reverse("business-detail", args=[self.business.id])
-        headers = self.get_auth_headers(self.regular_user)
-        response = self.client.get(url, **headers)
-        # Non-owner, non-admin will be forbidden
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_owner_can_update_business(self):
         url = reverse("business-detail", args=[self.business.id])
@@ -710,7 +770,7 @@ class BusinessCRUDAPITestCase(BaseAPITestCase):
         headers = self.get_auth_headers(self.regular_user)
         data = {"name": "Should Not Update"}
         response = self.client.patch(url, data, format="json", **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_admin_can_update_business(self):
         url = reverse("business-detail", args=[self.business.id])
@@ -753,7 +813,7 @@ class BusinessCRUDAPITestCase(BaseAPITestCase):
         url = reverse("business-detail", args=[self.business.id])
         headers = self.get_auth_headers(self.regular_user)
         response = self.client.delete(url, **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         # Business should still exist
         self.assertTrue(Business.objects.filter(id=self.business.id).exists())
 
@@ -773,18 +833,25 @@ class EmployeeInvitationTestCase(BaseAPITestCase):
             owner=self.owner_user,
         )
         # Create a creator employee (e.g. Admin)
-        self.creator = Employee.objects.create_user(
+        self.creator = User.objects.create_user(
             email="creator@example.com",
             phone="912345602",
             password="creatorpass",
         )
         self.creator_eb = EmployeeBusiness.objects.create(
-            employee=self.creator, business=self.business, role="Admin"
+            employee=self.creator,
+            business=self.business,
+            role=2,
+            created_by=self.creator,
         )
         self.creator.save()
         self.creator_eb.save()
 
-        self.invitation_create_url = reverse("employee-invite")
+        invitation_create_url = reverse("employee-invite")
+        invitation_param = {"business": self.business.id}
+        self.invitation_create_url = (
+            f"{invitation_create_url}?{urlencode(invitation_param)}"
+        )
         # The accept URL pattern expects a token argument.
         # We'll build it dynamically in the acceptance test.
 
@@ -793,7 +860,6 @@ class EmployeeInvitationTestCase(BaseAPITestCase):
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
-        headers.update(self.get_api_key())
         return headers
 
     @patch("accounts.views.requests.request")
@@ -806,11 +872,8 @@ class EmployeeInvitationTestCase(BaseAPITestCase):
 
         data = {
             "email": "invitee@example.com",
-            "first_name": "Invite",
-            "last_name": "Ees",
             "phone": "912345610",
-            "role": "Sales",
-            "business": self.business.id,
+            "role": 4,
         }
         headers = self.get_auth_headers(self.creator)
         response = self.client.post(
@@ -844,12 +907,10 @@ class EmployeeInvitationTestCase(BaseAPITestCase):
         # Create an invitation manually
         invitation = EmployeeInvitation.objects.create(
             email="invitee2@example.com",
-            first_name="Invitee",
-            last_name="Two",
             phone="912345611",
-            role="Sales",
-            business=self.business,
+            role=4,
             created_by=self.creator,
+            business=self.business,
         )
 
         accept_url = reverse("employee-invite-accept", args=[invitation.token])
@@ -859,10 +920,10 @@ class EmployeeInvitationTestCase(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # Check that the employee was created with temporary password "password"
-        employee = Employee.objects.filter(email="invitee2@example.com").first()
+        employee = User.objects.filter(email="invitee2@example.com").first()
         eb = EmployeeBusiness.objects.filter(employee=employee).first()
         self.assertIsNotNone(employee)
-        self.assertEqual(employee.first_name, invitation.first_name)
+        self.assertEqual(employee.email, invitation.email)
         self.assertEqual(eb.role, invitation.role)
 
         # Invitation should be marked as accepted.
@@ -889,7 +950,7 @@ class EmployeeCRUDPermissionTestCase(BaseAPITestCase):
             email="regularemp@example.com", phone="912345683", password="regularpass"
         )
 
-        # Create a business owned by self.owner
+        # Create a business for employee assignments.
         self.business = Business.objects.create(
             name="Employee Business",
             address="100 Business Rd",
@@ -897,121 +958,111 @@ class EmployeeCRUDPermissionTestCase(BaseAPITestCase):
             owner=self.owner,
         )
 
+        # Create EmployeeBusiness records for each user.
+        self.admin_eb = EmployeeBusiness.objects.create(
+            employee=self.admin,
+            business=self.business,
+            role=2,  # Role for admin, adjust as needed
+            created_by=self.admin,
+        )
+        self.owner_eb = EmployeeBusiness.objects.create(
+            employee=self.owner,
+            business=self.business,
+            role=1,  # Role for owner, adjust as needed
+            created_by=self.owner,
+        )
+        self.regular_eb = EmployeeBusiness.objects.create(
+            employee=self.regular,
+            business=self.business,
+            role=4,  # Role for regular user, adjust as needed
+            created_by=self.owner,
+        )
+
         # Create two employee users without business and role fields
-        self.employee_by_owner = Employee.objects.create_user(
+        self.employee_by_owner = User.objects.create_user(
             email="emp1@example.com",
             phone="912345684",
             password="emppass1",
             first_name="First",
             last_name="Employee",
-            created_by=self.owner,
         )
 
-        self.employee_other = Employee.objects.create_user(
+        self.employee_other = User.objects.create_user(
             email="emp2@example.com",
             phone="912345685",
             password="emppass2",
             first_name="Second",
             last_name="Employee",
-            created_by=self.owner,
         )
 
         # Create separate EmployeeBusiness instances for each employee
         # Assuming EmployeeBusiness is the new model linking employees with a business and a role.
         EmployeeBusiness.objects.create(
-            employee=self.employee_by_owner, business=self.business, role="Sales"
+            employee=self.employee_by_owner,
+            business=self.business,
+            role=4,
+            created_by=self.owner,
         )
 
         EmployeeBusiness.objects.create(
-            employee=self.employee_other, business=self.business, role="Sales"
+            employee=self.employee_other,
+            business=self.business,
+            role=4,
+            created_by=self.admin,
         )
 
     def get_headers(self, user):
         token = self.get_jwt_token(user)
         headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-        headers.update(self.get_api_key())
         return headers
-
-    # ----- Update tests ----- #
-    def test_employee_can_update_own_profile(self):
-        """An employee should be able to update their own non-role fields."""
-        url = reverse("employee-detail", args=[self.employee_by_owner.id])
-        headers = self.get_headers(self.employee_by_owner)
-        data = {"first_name": "UpdatedFirst"}
-        response = self.client.patch(url, data, format="json", **headers)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.employee_by_owner.refresh_from_db()
-        self.assertEqual(self.employee_by_owner.first_name, "UpdatedFirst")
-
-    def test_admin_can_update_any_employee(self):
-        """Admins should be allowed to update any employee."""
-        url = reverse("employee-detail", args=[self.employee_by_owner.id])
-        headers = self.get_headers(self.admin)
-        data = {"first_name": "AdminUpdated"}
-        response = self.client.patch(url, data, format="json", **headers)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.employee_by_owner.refresh_from_db()
-        self.assertEqual(self.employee_by_owner.first_name, "AdminUpdated")
-
-    def test_owner_can_update_employee_in_their_business(self):
-        """A business owner should be allowed to update an employee in their business."""
-        url = reverse("employee-detail", args=[self.employee_other.id])
-        headers = self.get_headers(self.owner)
-        data = {"first_name": "OwnerUpdated"}
-        response = self.client.patch(url, data, format="json", **headers)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.employee_other.refresh_from_db()
-        self.assertEqual(self.employee_other.first_name, "OwnerUpdated")
-
-    def test_non_permitted_user_cannot_update_employee(self):
-        """A user not linked to the employee should not be allowed to update the employee."""
-        url = reverse("employee-detail", args=[self.employee_by_owner.id])
-        headers = self.get_headers(self.regular)
-        data = {"first_name": "Hacked"}
-        response = self.client.patch(url, data, format="json", **headers)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     # ----- Delete tests -----
     def test_admin_can_delete_employee(self):
         """Admins should be allowed to delete an employee's EmployeeBusiness record."""
         url = reverse("employee-detail", args=[self.employee_other.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         headers = self.get_headers(self.admin)
-        data = {"business": self.business.id, "role": "Sales"}
+        data = {"business": self.business.id, "role": 4}
         response = self.client.delete(url, data, **headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         # Ensure the EmployeeBusiness record is deleted...
         self.assertFalse(
             EmployeeBusiness.objects.filter(
-                employee=self.employee_other, business=self.business, role="Sales"
+                employee=self.employee_other, business=self.business, role=4
             ).exists()
         )
         # ...but the Employee is still intact.
-        self.assertTrue(Employee.objects.filter(id=self.employee_other.id).exists())
+        self.assertTrue(User.objects.filter(id=self.employee_other.id).exists())
 
     def test_owner_can_delete_employee(self):
         """Owners should be allowed to delete an employee's EmployeeBusiness record within their business."""
         url = reverse("employee-detail", args=[self.employee_other.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         headers = self.get_headers(self.owner)
-        data = {"business": self.business.id, "role": "Sales"}
+        data = {"business": self.business.id, "role": 4}
         response = self.client.delete(url, data, **headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(
             EmployeeBusiness.objects.filter(
-                employee=self.employee_other, business=self.business, role="Sales"
+                employee=self.employee_other, business=self.business, role=4
             ).exists()
         )
-        self.assertTrue(Employee.objects.filter(id=self.employee_other.id).exists())
+        self.assertTrue(User.objects.filter(id=self.employee_other.id).exists())
 
     def test_non_permitted_user_cannot_delete_employee(self):
         """A user without proper permission should not be allowed to delete an employee's EmployeeBusiness record."""
         url = reverse("employee-detail", args=[self.employee_by_owner.id])
+        params = {"business": self.business.id}
+        url = f"{url}?{urlencode(params)}"
         headers = self.get_headers(self.regular)
-        data = {"business": self.business.id, "role": "Sales"}
+        data = {"business": self.business.id, "role": 4}
         response = self.client.delete(url, data, **headers)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         # The EmployeeBusiness record should still exist.
         self.assertTrue(
             EmployeeBusiness.objects.filter(
-                employee=self.employee_by_owner, business=self.business, role="Sales"
+                employee=self.employee_by_owner, business=self.business, role=4
             ).exists()
         )

@@ -12,7 +12,6 @@ from .models import (
     Supplier,
     Customer,
     Business,
-    Employee,
     EmployeeInvitation,
     EmployeeBusiness,
 )
@@ -156,7 +155,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
-        fields = "__all__"
+        fields = ["id", "name", "email", "phone", "address"]
+
+    def create(self, validated_data):
+        created_by = self.context["request"].user
+        business = self.context["request"].query_params.get("business")
+        try:
+            business = Business.objects.get(id=business)
+        except Business.DoesNotExist:
+            raise serializers.ValidationError("Business does not exist.")
+        if not business:
+            raise serializers.ValidationError("Business query parameter is required.")
+        supplier = Supplier.objects.create(
+            created_by=created_by, business=business, **validated_data
+        )
+        return supplier
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -187,11 +200,11 @@ class EmployeeSerializer(serializers.ModelSerializer):
         queryset=Business.objects.all(), write_only=True, required=False
     )
     role = serializers.ChoiceField(
-        choices=Employee.ROLE_CHOICES, write_only=True, required=False
+        choices=EmployeeBusiness.ROLE_CHOICES, write_only=True, required=False
     )
 
     class Meta:
-        model = Employee
+        model = User
         fields = (
             "id",
             "email",
@@ -199,7 +212,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "last_name",
             "phone",
             "password",
-            "created_by",
             "employee_businesses",
             "business",
             "role",
@@ -211,7 +223,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         # Remove business and role if they accidentally get passed during creation.
         validated_data.pop("business", None)
         validated_data.pop("role", None)
-        employee = Employee(**validated_data)
+        employee = User(**validated_data)
         if password:
             employee.set_password(password)
         employee.save()
@@ -239,4 +251,18 @@ class EmployeeSerializer(serializers.ModelSerializer):
 class EmployeeInvitationSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeInvitation
-        fields = ["email", "first_name", "last_name", "phone", "role", "business"]
+        fields = ["email", "phone", "role"]
+
+    def create(self, validated_data):
+        created_by = self.context["request"].user
+        business = self.context["request"].query_params.get("business")
+        if not business:
+            raise serializers.ValidationError("Business query parameter is required.")
+        try:
+            business = Business.objects.get(id=business)
+        except Business.DoesNotExist:
+            raise serializers.ValidationError("Business does not exist.")
+        invitation = EmployeeInvitation.objects.create(
+            created_by=created_by, business=business, **validated_data
+        )
+        return invitation
