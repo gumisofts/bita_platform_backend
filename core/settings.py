@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     "accounts",
     'file',
     'storages',
-
+    "notification",
 ]
 
 MIDDLEWARE = [
@@ -55,7 +55,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": ["notification.templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -147,12 +147,11 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
 }
 
-EMAIL_USE_SSL = True
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_USE_TLS = True  
+EMAIL_BACKEND = 'django_smtp_ssl.SSLEmailBackend'
 EMAIL_HOST = env("EMAIL_HOST")
 EMAIL_PORT = env("EMAIL_PORT")
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 
 ADMIN = ("Murad", "nuradhussen082@gmail.com")
 

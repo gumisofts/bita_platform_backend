@@ -7,4 +7,6 @@ urlpatterns = [
 
     # file urls
     path("api/", include("file.urls")),
+    # notification-module urls
+    path('api/', include('notification.urls')),  
 ]
