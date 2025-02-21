@@ -6,7 +6,7 @@ urlpatterns = [
     path("", include("accounts.urls")),
 
     # file urls
-    path("api/", include("file.urls")),
+    path("file/", include("file.urls")),
     # notification-module urls
     path('api/', include('notification.urls')),  
 ]
