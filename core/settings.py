@@ -14,6 +14,7 @@ DEBUG = env("DEBUG", False) == "True"
 
 ALLOWED_HOSTS = [
     "localhost",
+    "127.0.0.1"
 ]
 
 
@@ -180,6 +181,9 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_DIST": "SIDECAR",  # shorthand to use the sidecar instead
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     "REDOC_DIST": "SIDECAR",
+    # for binary data upload support
+    'COMPONENT_SPLIT_REQUEST': True,
+
 }
 
 AUTHENTICATION_BACKENDS = [
