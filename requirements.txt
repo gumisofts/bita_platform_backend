@@ -21,6 +21,7 @@ django-filter==24.3
 django-storages==1.14.5
 djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1
+drf-nested-routers==0.94.1
 drf-spectacular==0.28.0
 drf-spectacular-sidecar==2024.12.1
 environs==14.1.0
@@ -59,6 +60,7 @@ sqlparse==0.5.3
 Twisted==24.11.0
 txaio==23.1.1
 typing_extensions==4.12.2
+tzdata==2025.1
 uritemplate==4.1.1
 urllib3==2.3.0
 zope.interface==7.2

@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
 from datetime import timedelta
 
 load_dotenv("config/app.env")
@@ -205,3 +206,46 @@ AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
 }
+
+# Drf-Spectacular Additional Settings
+ITEM_LIST_QUERY_PARAMETERS = [
+    OpenApiParameter(
+        name="category_id",
+        description="Filter by category ID",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="manufacturer_id",
+        description="Filter by manufacturer ID",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="visible",
+        description="Filter by visibility (true/false)",
+        required=False,
+        type=OpenApiTypes.BOOL,
+    ),
+    OpenApiParameter(
+        name="returnable",
+        description="Filter by returnable (true/false)",
+        required=False,
+        type=OpenApiTypes.BOOL,
+    ),
+    OpenApiParameter(
+        name="search",
+        description="Search term",
+        required=False,
+        type=OpenApiTypes.STR,
+    ),
+]
+
+SUPPLY_RESERVATION_LIST_QUERY_PARAMETERS = [
+    OpenApiParameter(
+        name="status",
+        description="Filter by reservation status (active, cancelled, fulfilled)",
+        required=False,
+        type=OpenApiTypes.STR,
+    ),
+]
