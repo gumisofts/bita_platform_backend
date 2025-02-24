@@ -22,16 +22,12 @@ class UploadViewSet(ViewSet):
             saved_file = my_file.save()
             response = {
                 "message": "File uploaded successfully",
-                "stored_as": saved_file.stored_as
+                "stored_as": saved_file.stored_as,
             }
         else:
-            response = {
-                "message": "Invalid request",
-                "errors": my_file.errors
-            }
+            response = {"message": "Invalid request", "errors": my_file.errors}
 
         return Response(response)
-
 
 
 class FileDownloadView(APIView):
@@ -41,7 +37,6 @@ class FileDownloadView(APIView):
     def get(self, request, stored_as):
 
         file_instance = get_object_or_404(FileModel, stored_as=stored_as)
-        
+
         response_data = FileDownloadSerializer(file_instance).data
         return Response(response_data)
-
