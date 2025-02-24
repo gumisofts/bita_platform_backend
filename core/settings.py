@@ -4,6 +4,8 @@ from pathlib import Path
 
 from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
+from datetime import timedelta
 
 load_dotenv()
 load_dotenv(".env.production", override=True)
@@ -13,6 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = env("SECRET_KEY", get_random_secret_key())
 DEBUG = env("DEBUG", False) == "True"
 
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 ALLOWED_HOSTS = env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
@@ -38,6 +41,7 @@ INSTALLED_APPS = [
     "file",
     "storages",
     "notification",
+    "inventory",
 ]
 
 MIDDLEWARE = [
@@ -201,19 +205,53 @@ AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
 
 # S3 Storage Configuration
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
-AWS_S3_OBJECT_PARAMETERS = {
-    "CacheControl": "max-age=86400",
-}
-
-
-# AWS Credentials
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
-AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
-
-# S3 Storage Configuration
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
 }
+
+    "CacheControl": "max-age=86400",
+}
+
+# Drf-Spectacular Additional Settings
+ITEM_LIST_QUERY_PARAMETERS = [
+    OpenApiParameter(
+        name="category_id",
+        description="Filter by category ID",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="manufacturer_id",
+        description="Filter by manufacturer ID",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="visible",
+        description="Filter by visibility (true/false)",
+        required=False,
+        type=OpenApiTypes.BOOL,
+    ),
+    OpenApiParameter(
+        name="returnable",
+        description="Filter by returnable (true/false)",
+        required=False,
+        type=OpenApiTypes.BOOL,
+    ),
+    OpenApiParameter(
+        name="search",
+        description="Search term",
+        required=False,
+        type=OpenApiTypes.STR,
+    ),
+]
+
+SUPPLY_RESERVATION_LIST_QUERY_PARAMETERS = [
+    OpenApiParameter(
+        name="status",
+        description="Filter by reservation status (active, cancelled, fulfilled)",
+        required=False,
+        type=OpenApiTypes.STR,
+    ),
+]
