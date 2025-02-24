@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
 from datetime import timedelta
 
 load_dotenv("config/app.env")
@@ -12,10 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG", False) == "True"
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1"
-]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -36,9 +34,10 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
     "accounts",
-    'file',
-    'storages',
+    "file",
+    "storages",
     "notification",
+    "inventory",
 ]
 
 MIDDLEWARE = [
@@ -148,8 +147,8 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
 }
 
-EMAIL_USE_TLS = True  
-EMAIL_BACKEND = 'django_smtp_ssl.SSLEmailBackend'
+EMAIL_USE_TLS = True
+EMAIL_BACKEND = "django_smtp_ssl.SSLEmailBackend"
 EMAIL_HOST = env("EMAIL_HOST")
 EMAIL_PORT = env("EMAIL_PORT")
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
@@ -182,8 +181,7 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     "REDOC_DIST": "SIDECAR",
     # for binary data upload support
-    'COMPONENT_SPLIT_REQUEST': True,
-
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 AUTHENTICATION_BACKENDS = [
@@ -198,13 +196,56 @@ NOTIFICATION_API_KEY = ""
 
 
 # AWS Credentials
-AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
-AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
 
 # S3 Storage Configuration
-AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 AWS_S3_OBJECT_PARAMETERS = {
-    'CacheControl': 'max-age=86400', 
+    "CacheControl": "max-age=86400",
 }
+
+# Drf-Spectacular Additional Settings
+ITEM_LIST_QUERY_PARAMETERS = [
+    OpenApiParameter(
+        name="category_id",
+        description="Filter by category ID",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="manufacturer_id",
+        description="Filter by manufacturer ID",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="visible",
+        description="Filter by visibility (true/false)",
+        required=False,
+        type=OpenApiTypes.BOOL,
+    ),
+    OpenApiParameter(
+        name="returnable",
+        description="Filter by returnable (true/false)",
+        required=False,
+        type=OpenApiTypes.BOOL,
+    ),
+    OpenApiParameter(
+        name="search",
+        description="Search term",
+        required=False,
+        type=OpenApiTypes.STR,
+    ),
+]
+
+SUPPLY_RESERVATION_LIST_QUERY_PARAMETERS = [
+    OpenApiParameter(
+        name="status",
+        description="Filter by reservation status (active, cancelled, fulfilled)",
+        required=False,
+        type=OpenApiTypes.STR,
+    ),
+]
