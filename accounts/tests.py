@@ -2,8 +2,6 @@ from urllib.parse import urlencode
 from environs import Env
 from rest_framework import status
 from rest_framework.test import APITestCase
-from django.urls import reverse
-from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import (
     EmployeeBusiness,
@@ -186,9 +184,9 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         self.assertTrue(self.regular_user.check_password("newpass123"))
 
     def test_password_reset_confirm(self):
-        from django.utils.http import urlsafe_base64_encode
-        from django.utils.encoding import force_bytes
         from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
 
         uid = urlsafe_base64_encode(force_bytes(self.regular_user.pk))
         token = default_token_generator.make_token(self.regular_user)

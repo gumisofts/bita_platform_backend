@@ -1,12 +1,13 @@
 import json
+
 import requests
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.tokens import default_token_generator
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from rest_framework import serializers
 from django.core.mail import send_mail
-from django.conf import settings
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
     Supplier,
@@ -18,9 +19,6 @@ from .models import (
 
 
 User = get_user_model()
-
-email_url = settings.EMAIL_URL
-notification_api_key = settings.NOTIFICATION_API_KEY
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -200,7 +198,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
         queryset=Business.objects.all(), write_only=True, required=False
     )
     role = serializers.ChoiceField(
-        choices=EmployeeBusiness.ROLE_CHOICES, write_only=True, required=False
+        choices=EmployeeBusiness.ROLE_CHOICES,
+        write_only=True,
+        required=False,
+        choices=EmployeeBusiness.ROLE_CHOICES,
+        write_only=True,
+        required=False,
     )
 
     class Meta:

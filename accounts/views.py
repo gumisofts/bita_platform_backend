@@ -3,7 +3,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import update_session_auth_hash
 from rest_framework import generics, status, viewsets
 from rest_framework.exceptions import MethodNotAllowed
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
 from .serializers import (
     PasswordResetSerializer,

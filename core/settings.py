@@ -1,25 +1,24 @@
-from pathlib import Path
 import os
-from dotenv import load_dotenv
 from datetime import timedelta
+from pathlib import Path
 
-load_dotenv("config/app.env")
-load_dotenv("config/.env")
+from django.core.management.utils import get_random_secret_key
+from dotenv import load_dotenv
+
 load_dotenv()
+load_dotenv(".env.production", override=True)
 env = os.getenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = env("SECRET_KEY")
+SECRET_KEY = env("SECRET_KEY", get_random_secret_key())
 DEBUG = env("DEBUG", False) == "True"
 
-ALLOWED_HOSTS = [
-    "localhost",
-]
+ALLOWED_HOSTS = env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 
 # Application definition
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
 AUTH_USER_MODEL = "accounts.User"
 INSTALLED_APPS = [
@@ -75,13 +74,13 @@ ASGI_APPLICATION = "core.asgi.app"
 DATABASES = {
     "prod": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("POSTGRES_DB", "dev"),
-        "USER": env("POSTGRES_USER", "dev"),
-        "PASSWORD": env("POSTGRES_PASSWORD", "developer@123"),
-        "HOST": env("POSTGRES_HOST", "localhost"),
-        "PORT": env("POSTGRES_PORT", "5432"),
+        "NAME": env("PG_DB_NAME", "dev"),
+        "USER": env("PG_USER", "dev"),
+        "PASSWORD": env("PG_PASSWORD", "developer@123"),
+        "HOST": env("PG_HOST", "localhost"),
+        "PORT": env("PG_PORT", "5432"),
         "CONN_MAX_AGE": None,
-        "OPTIONS": {"sslmode": env("POSTGRES_SSL_MODE")},
+        "OPTIONS": {"sslmode": env("PG_SSL_MODE")},
     },
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -133,7 +132,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -185,7 +183,6 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-# EMAIL_URL = env("NOTIFICATION_API_URL") + "/api/send-single-email/"
 # TODO Remove these
 EMAIL_URL = ""
 NOTIFICATION_API_KEY = ""
