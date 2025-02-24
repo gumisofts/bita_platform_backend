@@ -5,9 +5,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.core.mail import EmailMessage
 from django.conf import settings
+from .spectacular_schemas import send_email_schema
+
 
 
 @csrf_exempt
+@send_email_schema
 @api_view(('POST',))
 def send_single_email(request):
     try:
