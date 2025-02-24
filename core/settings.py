@@ -14,6 +14,7 @@ SECRET_KEY = env("SECRET_KEY", get_random_secret_key())
 DEBUG = env("DEBUG", False) == "True"
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -34,6 +35,9 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
     "accounts",
+    "file",
+    "storages",
+    "notification",
 ]
 
 MIDDLEWARE = [
@@ -51,7 +55,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": ["notification.templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -142,12 +146,11 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
 }
 
-EMAIL_USE_SSL = True
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_USE_TLS = True
+EMAIL_BACKEND = "django_smtp_ssl.SSLEmailBackend"
 EMAIL_HOST = env("EMAIL_HOST")
 EMAIL_PORT = env("EMAIL_PORT")
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 
 ADMIN = ("Murad", "nuradhussen082@gmail.com")
 
@@ -176,6 +179,8 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_DIST": "SIDECAR",  # shorthand to use the sidecar instead
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     "REDOC_DIST": "SIDECAR",
+    # for binary data upload support
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 AUTHENTICATION_BACKENDS = [
@@ -186,3 +191,29 @@ AUTHENTICATION_BACKENDS = [
 # TODO Remove these
 EMAIL_URL = ""
 NOTIFICATION_API_KEY = ""
+
+
+# AWS Credentials
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
+
+# S3 Storage Configuration
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400",
+}
+
+
+# AWS Credentials
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
+
+# S3 Storage Configuration
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400",
+}
