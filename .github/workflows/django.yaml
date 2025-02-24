@@ -1,0 +1,70 @@
+name: BITA CI
+on:
+  push:
+    branches: ["main", "dev-v01", "v01"]
+  pull_request:
+    branches: ["main", "dev-v01", "v01"]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      pg:
+        image: postgres:alpine
+        ports:
+          - 5432:5432
+        volumes:
+          - pg_data:/var/lib/postgresql/data
+        env:
+          POSTGRES_PASSWORD: ${{secrets.PG_PASSWORD}}
+          POSTGRES_ROOT_PASSWORD: ${{secrets.PG_PASSWORD}}
+          POSTGRES_USER: ${{vars.PG_USER}}
+          POSTGRES_DB: ${{vars.PG_DB_NAME}}
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Format with black
+        run: |
+          pip install black
+          black --check .
+      - name: Lint with flake8
+        run: |
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Sort imports
+        run: |
+          pip install isort
+          isort .
+          isort --check --diff .
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Set up environment variables
+        run: |
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+          echo "PG_DB_NAME=${{ vars.PG_DB_NAME }}" >> .env
+          echo "PG_USER=${{ vars.PG_USER }}" >> .env
+          echo "PG_PASSWORD=${{ secrets.PG_PASSWORD }}" >> .env
+          echo "PG_HOST=${{ vars.PG_HOST }}" >> app.env
+          echo "PG_PORT=${{ vars.PG_PORT }}" >> app.env
+          echo "REDIS_HOST=${{ vars.REDIS_HOST }}" >> .env
+          echo "REDIS_PORT=${{ vars.REDIS_PORT }}" >> .env
+          echo "EMAIL_HOST=${{ vars.EMAIL_HOST }}" >> .env
+          echo "EMAIL_PORT=${{ vars.EMAIL_PORT }}" >> .env
+          echo "EMAIL_HOST_USER=${{ vars.EMAIL_HOST_USER }}" >> .env
+      - name: Run Tests
+        run: |
+          python manage.py test
