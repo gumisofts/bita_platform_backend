@@ -1,13 +1,9 @@
 from django.core.files import File
-from drf_spectacular.utils import (
-    extend_schema,
-    OpenApiTypes,
-    OpenApiParameter,
-    OpenApiResponse,
-    OpenApiExample,
-)
-from .serializers import FileUploadSerializer
+from drf_spectacular.utils import (OpenApiExample, OpenApiParameter,
+                                   OpenApiResponse, OpenApiTypes,
+                                   extend_schema)
 
+from .serializers import FileUploadSerializer
 
 file_upload_schema = extend_schema(
     summary="Upload a file",

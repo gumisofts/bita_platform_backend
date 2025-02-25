@@ -1,14 +1,15 @@
-from django.shortcuts import render
-from rest_framework.viewsets import ViewSet
-from rest_framework.response import Response
-from .serializers import FileUploadSerializer, FileDownloadSerializer
-from rest_framework.parsers import MultiPartParser, FormParser
-from .models import FileModel
-from django.shortcuts import get_object_or_404
-from django.http import FileResponse
-from rest_framework.views import APIView
 import os
-from .spectacular_schemas import file_upload_schema, file_download_schema
+
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404, render
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import ViewSet
+
+from .models import FileModel
+from .serializers import FileDownloadSerializer, FileUploadSerializer
+from .spectacular_schemas import file_download_schema, file_upload_schema
 
 
 class UploadViewSet(ViewSet):

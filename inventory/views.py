@@ -1,32 +1,17 @@
-from django.shortcuts import render
 from django.conf import settings
-from django.db.models.aggregates import Count
 from django.contrib.postgres.search import TrigramSimilarity
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
+from django.db.models.aggregates import Count
+from django.shortcuts import render
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from .models import (
-    Category,
-    Item,
-    Location,
-    Supply,
-    Store,
-    StockMovement,
-    ReturnRecall,
-    ItemImage,
-    SupplyReservation,
-)
-from .serializers import (
-    CategorySerializer,
-    ItemSerializer,
-    SupplySerializer,
-    StoreSerializer,
-    LocationSerializer,
-    StockMovementSerializer,
-    ReturnRecallSerializer,
-    ItemImageSerializer,
-    SupplyReservationSerializer,
-)
+from .models import (Category, Item, ItemImage, Location, ReturnRecall,
+                     StockMovement, Store, Supply, SupplyReservation)
+from .serializers import (CategorySerializer, ItemImageSerializer,
+                          ItemSerializer, LocationSerializer,
+                          ReturnRecallSerializer, StockMovementSerializer,
+                          StoreSerializer, SupplyReservationSerializer,
+                          SupplySerializer)
 
 # Create your views here.
 

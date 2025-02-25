@@ -1,47 +1,32 @@
 import json
-from django.contrib.auth import get_user_model
-from django.contrib.auth import update_session_auth_hash
+
+import requests
+from django.conf import settings
+from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.contrib.auth.tokens import default_token_generator
+from django.shortcuts import render
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from drf_spectacular.utils import (OpenApiExample, extend_schema,
+                                   extend_schema_view)
 from rest_framework import generics, status, viewsets
+from rest_framework.exceptions import ParseError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
-from .serializers import (
-    PasswordResetSerializer,
-    SetNewPasswordSerializer,
-    PasswordChangeSerializer,
-    UserSerializer,
-    CustomTokenObtainPairSerializer,
-    SupplierSerializer,
-    CustomerSerializer,
-    BusinessSerializer,
-    EmployeeSerializer,
-)
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode
-from .permissions import (
-    hasBusinessPermission,
-    hasCustomerPermission,
-    hasEmployeeInvitePermission,
-    hasSupplierPermission,
-    hasUserPermission,
-    hasEmployeePermission,
-)
-from .models import EmployeeBusiness, Supplier, Customer, Business
-from django.shortcuts import render
-import requests
-from django.conf import settings
-from .models import EmployeeInvitation
-from .serializers import (
-    EmployeeInvitationSerializer,
-)
-from drf_spectacular.utils import (
-    extend_schema,
-    extend_schema_view,
-    OpenApiExample,
-)
-from rest_framework.exceptions import ParseError
+
+from .models import (Business, Customer, EmployeeBusiness, EmployeeInvitation,
+                     Supplier)
+from .permissions import (hasBusinessPermission, hasCustomerPermission,
+                          hasEmployeeInvitePermission, hasEmployeePermission,
+                          hasSupplierPermission, hasUserPermission)
+from .serializers import (BusinessSerializer, CustomerSerializer,
+                          CustomTokenObtainPairSerializer,
+                          EmployeeInvitationSerializer, EmployeeSerializer,
+                          PasswordChangeSerializer, PasswordResetSerializer,
+                          SetNewPasswordSerializer, SupplierSerializer,
+                          UserSerializer)
 
 User = get_user_model()
 

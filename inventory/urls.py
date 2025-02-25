@@ -1,8 +1,9 @@
-from rest_framework.routers import DefaultRouter
-from . import views
 from django.urls import path
-from rest_framework_nested import routers
 from django.urls.conf import include
+from rest_framework.routers import DefaultRouter
+from rest_framework_nested import routers
+
+from . import views
 
 router = DefaultRouter()
 router.register("items", views.ItemViewSet, basename="items")

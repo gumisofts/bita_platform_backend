@@ -1,6 +1,7 @@
-from rest_framework.serializers import FileField, ModelSerializer
-from .models import FileModel
 from rest_framework import serializers
+from rest_framework.serializers import FileField, ModelSerializer
+
+from .models import FileModel
 
 
 class FileDownloadSerializer(serializers.Serializer):

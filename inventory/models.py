@@ -1,9 +1,10 @@
-from django.db import models
-from django.core.validators import MinValueValidator
 import enum
-from django.utils.translation import gettext as _
-from django.core.exceptions import ValidationError
+
 import requests
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
+from django.db import models
+from django.utils.translation import gettext as _
 
 
 # Create your models here.

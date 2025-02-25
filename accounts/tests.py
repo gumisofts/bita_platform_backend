@@ -1,20 +1,16 @@
+import json
+from unittest.mock import patch
 from urllib.parse import urlencode
-from django.urls import reverse
+
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from environs import Env
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import (
-    EmployeeBusiness,
-    Supplier,
-    Customer,
-    Business,
-    EmployeeInvitation,
-)
-import json
-from unittest.mock import patch
 
+from .models import (Business, Customer, EmployeeBusiness, EmployeeInvitation,
+                     Supplier)
 
 env = Env()
 env.read_env()

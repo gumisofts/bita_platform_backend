@@ -1,11 +1,11 @@
-from django.db import models
-import uuid, os
-from django.utils.timezone import now
-from storages.backends.s3boto3 import S3Boto3Storage
+import logging
+import os
+import uuid
 from io import BytesIO
 
-
-import logging
+from django.db import models
+from django.utils.timezone import now
+from storages.backends.s3boto3 import S3Boto3Storage
 
 logger = logging.getLogger(__name__)
 
@@ -84,10 +84,11 @@ class FileModel(models.Model):
             )  # Save only these fields
 
     def generate_image_versions(self):
-        from PIL import Image
-        from django.core.files.base import ContentFile
         import io
+
         import requests
+        from django.core.files.base import ContentFile
+        from PIL import Image
 
         # Read the image from S3
         response = requests.get(self.file.url, stream=True)

@@ -1,16 +1,11 @@
 from decimal import Decimal
+
 from django.urls import reverse
-from rest_framework.test import APITestCase
 from rest_framework import status
-from .models import (
-    Category,
-    Manufacturer,
-    Location,
-    Store,
-    Item,
-    Supply,
-    SupplyReservation,
-)
+from rest_framework.test import APITestCase
+
+from .models import (Category, Item, Location, Manufacturer, Store, Supply,
+                     SupplyReservation)
 
 
 class TestItemViewSet(APITestCase):
