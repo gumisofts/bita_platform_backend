@@ -27,18 +27,17 @@ jobs:
       pg:
         image: postgres:alpine
         ports:
-          - ${{ env.PG_PORT }}:5432
+          - 5432:5432
         volumes:
           - pg_data:/var/lib/postgresql/data
         env:
           POSTGRES_PASSWORD: ${{ env.PG_PASSWORD }}
-          POSTGRES_ROOT_PASSWORD: ${{ env.PG_PASSWORD }}
           POSTGRES_USER: ${{ env.PG_USER }}
           POSTGRES_DB: ${{ env.PG_DB_NAME }}
       redis:
         image: redis:alpine
         ports:
-          - ${{ env.REDIS_PORT }}:6379
+          - 6379:6379
         options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
     strategy:
       max-parallel: 4
@@ -62,7 +61,6 @@ jobs:
       - name: Sort imports
         run: |
           pip install isort
-          isort .
           isort --check --diff .
       - name: Install Dependencies
         run: |
