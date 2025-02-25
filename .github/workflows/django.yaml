@@ -27,18 +27,18 @@ jobs:
       pg:
         image: postgres:alpine
         ports:
-          - $PG_PORT:5432
+          - ${{ envs.PG_PORT }}:5432
         volumes:
           - pg_data:/var/lib/postgresql/data
         env:
-          POSTGRES_PASSWORD: $PG_PASSWORD
-          POSTGRES_ROOT_PASSWORD: $PG_PASSWORD
-          POSTGRES_USER: $PG_USER
-          POSTGRES_DB: $PG_DB_NAME
+          POSTGRES_PASSWORD: ${{ envs.PG_PASSWORD }}
+          POSTGRES_ROOT_PASSWORD: ${{ envs.PG_PASSWORD }}
+          POSTGRES_USER: ${{ envs.PG_USER }}
+          POSTGRES_DB: ${{ envs.PG_DB_NAME }}
       redis:
         image: redis:alpine
         ports:
-          - $REDIS_PORT:6379
+          - ${{ envs.REDIS_PORT }}:6379
         options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
     strategy:
       max-parallel: 4
