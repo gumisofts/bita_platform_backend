@@ -8,7 +8,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("accounts", "0011_remove_employee_business_remove_employee_role_and_more"),
+        (
+            "accounts",
+            "0011_remove_employee_business_remove_employee_role_and_more",
+        ),
     ]
 
     operations = [
@@ -16,7 +19,8 @@ class Migration(migrations.Migration):
             model_name="employeebusiness",
             name="employee",
             field=models.ForeignKey(
-                on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL
+                on_delete=django.db.models.deletion.CASCADE,
+                to=settings.AUTH_USER_MODEL,
             ),
         ),
         migrations.RemoveField(
@@ -30,7 +34,9 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="employeebusiness",
             name="role",
-            field=models.IntegerField(choices=[(1, 1), (2, 2), (3, 3), (4, 4)]),
+            field=models.IntegerField(
+                choices=[(1, 1), (2, 2), (3, 3), (4, 4)],
+            ),
         ),
         migrations.AlterField(
             model_name="employeeinvitation",

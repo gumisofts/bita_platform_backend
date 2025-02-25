@@ -1,12 +1,5 @@
 from rest_framework.permissions import BasePermission
 from .models import Business, EmployeeBusiness
-from rest_framework.permissions import SAFE_METHODS
-
-
-# if self.action == "list":
-#             self.permission_classes = [IsAuthenticated, IsAdminUser]
-#         elif self.action in ["retrieve", "update", "partial_update", "destroy"]:
-#             self.permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
 
 class hasUserPermission(BasePermission):
@@ -73,7 +66,10 @@ class hasEmployeePermission(BasePermission):
     def has_object_permission(self, request, view, obj):
         business = request.query_params.get("business")
         try:
-            target_eb = EmployeeBusiness.objects.get(employee=obj, business=business)
+            target_eb = EmployeeBusiness.objects.get(
+                employee=obj,
+                business=business,
+            )
             requester_eb = EmployeeBusiness.objects.get(
                 employee=request.user, business=business
             )

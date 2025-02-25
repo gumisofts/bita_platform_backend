@@ -2,8 +2,7 @@ import json
 from django.contrib.auth import get_user_model
 from django.contrib.auth import update_session_auth_hash
 from rest_framework import generics, status, viewsets
-from rest_framework.exceptions import MethodNotAllowed
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
@@ -21,7 +20,6 @@ from .serializers import (
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from .permissions import (
     hasBusinessPermission,
     hasCustomerPermission,
@@ -30,16 +28,19 @@ from .permissions import (
     hasUserPermission,
     hasEmployeePermission,
 )
-from .models import EmployeeBusiness, User, Supplier, Customer, Business
+from .models import EmployeeBusiness, Supplier, Customer, Business
 from django.shortcuts import render
-from rest_framework_simplejwt.tokens import AccessToken
 import requests
 from django.conf import settings
 from .models import EmployeeInvitation
 from .serializers import (
     EmployeeInvitationSerializer,
-)  # create one for invitation if needed
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample
+)
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiExample,
+)
 from rest_framework.exceptions import ParseError
 
 User = get_user_model()
@@ -73,7 +74,8 @@ User = get_user_model()
     ),
     retrieve=extend_schema(
         summary="Retrieve User",
-        description="Retrieve a single user by its ID. (Admin or the user queried)",
+        description="Retrieve a single user by its ID. \
+            (Admin or the user queried)",
     ),
     update=extend_schema(
         summary="Update User",
@@ -175,7 +177,8 @@ class PasswordChangeView(generics.UpdateAPIView):
 @extend_schema_view(
     post=extend_schema(
         summary="Login",
-        description="Obtain a new access token by exchanging username and password.",
+        description="Obtain a new access token by \
+            exchanging username and password.",
     ),
 )
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -189,7 +192,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     ),
     retrieve=extend_schema(
         summary="Retrieve Supplier",
-        description="Retrieve a single supplier by its ID. (Admin or the supplier queried)",
+        description="Retrieve a single supplier by its ID. \
+            (Admin or the supplier queried)",
     ),
     create=extend_schema(
         summary="Create Supplier",
@@ -227,7 +231,8 @@ class SupplierViewSet(viewsets.ModelViewSet):
     ),
     retrieve=extend_schema(
         summary="Retrieve Customer",
-        description="Retrieve a single customer by its ID. (Admin or the customer queried)",
+        description="Retrieve a single customer by its ID. \
+            (Admin or the customer queried)",
     ),
     create=extend_schema(
         summary="Create Customer",
@@ -265,7 +270,8 @@ class CustomerViewSet(viewsets.ModelViewSet):
     ),
     retrieve=extend_schema(
         summary="Retrieve Business",
-        description="Retrieve a single business by its ID. (Admin or the business owner queried)",
+        description="Retrieve a single business by its ID. \
+            (Admin or the business owner queried)",
     ),
     create=extend_schema(
         summary="Create Business",
@@ -302,7 +308,8 @@ class BusinessViewSet(viewsets.ModelViewSet):
     ),
     retrieve=extend_schema(
         summary="Retrieve Employee",
-        description="Retrieve a single employee by its ID. (Admin, business owner or the employee queried)",
+        description="Retrieve a single employee by its ID. \
+            (Admin, business owner or the employee queried)",
     ),
     update=extend_schema(
         summary="Update Employee", description="Update an employee completely."
@@ -313,7 +320,8 @@ class BusinessViewSet(viewsets.ModelViewSet):
     ),
     destroy=extend_schema(
         summary="Delete Employee Business Record",
-        description="Delete the EmployeeBusiness record for the employee using the provided business and role.",
+        description="Delete the EmployeeBusiness record for the \
+            employee using the provided business and role.",
     ),
 )
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -357,7 +365,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if "employee_businesses" in request.data:
             return Response(
                 {
-                    "detail": "Updating multiple businesses and roles directly is not allowed. Please use business and role fields."
+                    "detail": "Updating multiple businesses and roles \
+                        directly is not allowed. Please use \
+                        business and role fields."
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -367,7 +377,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if "employee_businesses" in request.data:
             return Response(
                 {
-                    "detail": "Updating multiple businesses and roles directly is not allowed. Please use business and role fields."
+                    "detail": "Updating multiple businesses and roles \
+                        directly is not allowed. Please use business \
+                        and role fields."
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -411,7 +423,8 @@ class JWTTokenVerifyView(TokenVerifyView):
 @extend_schema_view(
     post=extend_schema(
         summary="Employee Invitation Create",
-        description="Create an invitation for an employee and send an invitation email.",
+        description="Create an invitation for an employee \
+            and send an invitation email.",
     )
 )
 class EmployeeInvitationCreateView(generics.CreateAPIView):
@@ -426,14 +439,17 @@ class EmployeeInvitationCreateView(generics.CreateAPIView):
         invitation = serializer.save()
         # Construct the acceptance URL. Adjust BASE_URL as appropriate.
         request = self.request
-        acceptance_link = f"{request.scheme}://{request.get_host()}/employee/invite/accept/{invitation.token}/"
+        acceptance_link = f"""
+                    {request.scheme}://{request.get_host()}/employee/invite/accept/{invitation.token}/
+                    """
         # Send invitation email via NOTIFICATION_API.
         email_url = settings.EMAIL_URL
         notification_api_key = settings.NOTIFICATION_API_KEY
         payload = json.dumps(
             {
                 "subject": "You're Invited to Join as an Employee",
-                "message": f"Please click the following link to accept your invitation: {acceptance_link}",
+                "message": f"Please click the following link \
+                    to accept your invitation: {acceptance_link}",
                 "recipients": invitation.email,
             }
         )
@@ -441,18 +457,20 @@ class EmployeeInvitationCreateView(generics.CreateAPIView):
             "Authorization": f"Api-Key {notification_api_key}",
             "Content-Type": "application/json",
         }
-        response = requests.request("POST", email_url, headers=headers, data=payload)
+        requests.request("POST", email_url, headers=headers, data=payload)
 
 
 @extend_schema_view(
     post=extend_schema(
         summary="Employee Invitation Accept",
-        description="Accept an invitation to become an employee immediately when the invitation link is clicked.",
+        description="Accept an invitation to become an employee immediately \
+            when the invitation link is clicked.",
     )
 )
 class EmployeeInvitationAcceptView(generics.GenericAPIView):
     """
-    Accepts an invitation to become an employee immediately when the invitation link is clicked.
+    Accepts an invitation to become an employee immediately
+    when the invitation link is clicked.
     Processes the invitation via a GET request and returns a JSON response.
     """
 
@@ -460,7 +478,10 @@ class EmployeeInvitationAcceptView(generics.GenericAPIView):
 
     def post(self, request, token):
         try:
-            invitation = EmployeeInvitation.objects.get(token=token, accepted=False)
+            invitation = EmployeeInvitation.objects.get(
+                token=token,
+                accepted=False,
+            )
         except EmployeeInvitation.DoesNotExist:
             return Response(
                 {"detail": "Invalid or expired invitation token."},
@@ -471,7 +492,8 @@ class EmployeeInvitationAcceptView(generics.GenericAPIView):
         if User.objects.filter(email=invitation.email).exists():
             employee = User.objects.get(email=invitation.email)
         else:
-            # Create the employee using invitation data with a temporary password.
+            # Create the employee using invitation data
+            # with a temporary password.
             employee = User.objects.create_user(
                 email=invitation.email,
                 phone=invitation.phone,
@@ -495,7 +517,8 @@ class EmployeeInvitationAcceptView(generics.GenericAPIView):
             {
                 "subject": "Welcome Aboard!",
                 "message": (
-                    "Congratulations on joining our team. Your default password is 'password'. "
+                    "Congratulations on joining our team. \
+                    Your default password is 'password'. "
                     "Please change it after logging in."
                 ),
                 "recipients": invitation.email,

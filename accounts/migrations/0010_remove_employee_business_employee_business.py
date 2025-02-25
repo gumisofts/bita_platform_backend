@@ -6,7 +6,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("accounts", "0009_alter_employee_options_alter_user_options_and_more"),
+        (
+            "accounts",
+            "0009_alter_employee_options_alter_user_options_and_more",
+        ),
     ]
 
     operations = [

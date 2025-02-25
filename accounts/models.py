@@ -18,13 +18,14 @@ class TimeStampedModel(models.Model):
 
 class User(TimeStampedModel, AbstractUser):
     username = None
-    email = models.EmailField(unique=True, blank=True)  # Overriden to make it unique
+    email = models.EmailField(unique=True, blank=True)
     phone = models.CharField(
         max_length=15,
         validators=[
             RegexValidator(
                 regex=r"^(9|7)\d{8}$",
-                message="Phone number must be entered in the format: '912345678 / 712345678'. Up to 9 digits allowed.",
+                message="Phone number must be entered in the format: \
+                    '912345678 / 712345678'. Up to 9 digits allowed.",
             )
         ],
         unique=True,
@@ -62,7 +63,8 @@ class Supplier(TimeStampedModel):
         validators=[
             RegexValidator(
                 regex=r"^(9|7)\d{8}$",
-                message="Phone number must be entered in the format: '912345678 / 712345678'. Up to 9 digits allowed.",
+                message="Phone number must be entered in the format: \
+                    '912345678 / 712345678'. Up to 9 digits allowed.",
             )
         ],
     )
@@ -95,7 +97,8 @@ class Customer(TimeStampedModel):
         validators=[
             RegexValidator(
                 regex=r"^(9|7)\d{8}$",
-                message="Phone number must be entered in the format: '912345678 / 712345678'. Up to 9 digits allowed.",
+                message="Phone number must be entered in the format: \
+                    '912345678 / 712345678'. Up to 9 digits allowed.",
             )
         ],
     )
@@ -151,7 +154,9 @@ class EmployeeInvitation(TimeStampedModel):
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     email = models.EmailField()
     phone = models.CharField(max_length=15)
-    role = models.CharField(max_length=10, choices=EmployeeBusiness.ROLE_CHOICES)
+    role = models.IntegerField(
+        choices=EmployeeBusiness.ROLE_CHOICES,
+    )
     created_by = models.ForeignKey(
         User,
         on_delete=models.CASCADE,

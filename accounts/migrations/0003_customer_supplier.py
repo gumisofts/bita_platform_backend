@@ -31,7 +31,10 @@ class Migration(migrations.Migration):
                         max_length=15,
                         validators=[
                             django.core.validators.RegexValidator(
-                                message="Phone number must be entered in the format: '912345678 / 712345678'. Up to 9 digits allowed.",
+                                message="Phone number must be \
+                                    entered in the format: \
+                                    '912345678 / 712345678'. \
+                                    Up to 9 digits allowed.",
                                 regex="^(9|7)\\d{8}$",
                             )
                         ],
@@ -60,7 +63,10 @@ class Migration(migrations.Migration):
                         max_length=15,
                         validators=[
                             django.core.validators.RegexValidator(
-                                message="Phone number must be entered in the format: '912345678 / 712345678'. Up to 9 digits allowed.",
+                                message="Phone number must be \
+                                    entered in the format: \
+                                    '912345678 / 712345678'. \
+                                    Up to 9 digits allowed.",
                                 regex="^(9|7)\\d{8}$",
                             )
                         ],

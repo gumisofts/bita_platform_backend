@@ -1,11 +1,12 @@
 from urllib.parse import urlencode
+from django.urls import reverse
+from django.contrib.auth import get_user_model
 from environs import Env
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import (
     EmployeeBusiness,
-    User,
     Supplier,
     Customer,
     Business,
@@ -72,7 +73,11 @@ class UserCRUDAPITestCase(BaseAPITestCase):
         token = self.get_jwt_token(self.regular_user)
         url = reverse("user-detail", args=[self.regular_user.id])
         headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-        response = self.client.patch(url, {"email": "newemail@example.com"}, **headers)
+        response = self.client.patch(
+            url,
+            {"email": "newemail@example.com"},
+            **headers,
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.regular_user.refresh_from_db()
         self.assertEqual(self.regular_user.email, "newemail@example.com")
@@ -267,7 +272,12 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
-        response = self.client.post(url, self.supplier_data, format="json", **headers)
+        response = self.client.post(
+            url,
+            self.supplier_data,
+            format="json",
+            **headers,
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Supplier.objects.count(), 1)
 
@@ -284,7 +294,10 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_retrieve_supplier(self):
         token = self.get_jwt_token(self.admin_user)
-        supplier = Supplier.objects.create(business=self.business, **self.supplier_data)
+        supplier = Supplier.objects.create(
+            business=self.business,
+            **self.supplier_data,
+        )
         url = reverse("supplier-detail", args=[supplier.id])
         query_params = {"business": self.business.id}
         url = f"{url}?{urlencode(query_params)}"
@@ -296,7 +309,10 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_update_supplier(self):
         token = self.get_jwt_token(self.admin_user)
-        supplier = Supplier.objects.create(business=self.business, **self.supplier_data)
+        supplier = Supplier.objects.create(
+            business=self.business,
+            **self.supplier_data,
+        )
         url = reverse("supplier-detail", args=[supplier.id])
         query_params = {"business": self.business.id}
         url = f"{url}?{urlencode(query_params)}"
@@ -316,7 +332,10 @@ class SupplierCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_delete_supplier(self):
         token = self.get_jwt_token(self.admin_user)
-        supplier = Supplier.objects.create(business=self.business, **self.supplier_data)
+        supplier = Supplier.objects.create(
+            business=self.business,
+            **self.supplier_data,
+        )
         url = reverse("supplier-detail", args=[supplier.id])
         query_params = {"business": self.business.id}
         url = f"{url}?{urlencode(query_params)}"
@@ -417,7 +436,12 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
         headers = {
             "HTTP_AUTHORIZATION": f"Bearer {token}",
         }
-        response = self.client.post(url, self.customer_data, format="json", **headers)
+        response = self.client.post(
+            url,
+            self.customer_data,
+            format="json",
+            **headers,
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Customer.objects.count(), 1)
 
@@ -434,7 +458,10 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_retrieve_customer(self):
         token = self.get_jwt_token(self.admin_user)
-        customer = Customer.objects.create(business=self.business, **self.customer_data)
+        customer = Customer.objects.create(
+            business=self.business,
+            **self.customer_data,
+        )
         url = reverse("customer-detail", args=[customer.id])
         params = {"business": self.business.id}
         url = f"{url}?{urlencode(params)}"
@@ -446,7 +473,10 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_update_customer(self):
         token = self.get_jwt_token(self.admin_user)
-        customer = Customer.objects.create(business=self.business, **self.customer_data)
+        customer = Customer.objects.create(
+            business=self.business,
+            **self.customer_data,
+        )
         url = reverse("customer-detail", args=[customer.id])
         params = {"business": self.business.id}
         url = f"{url}?{urlencode(params)}"
@@ -467,7 +497,10 @@ class CustomerCRUDAPITestCase(BaseAPITestCase):
 
     def test_admin_can_delete_customer(self):
         token = self.get_jwt_token(self.admin_user)
-        customer = Customer.objects.create(business=self.business, **self.customer_data)
+        customer = Customer.objects.create(
+            business=self.business,
+            **self.customer_data,
+        )
         url = reverse("customer-detail", args=[customer.id])
         params = {"business": self.business.id}
         url = f"{url}?{urlencode(params)}"
@@ -569,7 +602,9 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
     def test_owner_can_update_own_customer(self):
         token = self.get_jwt_token(self.owner_user)
         customer = Customer.objects.create(
-            business=self.business, created_by=self.regular_user, **self.customer_data
+            business=self.business,
+            created_by=self.regular_user,
+            **self.customer_data,
         )
         url = reverse("customer-detail", args=[customer.id])
         params = {"business": self.business.id}
@@ -606,7 +641,9 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
 
     def test_admin_can_update_any_customer(self):
         customer = Customer.objects.create(
-            business=self.business, created_by=self.regular_user, **self.customer_data
+            business=self.business,
+            created_by=self.regular_user,
+            **self.customer_data,
         )
         token = self.get_jwt_token(self.admin_user)
         url = reverse("customer-detail", args=[customer.id])
@@ -624,7 +661,9 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
     def test_owner_can_update_own_supplier(self):
         token = self.get_jwt_token(self.owner_user)
         supplier = Supplier.objects.create(
-            business=self.business, created_by=self.regular_user, **self.supplier_data
+            business=self.business,
+            created_by=self.regular_user,
+            **self.supplier_data,
         )
         url = reverse("supplier-detail", args=[supplier.id])
         query_params = {"business": self.business.id}
@@ -665,7 +704,9 @@ class CustomerSupplierPermissionTestCase(BaseAPITestCase):
 
     def test_admin_can_update_any_supplier(self):
         supplier = Supplier.objects.create(
-            business=self.business, created_by=self.regular_user, **self.supplier_data
+            business=self.business,
+            created_by=self.regular_user,
+            **self.supplier_data,
         )
         token = self.get_jwt_token(self.admin_user)
         url = reverse("supplier-detail", args=[supplier.id])
@@ -863,7 +904,8 @@ class EmployeeInvitationTestCase(BaseAPITestCase):
     @patch("accounts.views.requests.request")
     def test_employee_invitation_create(self, mock_request):
         """
-        Ensure that an invitation is created and an email is attempted to be sent.
+        Ensure that an invitation is created and
+        an email is attempted to be sent.
         """
         # Simulate a successful email API call
         mock_request.return_value.status_code = 200
@@ -889,15 +931,18 @@ class EmployeeInvitationTestCase(BaseAPITestCase):
         # Assert that the email sending API was called
         self.assertTrue(mock_request.called)
         args, kwargs = mock_request.call_args
-        # Check that the payload contains the acceptance link with the invitation token.
+        # Check that the payload contains the acceptance
+        # link with the invitation token.
         payload = json.loads(kwargs.get("data", "{}"))
         self.assertIn(str(invitation.token), payload.get("message", ""))
 
     @patch("accounts.views.requests.request")
     def test_employee_invitation_accept(self, mock_request):
         """
-        Ensure that hitting the accept URL immediately creates the employee using a temporary password,
-        marks the invitation as accepted and attempts to send a congratulatory email.
+        Ensure that hitting the accept URL immediately creates
+        the employee using a temporary password,
+        marks the invitation as accepted and attempts
+        to send a congratulatory email.
         """
         # Simulate a successful email API call
         mock_request.return_value.status_code = 200
@@ -917,7 +962,8 @@ class EmployeeInvitationTestCase(BaseAPITestCase):
         response = self.client.post(accept_url, **headers)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Check that the employee was created with temporary password "password"
+        # Check that the employee was created with
+        # temporary password "password"
         employee = User.objects.filter(email="invitee2@example.com").first()
         eb = EmployeeBusiness.objects.filter(employee=employee).first()
         self.assertIsNotNone(employee)
@@ -939,13 +985,19 @@ class EmployeeCRUDPermissionTestCase(BaseAPITestCase):
     def setUp(self):
         # Create users for testing
         self.admin = User.objects.create_superuser(
-            email="adminemp@example.com", phone="912345681", password="adminpass"
+            email="adminemp@example.com",
+            phone="912345681",
+            password="adminpass",
         )
         self.owner = User.objects.create_user(
-            email="owneremp@example.com", phone="912345682", password="ownerpass"
+            email="owneremp@example.com",
+            phone="912345682",
+            password="ownerpass",
         )
         self.regular = User.objects.create_user(
-            email="regularemp@example.com", phone="912345683", password="regularpass"
+            email="regularemp@example.com",
+            phone="912345683",
+            password="regularpass",
         )
 
         # Create a business for employee assignments.
@@ -994,7 +1046,8 @@ class EmployeeCRUDPermissionTestCase(BaseAPITestCase):
         )
 
         # Create separate EmployeeBusiness instances for each employee
-        # Assuming EmployeeBusiness is the new model linking employees with a business and a role.
+        # Assuming EmployeeBusiness is the new model linking employees
+        # with a business and a role.
         EmployeeBusiness.objects.create(
             employee=self.employee_by_owner,
             business=self.business,
@@ -1016,7 +1069,8 @@ class EmployeeCRUDPermissionTestCase(BaseAPITestCase):
 
     # ----- Delete tests -----
     def test_admin_can_delete_employee(self):
-        """Admins should be allowed to delete an employee's EmployeeBusiness record."""
+        """Admins should be allowed to delete an employee's
+        EmployeeBusiness record."""
         url = reverse("employee-detail", args=[self.employee_other.id])
         params = {"business": self.business.id}
         url = f"{url}?{urlencode(params)}"
@@ -1031,10 +1085,13 @@ class EmployeeCRUDPermissionTestCase(BaseAPITestCase):
             ).exists()
         )
         # ...but the Employee is still intact.
-        self.assertTrue(User.objects.filter(id=self.employee_other.id).exists())
+        self.assertTrue(
+            User.objects.filter(id=self.employee_other.id).exists(),
+        )
 
     def test_owner_can_delete_employee(self):
-        """Owners should be allowed to delete an employee's EmployeeBusiness record within their business."""
+        """Owners should be allowed to delete an employee's\
+         EmployeeBusiness record within their business."""
         url = reverse("employee-detail", args=[self.employee_other.id])
         params = {"business": self.business.id}
         url = f"{url}?{urlencode(params)}"
@@ -1047,10 +1104,13 @@ class EmployeeCRUDPermissionTestCase(BaseAPITestCase):
                 employee=self.employee_other, business=self.business, role=4
             ).exists()
         )
-        self.assertTrue(User.objects.filter(id=self.employee_other.id).exists())
+        self.assertTrue(
+            User.objects.filter(id=self.employee_other.id).exists(),
+        )
 
     def test_non_permitted_user_cannot_delete_employee(self):
-        """A user without proper permission should not be allowed to delete an employee's EmployeeBusiness record."""
+        """A user without proper permission should\
+        not be allowed to delete an employee's EmployeeBusiness record."""
         url = reverse("employee-detail", args=[self.employee_by_owner.id])
         params = {"business": self.business.id}
         url = f"{url}?{urlencode(params)}"

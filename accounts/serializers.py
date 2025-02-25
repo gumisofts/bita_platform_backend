@@ -1,12 +1,4 @@
-import json
-
-import requests
-from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
-from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
@@ -54,30 +46,39 @@ class PasswordResetSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         if not User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("User with this email does not exist.")
+            raise serializers.ValidationError(
+                "User with this email does not exist.",
+            )
         return value
 
-    def save(self):
-        request = self.context.get("request")
-        user = User.objects.get(email=self.validated_data["email"])
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        reset_url = f"{request.scheme}://{request.get_host()}/accounts/password-reset-confirm/{uid}/{token}/"
-        email_message = "Click the link below to reset your password:\n\n" + reset_url
-        email_subject = "Password Reset"
-        recipients = user.email
-        payload = json.dumps(
-            {
-                "subject": email_subject,
-                "message": email_message,
-                "recipients": recipients,
-            }
-        )
-        headers = {
-            "Authorization": f"Api-Key {notification_api_key}",
-            "Content-Type": "application/json",
-        }
-        response = requests.request("POST", email_url, headers=headers, data=payload)
+    # def save(self):
+    #     request = self.context.get("request")
+    #     user = User.objects.get(email=self.validated_data["email"])
+    #     uid = urlsafe_base64_encode(force_bytes(user.pk))
+    #     token = default_token_generator.make_token(user)
+    #     reset_url = f"""
+    #       {request.scheme}://{request.get_host()}/accounts/password-reset-confirm/{uid}/{token}/
+    #       """
+    #     email_message = "Click the link below to reset \
+    #       your password:\n\n" + reset_url
+    #     email_subject = "Password Reset"
+    #     recipients = user.email
+    #     payload = json.dumps(
+    #         {
+    #             "subject": email_subject,
+    #             "message": email_message,
+    #             "recipients": recipients,
+    #         }
+    #     )
+    #     headers = {
+    #         "Authorization": f"Api-Key {notification_api_key}",
+    #         "Content-Type": "application/json",
+    #     }
+    #     requests.request(
+    #         "POST",
+    #         email_url,
+    #         headers=headers,
+    #         data=payload)
 
 
 class SetNewPasswordSerializer(serializers.Serializer):
@@ -124,14 +125,20 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         identifier = attrs.get("identifier")
         password = attrs.get("password", "")
         if not identifier or not password:
-            raise serializers.ValidationError("Identifier and password are required.")
+            raise serializers.ValidationError(
+                "Identifier and password are required.",
+            )
 
         user = authenticate(
-            request=self.context.get("request"), username=identifier, password=password
+            request=self.context.get("request"),
+            username=identifier,
+            password=password,
         )
         if not user:
             print(user)
-            raise serializers.ValidationError("No user with these credentials.")
+            raise serializers.ValidationError(
+                "No user with these credentials.",
+            )
 
         refresh = self.get_token(user)
         data = {
@@ -163,7 +170,9 @@ class SupplierSerializer(serializers.ModelSerializer):
         except Business.DoesNotExist:
             raise serializers.ValidationError("Business does not exist.")
         if not business:
-            raise serializers.ValidationError("Business query parameter is required.")
+            raise serializers.ValidationError(
+                "Business query parameter is required.",
+            )
         supplier = Supplier.objects.create(
             created_by=created_by, business=business, **validated_data
         )
@@ -201,9 +210,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
         choices=EmployeeBusiness.ROLE_CHOICES,
         write_only=True,
         required=False,
-        choices=EmployeeBusiness.ROLE_CHOICES,
-        write_only=True,
-        required=False,
     )
 
     class Meta:
@@ -223,7 +229,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)
-        # Remove business and role if they accidentally get passed during creation.
+        # Remove business and role if they
+        # accidentally get passed during creation.
         validated_data.pop("business", None)
         validated_data.pop("role", None)
         employee = User(**validated_data)
@@ -239,7 +246,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
         instance = super().update(instance, validated_data)
         if business and role:
             try:
-                eb = EmployeeBusiness.objects.get(employee=instance, business=business)
+                eb = EmployeeBusiness.objects.get(
+                    employee=instance,
+                    business=business,
+                )
                 # Update the role if different.
                 if eb.role != role:
                     eb.role = role
@@ -260,7 +270,9 @@ class EmployeeInvitationSerializer(serializers.ModelSerializer):
         created_by = self.context["request"].user
         business = self.context["request"].query_params.get("business")
         if not business:
-            raise serializers.ValidationError("Business query parameter is required.")
+            raise serializers.ValidationError(
+                "Business query parameter is required.",
+            )
         try:
             business = Business.objects.get(id=business)
         except Business.DoesNotExist:

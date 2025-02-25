@@ -8,7 +8,8 @@ def validate_phone(phone):
     phone_regex = r"^(9|7)\d{8}$"
     if not re.match(phone_regex, phone):
         raise ValidationError(
-            "Phone number must be entered in the format: '912345678 / 712345678'. Up to 9 digits allowed."
+            "Phone number must be entered in the format: \
+            '912345678 / 712345678'. Up to 9 digits allowed."
         )
 
 
