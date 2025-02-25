@@ -5,13 +5,28 @@ from django.shortcuts import render
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from .models import (Category, Item, ItemImage, Location, ReturnRecall,
-                     StockMovement, Store, Supply, SupplyReservation)
-from .serializers import (CategorySerializer, ItemImageSerializer,
-                          ItemSerializer, LocationSerializer,
-                          ReturnRecallSerializer, StockMovementSerializer,
-                          StoreSerializer, SupplyReservationSerializer,
-                          SupplySerializer)
+from .models import (
+    Category,
+    Item,
+    ItemImage,
+    Location,
+    ReturnRecall,
+    StockMovement,
+    Store,
+    Supply,
+    SupplyReservation,
+)
+from .serializers import (
+    CategorySerializer,
+    ItemImageSerializer,
+    ItemSerializer,
+    LocationSerializer,
+    ReturnRecallSerializer,
+    StockMovementSerializer,
+    StoreSerializer,
+    SupplyReservationSerializer,
+    SupplySerializer,
+)
 
 # Create your views here.
 

@@ -2,8 +2,7 @@ from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import (Business, Customer, EmployeeBusiness, EmployeeInvitation,
-                     Supplier)
+from .models import Business, Customer, EmployeeBusiness, EmployeeInvitation, Supplier
 
 User = get_user_model()
 

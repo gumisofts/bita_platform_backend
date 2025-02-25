@@ -1,7 +1,16 @@
 from rest_framework import serializers
 
-from .models import (Category, Item, ItemImage, Location, ReturnRecall,
-                     StockMovement, Store, Supply, SupplyReservation)
+from .models import (
+    Category,
+    Item,
+    ItemImage,
+    Location,
+    ReturnRecall,
+    StockMovement,
+    Store,
+    Supply,
+    SupplyReservation,
+)
 from .utils import upload_to_file_service, validate_image_file
 
 

@@ -4,8 +4,15 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import (Category, Item, Location, Manufacturer, Store, Supply,
-                     SupplyReservation)
+from .models import (
+    Category,
+    Item,
+    Location,
+    Manufacturer,
+    Store,
+    Supply,
+    SupplyReservation,
+)
 
 
 class TestItemViewSet(APITestCase):

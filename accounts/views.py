@@ -7,8 +7,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import render
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from drf_spectacular.utils import (OpenApiExample, extend_schema,
-                                   extend_schema_view)
+from drf_spectacular.utils import OpenApiExample, extend_schema, extend_schema_view
 from rest_framework import generics, status, viewsets
 from rest_framework.exceptions import ParseError
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,17 +15,27 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
 
-from .models import (Business, Customer, EmployeeBusiness, EmployeeInvitation,
-                     Supplier)
-from .permissions import (hasBusinessPermission, hasCustomerPermission,
-                          hasEmployeeInvitePermission, hasEmployeePermission,
-                          hasSupplierPermission, hasUserPermission)
-from .serializers import (BusinessSerializer, CustomerSerializer,
-                          CustomTokenObtainPairSerializer,
-                          EmployeeInvitationSerializer, EmployeeSerializer,
-                          PasswordChangeSerializer, PasswordResetSerializer,
-                          SetNewPasswordSerializer, SupplierSerializer,
-                          UserSerializer)
+from .models import Business, Customer, EmployeeBusiness, EmployeeInvitation, Supplier
+from .permissions import (
+    hasBusinessPermission,
+    hasCustomerPermission,
+    hasEmployeeInvitePermission,
+    hasEmployeePermission,
+    hasSupplierPermission,
+    hasUserPermission,
+)
+from .serializers import (
+    BusinessSerializer,
+    CustomerSerializer,
+    CustomTokenObtainPairSerializer,
+    EmployeeInvitationSerializer,
+    EmployeeSerializer,
+    PasswordChangeSerializer,
+    PasswordResetSerializer,
+    SetNewPasswordSerializer,
+    SupplierSerializer,
+    UserSerializer,
+)
 
 User = get_user_model()
 

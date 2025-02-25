@@ -9,8 +9,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import (Business, Customer, EmployeeBusiness, EmployeeInvitation,
-                     Supplier)
+from .models import Business, Customer, EmployeeBusiness, EmployeeInvitation, Supplier
 
 env = Env()
 env.read_env()
