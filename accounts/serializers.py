@@ -1,11 +1,12 @@
 import json
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import requests
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
@@ -31,8 +32,8 @@ class UserSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password", None)
         user = super().create(validated_data)
         if password:
-            Password.objects.create(user=user, password=password)
             user.set_password(password)
+            Password.objects.create(user=user, password=user.password)
             user.save()
         return user
 
@@ -64,7 +65,7 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
         request = self.context.get("request")
         user = request.user
 
-        expires_at = datetime.now() + timedelta(hours=1)
+        expires_at = timezone.now() + timedelta(hours=1)
         PhoneChangeRequest.objects.create(
             user=user,
             new_phone=self.validated_data["new_phone"],
@@ -104,7 +105,7 @@ class EmailChangeRequestSerializer(serializers.Serializer):
     def save(self):
         request = self.context.get("request")
         user = request.user
-        expires_at = datetime.now() + timedelta(hours=1)
+        expires_at = timezone.now() + timedelta(hours=1)
         EmailChangeRequest.objects.create(
             user=user,
             new_email=self.validated_data["new_email"],
@@ -223,7 +224,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             password=password,
         )
         if not user:
-            print(user)
             raise serializers.ValidationError(
                 "No user with these credentials.",
             )
