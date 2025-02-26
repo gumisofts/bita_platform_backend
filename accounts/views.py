@@ -1,30 +1,30 @@
+from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.contrib.auth.tokens import default_token_generator
+from django.shortcuts import render
 from django.utils import timezone
-from django.contrib.auth import get_user_model
-from django.contrib.auth import update_session_auth_hash
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from drf_spectacular.utils import (
+    OpenApiExample,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import generics, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
+
+from .models import Business, EmailChangeRequest, PhoneChangeRequest
 from .serializers import (
+    BusinessSerializer,
+    CustomTokenObtainPairSerializer,
     EmailChangeRequestSerializer,
-    PasswordResetSerializer,
     PasswordChangeSerializer,
+    PasswordResetSerializer,
     PhoneChangeRequestSerializer,
     SetNewPasswordSerializer,
     UserSerializer,
-    CustomTokenObtainPairSerializer,
-    BusinessSerializer,
-)
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode
-from .models import Business, EmailChangeRequest, PhoneChangeRequest
-from django.shortcuts import render
-from drf_spectacular.utils import (
-    extend_schema,
-    extend_schema_view,
-    OpenApiExample,
 )
 
 User = get_user_model()

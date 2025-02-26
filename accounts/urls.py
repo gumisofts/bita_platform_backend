@@ -13,15 +13,15 @@ from accounts.consumers import TestConsumer
 from .views import (
     BusinessViewSet,
     CustomTokenObtainPairView,
+    EmailChangeConfirmView,
+    EmailChangeRequestView,
     JWTTokenVerifyView,
     PasswordChangeView,
     PasswordResetConfirmView,
     PasswordResetView,
-    UserViewSet,
-    PhoneChangeRequestView,
     PhoneChangeConfirmView,
-    EmailChangeRequestView,
-    EmailChangeConfirmView,
+    PhoneChangeRequestView,
+    UserViewSet,
     api_documentation,
 )
 

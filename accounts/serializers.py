@@ -1,21 +1,17 @@
-from datetime import datetime, timedelta
 import json
 import os
 import re
-from django.contrib.auth import authenticate, get_user_model
+from datetime import datetime, timedelta
+
 import requests
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import (
-    Business,
-    EmailChangeRequest,
-    Password,
-    PhoneChangeRequest,
-)
 
+from .models import Business, EmailChangeRequest, Password, PhoneChangeRequest
 
 User = get_user_model()
 

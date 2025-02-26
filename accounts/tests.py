@@ -1,14 +1,15 @@
 from unittest.mock import patch
-from django.urls import reverse
+
 from django.contrib.auth import get_user_model
-from django.utils import timezone
-from django.utils.http import urlsafe_base64_encode
-from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import PhoneChangeRequest, EmailChangeRequest
+from .models import EmailChangeRequest, PhoneChangeRequest
 
 User = get_user_model()
 
