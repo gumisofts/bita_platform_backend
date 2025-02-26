@@ -203,7 +203,11 @@ class EmailChangeRequest(models.Model):
 class Branch(models.Model):
     name = models.CharField(max_length=255)
     address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True)
-    business = models.ForeignKey(Business, on_delete=models.SET_NULL, null=True)
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.SET_NULL,
+        null=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

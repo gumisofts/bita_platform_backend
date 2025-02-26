@@ -153,7 +153,8 @@ class Migration(migrations.Migration):
                 unique=True,
                 validators=[
                     django.core.validators.RegexValidator(
-                        message="Phone number must be entered in the format:                     '912345678 / 712345678'. Up to 9 digits allowed.",
+                        message="Phone number must be entered in the format: \
+                            '912345678 / 712345678'. Up to 9 digits allowed.",
                         regex="^(9|7)\\d{8}$",
                     )
                 ],
@@ -179,7 +180,9 @@ class Migration(migrations.Migration):
             name="groups",
             field=models.ManyToManyField(
                 blank=True,
-                help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                help_text="The groups this user belongs to. \
+                    A user will get all permissions granted \
+                        to each of their groups.",
                 related_name="user_set",
                 related_query_name="user",
                 to="auth.group",
@@ -191,7 +194,9 @@ class Migration(migrations.Migration):
             name="is_active",
             field=models.BooleanField(
                 default=True,
-                help_text="Designates whether this user should be treated as active. Unselect this instead of deleting accounts.",
+                help_text="Designates whether this user should \
+                    be treated as active. Unselect this \
+                        instead of deleting accounts.",
                 verbose_name="active",
             ),
         ),
@@ -200,7 +205,8 @@ class Migration(migrations.Migration):
             name="is_staff",
             field=models.BooleanField(
                 default=False,
-                help_text="Designates whether the user can log into this admin site.",
+                help_text="Designates whether the user \
+                    can log into this admin site.",
                 verbose_name="staff status",
             ),
         ),
@@ -209,7 +215,8 @@ class Migration(migrations.Migration):
             name="is_superuser",
             field=models.BooleanField(
                 default=False,
-                help_text="Designates that this user has all permissions without explicitly assigning them.",
+                help_text="Designates that this user has all \
+                      without explicitly assigning them.",
                 verbose_name="superuser status",
             ),
         ),
@@ -418,7 +425,9 @@ class Migration(migrations.Migration):
                         max_length=15,
                         validators=[
                             django.core.validators.RegexValidator(
-                                message="Phone number must be entered in the format:                     '912345678 / 712345678'. Up to 9 digits allowed.",
+                                message="Phone number must be entered in \
+                                    the format: '912345678 / 712345678'.\
+                                          Up to 9 digits allowed.",
                                 regex="^(9|7)\\d{8}$",
                             )
                         ],

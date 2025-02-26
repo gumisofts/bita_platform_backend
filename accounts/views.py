@@ -1,9 +1,8 @@
 from django.utils import timezone
-import json
 from django.contrib.auth import get_user_model
 from django.contrib.auth import update_session_auth_hash
 from rest_framework import generics, status, viewsets
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
@@ -16,21 +15,17 @@ from .serializers import (
     UserSerializer,
     CustomTokenObtainPairSerializer,
     BusinessSerializer,
-    EmployeeSerializer,
 )
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from .models import Business, EmailChangeRequest, PhoneChangeRequest
 from django.shortcuts import render
-import requests
-from django.conf import settings
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
     OpenApiExample,
 )
-from rest_framework.exceptions import ParseError
 
 User = get_user_model()
 
@@ -119,7 +114,10 @@ class PhoneChangeConfirmView(generics.GenericAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         phone_request = (
-            PhoneChangeRequest.objects.filter(user=user, expires_at__gte=timezone.now())
+            PhoneChangeRequest.objects.filter(
+                user=user,
+                expires_at__gte=timezone.now(),
+            )
             .order_by("-created_at")
             .first()
         )
@@ -132,7 +130,8 @@ class PhoneChangeConfirmView(generics.GenericAPIView):
         user.save()
         phone_request.delete()
         return Response(
-            {"detail": "Phone number has been changed."}, status=status.HTTP_200_OK
+            {"detail": "Phone number has been changed."},
+            status=status.HTTP_200_OK,
         )
 
 
@@ -166,7 +165,10 @@ class EmailChangeConfirmView(generics.GenericAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         email_request = (
-            EmailChangeRequest.objects.filter(user=user, expires_at__gte=timezone.now())
+            EmailChangeRequest.objects.filter(
+                user=user,
+                expires_at__gte=timezone.now(),
+            )
             .order_by("-created_at")
             .first()
         )
@@ -304,16 +306,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         description="Delete a business instance.",
     ),
 )
-class BusinessViewSet(viewsets.ModelViewSet):
-    queryset = Business.objects.all()
-    serializer_class = BusinessSerializer
-
-    def get_queryset(self):
-        if self.request.user.is_superuser:
-            return Business.objects.all()
-        return Business.objects.filter(owner=self.request.user)
-
-
 @extend_schema_view(
     post=extend_schema(
         summary="Token verification",

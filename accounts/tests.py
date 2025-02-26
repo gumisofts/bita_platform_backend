@@ -123,24 +123,31 @@ class PhoneChangeRequestTests(APITestCase):
     @patch("accounts.serializers.requests.request")
     def test_confirm_phone_change_request(self, mock_request):
         """
-        Test that providing a valid uid and token updates the user's phone number
+        Test that providing a valid uid and token updates the
+        user's phone number
         and deletes the PhoneChangeRequest.
         """
         self.client.force_authenticate(user=self.user)
         payload = {"new_phone": "712345678"}
         # Create the phone change request
         self.client.post(self.phone_change_request_url, payload, format="json")
-        # Prepare uidb64 and token (using the same default_token_generator as in the views)
+        # Prepare uidb64 and token (using the same default_token_generator
+        # as in the views)
         uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
         token = default_token_generator.make_token(self.user)
-        confirm_url = reverse(self.phone_change_confirm_url_name, args=[uidb64, token])
+        confirm_url = reverse(
+            self.phone_change_confirm_url_name,
+            args=[uidb64, token],
+        )
         response = self.client.post(confirm_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Verify that the user's phone number was updated
         self.user.refresh_from_db()
         self.assertEqual(self.user.phone_number, payload["new_phone"])
         # Verify that the PhoneChangeRequest is removed
-        self.assertFalse(PhoneChangeRequest.objects.filter(user=self.user).exists())
+        self.assertFalse(
+            PhoneChangeRequest.objects.filter(user=self.user).exists(),
+        )
 
     @patch("accounts.serializers.requests.request")
     def test_confirm_phone_change_request_invalid_token(self, mock_request):
@@ -168,15 +175,25 @@ class PhoneChangeRequestTests(APITestCase):
         payload = {"new_phone": "712345678"}
         self.client.post(self.phone_change_request_url, payload, format="json")
         # Manually expire the PhoneChangeRequest
-        phone_request = PhoneChangeRequest.objects.filter(user=self.user).first()
-        phone_request.expires_at = timezone.now() - timezone.timedelta(minutes=1)
+        phone_request = PhoneChangeRequest.objects.filter(
+            user=self.user,
+        ).first()
+        phone_request.expires_at = timezone.now() - timezone.timedelta(
+            minutes=1,
+        )
         phone_request.save()
         uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
         token = default_token_generator.make_token(self.user)
-        confirm_url = reverse(self.phone_change_confirm_url_name, args=[uidb64, token])
+        confirm_url = reverse(
+            self.phone_change_confirm_url_name,
+            args=[uidb64, token],
+        )
         response = self.client.post(confirm_url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("no valid phone change request", response.data["detail"].lower())
+        self.assertIn(
+            "no valid phone change request",
+            response.data["detail"].lower(),
+        )
 
 
 class EmailChangeRequestTests(APITestCase):
@@ -212,18 +229,24 @@ class EmailChangeRequestTests(APITestCase):
 
     @patch("accounts.serializers.requests.request")
     def test_confirm_email_change_request(self, mock_request):
-        # Even though the email send happens in creation, it is already mocked above.
+        # Even though the email send happens in
+        # creation, it is already mocked above.
         self.client.force_authenticate(user=self.user)
         payload = {"new_email": "newuser@example.com"}
         self.client.post(self.email_change_request_url, payload, format="json")
         uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
         token = default_token_generator.make_token(self.user)
-        confirm_url = reverse(self.email_change_confirm_url_name, args=[uidb64, token])
+        confirm_url = reverse(
+            self.email_change_confirm_url_name,
+            args=[uidb64, token],
+        )
         response = self.client.post(confirm_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, payload["new_email"])
-        self.assertFalse(EmailChangeRequest.objects.filter(user=self.user).exists())
+        self.assertFalse(
+            EmailChangeRequest.objects.filter(user=self.user).exists(),
+        )
 
     @patch("accounts.serializers.requests.request")
     def test_confirm_email_change_request_invalid_token(self, mock_request):
@@ -244,15 +267,25 @@ class EmailChangeRequestTests(APITestCase):
         self.client.force_authenticate(user=self.user)
         payload = {"new_email": "newuser@example.com"}
         self.client.post(self.email_change_request_url, payload, format="json")
-        email_request = EmailChangeRequest.objects.filter(user=self.user).first()
-        email_request.expires_at = timezone.now() - timezone.timedelta(minutes=1)
+        email_request = EmailChangeRequest.objects.filter(
+            user=self.user,
+        ).first()
+        email_request.expires_at = timezone.now() - timezone.timedelta(
+            minutes=1,
+        )
         email_request.save()
         uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
         token = default_token_generator.make_token(self.user)
-        confirm_url = reverse(self.email_change_confirm_url_name, args=[uidb64, token])
+        confirm_url = reverse(
+            self.email_change_confirm_url_name,
+            args=[uidb64, token],
+        )
         response = self.client.post(confirm_url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("no valid email change request", response.data["detail"].lower())
+        self.assertIn(
+            "no valid email change request",
+            response.data["detail"].lower(),
+        )
 
 
 class PasswordResetTests(APITestCase):
@@ -276,7 +309,11 @@ class PasswordResetTests(APITestCase):
         """
         mock_request.return_value.status_code = 200
         payload = {"email": self.user.email}
-        response = self.client.post(self.password_reset_url, payload, format="json")
+        response = self.client.post(
+            self.password_reset_url,
+            payload,
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("detail", response.data)
         mock_request.assert_called_once()
@@ -286,13 +323,21 @@ class PasswordResetTests(APITestCase):
         Test that a password reset with a non-existent email returns 400.
         """
         payload = {"email": "nonexistent@example.com"}
-        response = self.client.post(self.password_reset_url, payload, format="json")
+        response = self.client.post(
+            self.password_reset_url,
+            payload,
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("does not exist", response.data.get("email", [""])[0].lower())
+        self.assertIn(
+            "does not exist",
+            response.data.get("email", [""])[0].lower(),
+        )
 
     def test_password_reset_confirm_valid(self):
         """
-        Test that providing a valid uid, token, and new password resets the password.
+        Test that providing a valid uid, token,
+        and new password resets the password.
         """
         # Prepare uid and token as in the PasswordResetConfirmView
         uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
@@ -319,7 +364,10 @@ class PasswordResetTests(APITestCase):
         confirm_url = reverse(
             self.password_reset_confirm_url_name, args=[uidb64, invalid_token]
         )
-        payload = {"new_password": "newpassword", "new_password_confirm": "newpassword"}
+        payload = {
+            "new_password": "newpassword",
+            "new_password_confirm": "newpassword",
+        }
         response = self.client.post(confirm_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("invalid", response.data.get("detail", "").lower())
@@ -345,14 +393,18 @@ class LoginTests(APITestCase):
         payload = {"identifier": self.user.email, "password": self.password}
         response = self.client.post(self.login_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Optionally, check for presence of a token or success detail in response
+        # Optionally, check for presence of a token or
+        # success detail in response
         self.assertTrue("access" in response.data or "detail" in response.data)
 
     def test_login_with_phone_number(self):
         """
         Test that a user can log in using their phone number.
         """
-        payload = {"identifier": self.user.phone_number, "password": self.password}
+        payload = {
+            "identifier": self.user.phone_number,
+            "password": self.password,
+        }
         response = self.client.post(self.login_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Optionally, check for the token or success detail in response

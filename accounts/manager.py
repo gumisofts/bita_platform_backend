@@ -22,12 +22,22 @@ class CustomUserManager(BaseUserManager):
             raise ValueError("The Phone field must be set")
         validate_phone(phone_number)
         email = self.normalize_email(email)
-        user = self.model(email=email, phone_number=phone_number, **extra_fields)
+        user = self.model(
+            email=email,
+            phone_number=phone_number,
+            **extra_fields,
+        )
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, phone_number, password=None, **extra_fields):
+    def create_superuser(
+        self,
+        email,
+        phone_number,
+        password=None,
+        **extra_fields,
+    ):
         """Create and return a superuser."""
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)

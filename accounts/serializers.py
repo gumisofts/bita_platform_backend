@@ -4,7 +4,6 @@ import os
 import re
 from django.contrib.auth import authenticate, get_user_model
 import requests
-from django.core.validators import RegexValidator
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
@@ -31,7 +30,7 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         email = validated_data.get("email")
         phone = validated_data.get("phone_number")
-        if email == None or phone == None:
+        if email is None or phone is None:
             raise serializers.ValidationError("Email or phone is required.")
         password = validated_data.pop("password", None)
         user = super().create(validated_data)
@@ -42,7 +41,13 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 
     def update(self, instance, validated_data):
-        for field in ["email", "phone_number", "password", "is_staff", "is_superuser"]:
+        for field in [
+            "email",
+            "phone_number",
+            "password",
+            "is_staff",
+            "is_superuser",
+        ]:
             validated_data.pop(field, None)
         return super().update(instance, validated_data)
 
@@ -64,7 +69,7 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
         user = request.user
 
         expires_at = datetime.now() + timedelta(hours=1)
-        phone_change = PhoneChangeRequest.objects.create(
+        PhoneChangeRequest.objects.create(
             user=user,
             new_phone=self.validated_data["new_phone"],
             expires_at=expires_at,
@@ -72,7 +77,9 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        confirm_url = f"{request.scheme}://{request.get_host()}/accounts/phone-change-confirm/{uid}/{token}/"
+        confirm_url = f"""
+                {request.scheme}://{request.get_host()}/accounts/phone-change-confirm/{uid}/{token}/
+                """
 
         email_message = (
             "Click the link below to confirm your phone number change:\n\n"
@@ -102,16 +109,20 @@ class EmailChangeRequestSerializer(serializers.Serializer):
         request = self.context.get("request")
         user = request.user
         expires_at = datetime.now() + timedelta(hours=1)
-        email_change = EmailChangeRequest.objects.create(
+        EmailChangeRequest.objects.create(
             user=user,
             new_email=self.validated_data["new_email"],
             expires_at=expires_at,
         )
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        confirm_url = f"{request.scheme}://{request.get_host()}/accounts/email-change-confirm/{uid}/{token}/"
+        confirm_url = f"""
+                {request.scheme}://{request.get_host()}/accounts/email-change-confirm/{uid}/{token}/
+                """
         email_message = (
-            "Click the link below to confirm your email change:\n\n" + confirm_url
+            "Click the link below to confirm\
+                  your email change:\n\n"
+            + confirm_url
         )
         email_subject = "Email Change Confirmation"
         payload = json.dumps(
@@ -255,49 +266,3 @@ class SetNewPasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data["password"])
         user.save()
         return user
-
-
-class BusinessSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Business
-        fields = "__all__"
-
-
-class EmployeeSerializer(serializers.ModelSerializer):
-    business = serializers.PrimaryKeyRelatedField(
-        queryset=Business.objects.all(), write_only=True, required=False
-    )
-
-    class Meta:
-        model = User
-        fields = (
-            "id",
-            "email",
-            "first_name",
-            "last_name",
-            "phone",
-            "password",
-            "employee_businesses",
-            "business",
-            "role",
-        )
-        extra_kwargs = {"password": {"write_only": True}}
-
-    def create(self, validated_data):
-        password = validated_data.pop("password", None)
-        # Remove business and role if they
-        # accidentally get passed during creation.
-        validated_data.pop("business", None)
-        validated_data.pop("role", None)
-        employee = User(**validated_data)
-        if password:
-            employee.set_password(password)
-        employee.save()
-        return employee
-
-    def update(self, instance, validated_data):
-        business = validated_data.pop("business", None)
-        role = validated_data.pop("role", None)
-        # Update any other Employee fields.
-        instance = super().update(instance, validated_data)
-        return instance
