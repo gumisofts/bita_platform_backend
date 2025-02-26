@@ -79,7 +79,7 @@ ASGI_APPLICATION = "core.asgi.app"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    "prod": {
+    "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("PG_DB_NAME", "dev"),
         "USER": env("PG_USER", "dev"),
@@ -88,10 +88,6 @@ DATABASES = {
         "PORT": env("PG_PORT", "5432"),
         "CONN_MAX_AGE": None,
         "OPTIONS": {"sslmode": env("PG_SSL_MODE")},
-    },
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
     },
 }
 

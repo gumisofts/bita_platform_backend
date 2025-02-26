@@ -1,7 +1,6 @@
 from django.urls import path
 from django.urls.conf import include
 from rest_framework.routers import DefaultRouter
-from rest_framework_nested import routers
 
 from . import views
 
@@ -14,9 +13,9 @@ router.register("location", views.LocationViewSet, basename="locations")
 router.register("stock-movement", views.StockMovementViewSet)
 router.register("reservations", views.SupplyReservationViewSet, basename="reservations")
 
-items_router = routers.NestedDefaultRouter(router, "items", lookup="item")
-items_router.register("images", views.ItemImageViewSet, basename="item-images")
+# items_router = routers.NestedDefaultRouter(router, "items", lookup="item")
+# items_router.register("images", views.ItemImageViewSet, basename="item-images")
 
 
 # URLConf
-urlpatterns = router.urls + items_router.urls
+urlpatterns = router.urls
