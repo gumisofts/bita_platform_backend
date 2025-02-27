@@ -6,11 +6,20 @@ from .models import User
 
 class CustomUserAdmin(UserAdmin):
     model = User
-    list_display = ("email", "phone", "is_staff", "is_active")
+    list_display = ("email", "phone_number", "is_staff", "is_active")
     list_filter = ("is_staff", "is_active")
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Personal Info", {"fields": ("phone", "first_name", "last_name")}),
+        (
+            "Personal Info",
+            {
+                "fields": (
+                    "phone_number",
+                    "first_name",
+                    "last_name",
+                )
+            },
+        ),
         (
             "Permissions",
             {
@@ -31,7 +40,7 @@ class CustomUserAdmin(UserAdmin):
                 "classes": ("wide",),
                 "fields": (
                     "email",
-                    "phone",
+                    "phone_number",
                     "password1",
                     "password2",
                     "is_staff",

@@ -1,39 +1,29 @@
-import json
-
-import requests
-from django.conf import settings
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import render
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from drf_spectacular.utils import OpenApiExample, extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    OpenApiExample,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import generics, status, viewsets
-from rest_framework.exceptions import ParseError
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
 
-from .models import Business, Customer, EmployeeBusiness, EmployeeInvitation, Supplier
-from .permissions import (
-    hasBusinessPermission,
-    hasCustomerPermission,
-    hasEmployeeInvitePermission,
-    hasEmployeePermission,
-    hasSupplierPermission,
-    hasUserPermission,
-)
+from .models import Business, EmailChangeRequest, PhoneChangeRequest
 from .serializers import (
     BusinessSerializer,
-    CustomerSerializer,
     CustomTokenObtainPairSerializer,
-    EmployeeInvitationSerializer,
-    EmployeeSerializer,
+    EmailChangeRequestSerializer,
     PasswordChangeSerializer,
     PasswordResetSerializer,
+    PhoneChangeRequestSerializer,
     SetNewPasswordSerializer,
-    SupplierSerializer,
     UserSerializer,
 )
 
@@ -87,7 +77,117 @@ User = get_user_model()
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [hasUserPermission]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_active = False
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PhoneChangeRequestView(generics.GenericAPIView):
+    serializer_class = PhoneChangeRequestSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {"detail": "Phone change request sent."}, status=status.HTTP_200_OK
+        )
+
+
+class PhoneChangeConfirmView(generics.GenericAPIView):
+    def post(self, request, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response(
+                {"detail": "Invalid link."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if not default_token_generator.check_token(user, token):
+            return Response(
+                {"detail": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        phone_request = (
+            PhoneChangeRequest.objects.filter(
+                user=user,
+                expires_at__gte=timezone.now(),
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if not phone_request:
+            return Response(
+                {"detail": "No valid phone change request found"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user.phone_number = phone_request.new_phone
+        user.save()
+        phone_request.delete()
+        return Response(
+            {"detail": "Phone number has been changed."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class EmailChangeRequestView(generics.GenericAPIView):
+    serializer_class = EmailChangeRequestSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {"detail": "Email change confirmation link sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class EmailChangeConfirmView(generics.GenericAPIView):
+    def post(self, request, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response(
+                {"detail": "Invalid link."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if not default_token_generator.check_token(user, token):
+            return Response(
+                {"detail": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        email_request = (
+            EmailChangeRequest.objects.filter(
+                user=user,
+                expires_at__gte=timezone.now(),
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if not email_request:
+            return Response(
+                {"detail": "No valid email change request found"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user.email = email_request.new_email
+        user.save()
+        email_request.delete()
+        return Response(
+            {"detail": "Email has been changed."}, status=status.HTTP_200_OK
+        )
+
+
+class BusinessViewSet(viewsets.ModelViewSet):
+    queryset = Business.objects.all()
+    serializer_class = BusinessSerializer
 
 
 @extend_schema_view(
@@ -181,84 +281,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 @extend_schema_view(
     list=extend_schema(
-        summary="List Suppliers",
-        description="Retrieve a list of all suppliers. (Admin only)",
-    ),
-    retrieve=extend_schema(
-        summary="Retrieve Supplier",
-        description="Retrieve a single supplier by its ID. \
-            (Admin or the supplier queried)",
-    ),
-    create=extend_schema(
-        summary="Create Supplier",
-        description="Create a new supplier.",
-    ),
-    update=extend_schema(
-        summary="Update Supplier",
-        description="Update a supplier completely.",
-    ),
-    partial_update=extend_schema(
-        summary="Partial Update Supplier",
-        description="Partially update a supplier instance.",
-    ),
-    destroy=extend_schema(
-        summary="Delete Supplier",
-        description="Delete a supplier instance.",
-    ),
-)
-class SupplierViewSet(viewsets.ModelViewSet):
-    serializer_class = SupplierSerializer
-    permission_classes = [IsAuthenticated, hasSupplierPermission]
-
-    def get_queryset(self):
-        business_id = self.request.query_params.get("business")
-        if business_id:
-            return Supplier.objects.filter(business_id=business_id)
-        # If no business id is provided, return an empty queryset.
-        raise ParseError("Missing required parameter: business")
-
-
-@extend_schema_view(
-    list=extend_schema(
-        summary="List Customers",
-        description="Retrieve a list of all customers. (Admin only)",
-    ),
-    retrieve=extend_schema(
-        summary="Retrieve Customer",
-        description="Retrieve a single customer by its ID. \
-            (Admin or the customer queried)",
-    ),
-    create=extend_schema(
-        summary="Create Customer",
-        description="Create a new customer.",
-    ),
-    update=extend_schema(
-        summary="Update Customer",
-        description="Update a customer completely.",
-    ),
-    partial_update=extend_schema(
-        summary="Partial Update Customer",
-        description="Partially update a customer instance.",
-    ),
-    destroy=extend_schema(
-        summary="Delete Customer",
-        description="Delete a customer instance.",
-    ),
-)
-class CustomerViewSet(viewsets.ModelViewSet):
-    serializer_class = CustomerSerializer
-    permission_classes = [IsAuthenticated, hasCustomerPermission]
-
-    def get_queryset(self):
-        business_id = self.request.query_params.get("business")
-        if business_id:
-            return Customer.objects.filter(business_id=business_id)
-        # If no business id is provided, return an empty queryset.
-        raise ParseError("Missing required parameter: business")
-
-
-@extend_schema_view(
-    list=extend_schema(
         summary="List Businesses",
         description="Retrieve a list of all businesses. (Admin only)",
     ),
@@ -284,102 +306,6 @@ class CustomerViewSet(viewsets.ModelViewSet):
         description="Delete a business instance.",
     ),
 )
-class BusinessViewSet(viewsets.ModelViewSet):
-    queryset = Business.objects.all()
-    serializer_class = BusinessSerializer
-    permission_classes = [IsAuthenticated, hasBusinessPermission]
-
-    def get_queryset(self):
-        if self.request.user.is_superuser:
-            return Business.objects.all()
-        return Business.objects.filter(owner=self.request.user)
-
-
-@extend_schema_view(
-    list=extend_schema(
-        summary="List Employees",
-        description="Retrieve a list of all employees. (Admin only)",
-    ),
-    retrieve=extend_schema(
-        summary="Retrieve Employee",
-        description="Retrieve a single employee by its ID. \
-            (Admin, business owner or the employee queried)",
-    ),
-    update=extend_schema(
-        summary="Update Employee", description="Update an employee completely."
-    ),
-    partial_update=extend_schema(
-        summary="Partial Update Employee",
-        description="Partially update an employee instance.",
-    ),
-    destroy=extend_schema(
-        summary="Delete Employee Business Record",
-        description="Delete the EmployeeBusiness record for the \
-            employee using the provided business and role.",
-    ),
-)
-class EmployeeViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = EmployeeSerializer
-    http_method_names = ["get", "patch", "delete", "head", "options"]
-    permission_classes = [IsAuthenticated, hasEmployeePermission]
-
-    def get_queryset(self):
-        business_id = self.request.query_params.get("business")
-        if not business_id:
-            raise ParseError("Missing required parameter: business")
-        employee_ids = EmployeeBusiness.objects.filter(
-            business_id=business_id
-        ).values_list("employee_id", flat=True)
-        return User.objects.filter(id__in=employee_ids)
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        business_id = request.data.get("business")
-        role = request.data.get("role")
-        if business_id and role:
-            try:
-                eb = EmployeeBusiness.objects.get(
-                    employee=instance, business_id=business_id, role=role
-                )
-                eb.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            except EmployeeBusiness.DoesNotExist:
-                return Response(
-                    {"detail": "EmployeeBusiness instance not found."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        else:
-            return Response(
-                {"detail": "Business and role are required for deletion."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-    def update(self, request, *args, **kwargs):
-        if "employee_businesses" in request.data:
-            return Response(
-                {
-                    "detail": "Updating multiple businesses and roles \
-                        directly is not allowed. Please use \
-                        business and role fields."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return super().update(request, *args, **kwargs)
-
-    def partial_update(self, request, *args, **kwargs):
-        if "employee_businesses" in request.data:
-            return Response(
-                {
-                    "detail": "Updating multiple businesses and roles \
-                        directly is not allowed. Please use business \
-                        and role fields."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return super().partial_update(request, *args, **kwargs)
-
-
 @extend_schema_view(
     post=extend_schema(
         summary="Token verification",
@@ -412,120 +338,6 @@ class JWTTokenVerifyView(TokenVerifyView):
             {"detail": "Token is valid", "user": user_data},
             status=status.HTTP_200_OK,
         )
-
-
-@extend_schema_view(
-    post=extend_schema(
-        summary="Employee Invitation Create",
-        description="Create an invitation for an employee \
-            and send an invitation email.",
-    )
-)
-class EmployeeInvitationCreateView(generics.CreateAPIView):
-    """
-    Creates an invitation for an employee and sends an invitation email.
-    """
-
-    serializer_class = EmployeeInvitationSerializer
-    permission_classes = [IsAuthenticated, hasEmployeeInvitePermission]
-
-    def perform_create(self, serializer):
-        invitation = serializer.save()
-        # Construct the acceptance URL. Adjust BASE_URL as appropriate.
-        request = self.request
-        acceptance_link = f"""
-                    {request.scheme}://{request.get_host()}/employee/invite/accept/{invitation.token}/
-                    """
-        # Send invitation email via NOTIFICATION_API.
-        email_url = settings.EMAIL_URL
-        notification_api_key = settings.NOTIFICATION_API_KEY
-        payload = json.dumps(
-            {
-                "subject": "You're Invited to Join as an Employee",
-                "message": f"Please click the following link \
-                    to accept your invitation: {acceptance_link}",
-                "recipients": invitation.email,
-            }
-        )
-        headers = {
-            "Authorization": f"Api-Key {notification_api_key}",
-            "Content-Type": "application/json",
-        }
-        requests.request("POST", email_url, headers=headers, data=payload)
-
-
-@extend_schema_view(
-    post=extend_schema(
-        summary="Employee Invitation Accept",
-        description="Accept an invitation to become an employee immediately \
-            when the invitation link is clicked.",
-    )
-)
-class EmployeeInvitationAcceptView(generics.GenericAPIView):
-    """
-    Accepts an invitation to become an employee immediately
-    when the invitation link is clicked.
-    Processes the invitation via a GET request and returns a JSON response.
-    """
-
-    permission_classes = [AllowAny]
-
-    def post(self, request, token):
-        try:
-            invitation = EmployeeInvitation.objects.get(
-                token=token,
-                accepted=False,
-            )
-        except EmployeeInvitation.DoesNotExist:
-            return Response(
-                {"detail": "Invalid or expired invitation token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Check if an employee with the invitation email already exists.
-        if User.objects.filter(email=invitation.email).exists():
-            employee = User.objects.get(email=invitation.email)
-        else:
-            # Create the employee using invitation data
-            # with a temporary password.
-            employee = User.objects.create_user(
-                email=invitation.email,
-                phone=invitation.phone,
-                password="password",
-            )
-        EmployeeBusiness.objects.create(
-            employee=employee,
-            business=invitation.business,
-            role=invitation.role,
-            created_by=invitation.created_by,
-        )
-
-        # Mark invitation as accepted.
-        invitation.accepted = True
-        invitation.save()
-
-        # Send congratulatory email via NOTIFICATION_API.
-        email_url = settings.EMAIL_URL
-        notification_api_key = settings.NOTIFICATION_API_KEY
-        payload = json.dumps(
-            {
-                "subject": "Welcome Aboard!",
-                "message": (
-                    "Congratulations on joining our team. \
-                    Your default password is 'password'. "
-                    "Please change it after logging in."
-                ),
-                "recipients": invitation.email,
-            }
-        )
-        headers = {
-            "Authorization": f"Api-Key {notification_api_key}",
-            "Content-Type": "application/json",
-        }
-        requests.request("POST", email_url, headers=headers, data=payload)
-
-        serializer = EmployeeSerializer(employee)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 def api_documentation(request):
