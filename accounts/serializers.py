@@ -1,38 +1,147 @@
+import json
+import os
+import re
+from datetime import timedelta
+
+import requests
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import Business, Customer, EmployeeBusiness, EmployeeInvitation, Supplier
+from .models import Business, EmailChangeRequest, Password, PhoneChangeRequest
 
 User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True)
+
     class Meta:
         model = User
-        fields = ("email", "first_name", "last_name", "phone", "password")
-        extra_kwargs = {
-            "password": {"write_only": True},
-        }
-
-    def get_fields(self):
-        fields = super().get_fields()
-        request = self.context.get("request", None)
-        if request and request.method != "POST":
-            fields.pop("password", None)
-        return fields
+        fields = "__all__"
 
     def create(self, validated_data):
         email = validated_data.get("email")
-        phone = validated_data.get("phone")
-        if email or phone:
-            password = validated_data.pop("password", None)
-            user = super().create(validated_data)
-            if password:
-                user.set_password(password)
-                user.save()
-            return user
-        raise serializers.ValidationError("Email or phone is required.")
+        phone = validated_data.get("phone_number")
+        if email is None or phone is None:
+            raise serializers.ValidationError("Email or phone is required.")
+        password = validated_data.pop("password", None)
+        user = super().create(validated_data)
+        if password:
+            user.set_password(password)
+            Password.objects.create(user=user, password=user.password)
+            user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        for field in [
+            "email",
+            "phone_number",
+            "password",
+            "is_staff",
+            "is_superuser",
+        ]:
+            validated_data.pop(field, None)
+        return super().update(instance, validated_data)
+
+
+class PhoneChangeRequestSerializer(serializers.Serializer):
+    new_phone = serializers.CharField(max_length=15)
+
+    def validate_new_phone(self, value):
+        phone_regex = r"^(9|7)\d{8}$"
+        if not re.match(phone_regex, value):
+            raise serializers.ValidationError(
+                "Phone number must be entered in the format: \
+                '912345678 / 712345678'. Up to 9 digits allowed."
+            )
+        return value
+
+    def save(self):
+        request = self.context.get("request")
+        user = request.user
+
+        expires_at = timezone.now() + timedelta(hours=1)
+        PhoneChangeRequest.objects.create(
+            user=user,
+            new_phone=self.validated_data["new_phone"],
+            expires_at=expires_at,
+        )
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        confirm_url = f"""
+                {request.scheme}://{request.get_host()}/accounts/phone-change-confirm/{uid}/{token}/
+                """
+
+        email_message = (
+            "Click the link below to confirm your phone number change:\n\n"
+            + confirm_url
+        )
+        email_subject = "Phone Number Change Confirmation"
+        payload = json.dumps(
+            {
+                "subject": email_subject,
+                "message": email_message,
+                "recipients": user.email,
+            }
+        )
+        notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
+        email_url = os.environ.get("EMAIL_URL")
+        headers = {
+            "Authorization": f"Api-Key {notification_api_key}",
+            "Content-Type": "application/json",
+        }
+        requests.request("POST", email_url, headers=headers, data=payload)
+
+
+class EmailChangeRequestSerializer(serializers.Serializer):
+    new_email = serializers.EmailField()
+
+    def save(self):
+        request = self.context.get("request")
+        user = request.user
+        expires_at = timezone.now() + timedelta(hours=1)
+        EmailChangeRequest.objects.create(
+            user=user,
+            new_email=self.validated_data["new_email"],
+            expires_at=expires_at,
+        )
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        confirm_url = f"""
+                {request.scheme}://{request.get_host()}/accounts/email-change-confirm/{uid}/{token}/
+                """
+        email_message = (
+            "Click the link below to confirm\
+                  your email change:\n\n"
+            + confirm_url
+        )
+        email_subject = "Email Change Confirmation"
+        payload = json.dumps(
+            {
+                "subject": email_subject,
+                "message": email_message,
+                "recipients": user.email,
+            }
+        )
+        notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
+        email_url = os.environ.get("EMAIL_URL")
+        headers = {
+            "Authorization": f"Api-Key {notification_api_key}",
+            "Content-Type": "application/json",
+        }
+        requests.request("POST", email_url, headers=headers, data=payload)
+
+
+class BusinessSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Business
+        fields = "__all__"
 
 
 class PasswordResetSerializer(serializers.Serializer):
@@ -45,49 +154,35 @@ class PasswordResetSerializer(serializers.Serializer):
             )
         return value
 
-    # def save(self):
-    #     request = self.context.get("request")
-    #     user = User.objects.get(email=self.validated_data["email"])
-    #     uid = urlsafe_base64_encode(force_bytes(user.pk))
-    #     token = default_token_generator.make_token(user)
-    #     reset_url = f"""
-    #       {request.scheme}://{request.get_host()}/accounts/password-reset-confirm/{uid}/{token}/
-    #       """
-    #     email_message = "Click the link below to reset \
-    #       your password:\n\n" + reset_url
-    #     email_subject = "Password Reset"
-    #     recipients = user.email
-    #     payload = json.dumps(
-    #         {
-    #             "subject": email_subject,
-    #             "message": email_message,
-    #             "recipients": recipients,
-    #         }
-    #     )
-    #     headers = {
-    #         "Authorization": f"Api-Key {notification_api_key}",
-    #         "Content-Type": "application/json",
-    #     }
-    #     requests.request(
-    #         "POST",
-    #         email_url,
-    #         headers=headers,
-    #         data=payload)
-
-
-class SetNewPasswordSerializer(serializers.Serializer):
-    password = serializers.CharField(write_only=True)
-    password_confirm = serializers.CharField(write_only=True)
-
-    def validate(self, attrs):
-        if attrs["password"] != attrs["password_confirm"]:
-            raise serializers.ValidationError("Passwords do not match.")
-        return attrs
-
-    def save(self, user):
-        user.set_password(self.validated_data["password"])
-        user.save()
-        return user
+    def save(self):
+        request = self.context.get("request")
+        user = User.objects.get(email=self.validated_data["email"])
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_url = f"""
+          {request.scheme}://{request.get_host()}/accounts/password-reset-confirm/{uid}/{token}/
+          """
+        email_message = (
+            "Click the link below to reset \
+          your password:\n\n"
+            + reset_url
+        )
+        email_subject = "Password Reset"
+        recipients = user.email
+        payload = json.dumps(
+            {
+                "subject": email_subject,
+                "message": email_message,
+                "recipients": recipients,
+            }
+        )
+        notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
+        email_url = os.environ.get("EMAIL_URL")
+        headers = {
+            "Authorization": f"Api-Key {notification_api_key}",
+            "Content-Type": "application/json",
+        }
+        requests.request("POST", email_url, headers=headers, data=payload)
 
 
 class PasswordChangeSerializer(serializers.Serializer):
@@ -117,7 +212,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         identifier = attrs.get("identifier")
-        password = attrs.get("password", "")
+        password = attrs.get("password", None)
         if not identifier or not password:
             raise serializers.ValidationError(
                 "Identifier and password are required.",
@@ -129,7 +224,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             password=password,
         )
         if not user:
-            print(user)
             raise serializers.ValidationError(
                 "No user with these credentials.",
             )
@@ -141,137 +235,30 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             "user": {
                 "id": user.id,
                 "email": user.email,
-                "phone": user.phone,
+                "phone_number": user.phone_number,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
-                "role": user.role if hasattr(user, "role") else None,
+                "username": user.username,
+                "is_superuser": user.is_superuser,
+                "is_staff": user.is_staff,
+                "created_at": user.created_at,
+                "updated_at": user.updated_at,
             },
         }
 
         return data
 
 
-class SupplierSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Supplier
-        fields = ["id", "name", "email", "phone", "address"]
+class SetNewPasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+    password_confirm = serializers.CharField(write_only=True)
 
-    def create(self, validated_data):
-        created_by = self.context["request"].user
-        business = self.context["request"].query_params.get("business")
-        try:
-            business = Business.objects.get(id=business)
-        except Business.DoesNotExist:
-            raise serializers.ValidationError("Business does not exist.")
-        if not business:
-            raise serializers.ValidationError(
-                "Business query parameter is required.",
-            )
-        supplier = Supplier.objects.create(
-            created_by=created_by, business=business, **validated_data
-        )
-        return supplier
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError("Passwords do not match.")
+        return attrs
 
-
-class CustomerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Customer
-        fields = "__all__"
-
-
-class BusinessSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Business
-        fields = "__all__"
-
-
-class EmployeeBusinessSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = EmployeeBusiness
-        fields = ("business", "role")
-
-
-class EmployeeSerializer(serializers.ModelSerializer):
-    # This read_only field remains available for GET responses.
-    employee_businesses = EmployeeBusinessSerializer(
-        source="employeebusiness_set", many=True, read_only=True
-    )
-    # Write-only fields for update/delete operations.
-    business = serializers.PrimaryKeyRelatedField(
-        queryset=Business.objects.all(), write_only=True, required=False
-    )
-    role = serializers.ChoiceField(
-        choices=EmployeeBusiness.ROLE_CHOICES,
-        write_only=True,
-        required=False,
-    )
-
-    class Meta:
-        model = User
-        fields = (
-            "id",
-            "email",
-            "first_name",
-            "last_name",
-            "phone",
-            "password",
-            "employee_businesses",
-            "business",
-            "role",
-        )
-        extra_kwargs = {"password": {"write_only": True}}
-
-    def create(self, validated_data):
-        password = validated_data.pop("password", None)
-        # Remove business and role if they
-        # accidentally get passed during creation.
-        validated_data.pop("business", None)
-        validated_data.pop("role", None)
-        employee = User(**validated_data)
-        if password:
-            employee.set_password(password)
-        employee.save()
-        return employee
-
-    def update(self, instance, validated_data):
-        business = validated_data.pop("business", None)
-        role = validated_data.pop("role", None)
-        # Update any other Employee fields.
-        instance = super().update(instance, validated_data)
-        if business and role:
-            try:
-                eb = EmployeeBusiness.objects.get(
-                    employee=instance,
-                    business=business,
-                )
-                # Update the role if different.
-                if eb.role != role:
-                    eb.role = role
-                    eb.save()
-            except EmployeeBusiness.DoesNotExist:
-                EmployeeBusiness.objects.create(
-                    employee=instance, business=business, role=role
-                )
-        return instance
-
-
-class EmployeeInvitationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = EmployeeInvitation
-        fields = ["email", "phone", "role"]
-
-    def create(self, validated_data):
-        created_by = self.context["request"].user
-        business = self.context["request"].query_params.get("business")
-        if not business:
-            raise serializers.ValidationError(
-                "Business query parameter is required.",
-            )
-        try:
-            business = Business.objects.get(id=business)
-        except Business.DoesNotExist:
-            raise serializers.ValidationError("Business does not exist.")
-        invitation = EmployeeInvitation.objects.create(
-            created_by=created_by, business=business, **validated_data
-        )
-        return invitation
+    def save(self, user):
+        user.set_password(self.validated_data["password"])
+        user.save()
+        return user

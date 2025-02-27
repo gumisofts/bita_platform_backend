@@ -12,16 +12,15 @@ from accounts.consumers import TestConsumer
 
 from .views import (
     BusinessViewSet,
-    CustomerViewSet,
     CustomTokenObtainPairView,
-    EmployeeInvitationAcceptView,
-    EmployeeInvitationCreateView,
-    EmployeeViewSet,
+    EmailChangeConfirmView,
+    EmailChangeRequestView,
     JWTTokenVerifyView,
     PasswordChangeView,
     PasswordResetConfirmView,
     PasswordResetView,
-    SupplierViewSet,
+    PhoneChangeConfirmView,
+    PhoneChangeRequestView,
     UserViewSet,
     api_documentation,
 )
@@ -30,9 +29,6 @@ auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
-router.register(r"suppliers", SupplierViewSet, basename="supplier")
-router.register(r"customers", CustomerViewSet, basename="customer")
-router.register(r"employees", EmployeeViewSet, basename="employee")
 router.register(r"businesses", BusinessViewSet)
 
 urlpatterns = [
@@ -71,13 +67,23 @@ urlpatterns = [
         name="password-change",
     ),
     path(
-        "employee/invite/",
-        EmployeeInvitationCreateView.as_view(),
-        name="employee-invite",
+        "phone-change/",
+        PhoneChangeRequestView.as_view(),
+        name="phone-change",
     ),
     path(
-        "employee/invite/accept/<uuid:token>/",
-        EmployeeInvitationAcceptView.as_view(),
-        name="employee-invite-accept",
+        "phone-change-confirm/<uidb64>/<token>/",
+        PhoneChangeConfirmView.as_view(),
+        name="phone-change-confirm",
+    ),
+    path(
+        "email-change/",
+        EmailChangeRequestView.as_view(),
+        name="email-change",
+    ),
+    path(
+        "email-change-confirm/<uidb64>/<token>/",
+        EmailChangeConfirmView.as_view(),
+        name="email-change-confirm",
     ),
 ] + router.urls
