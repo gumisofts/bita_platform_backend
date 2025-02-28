@@ -31,6 +31,7 @@ hyperlink==21.0.0
 idna==3.10
 incremental==24.7.2
 inflection==0.5.1
+isort==6.0.0
 jmespath==1.0.1
 jsonschema==4.23.0
 jsonschema-specifications==2024.10.1
