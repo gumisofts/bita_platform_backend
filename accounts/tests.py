@@ -9,7 +9,13 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Address, Business, EmailChangeRequest, PhoneChangeRequest, Role
+from .models import (
+    Address,
+    Business,
+    EmailChangeRequest,
+    PhoneChangeRequest,
+    Role,
+)
 
 User = get_user_model()
 
@@ -459,7 +465,11 @@ class EmployeeInvitationTests(APITestCase):
             "business_id": self.business.id,
             "role_id": self.role.id,
         }
-        response = self.client.post(self.invitation_url, payload, format="json")
+        response = self.client.post(
+            self.invitation_url,
+            payload,
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("detail", response.data)
         self.assertIn("sent", response.data["detail"].lower())
@@ -476,7 +486,11 @@ class EmployeeInvitationTests(APITestCase):
             "role": 999,
             "business": self.business.pk,
         }
-        response = self.client.post(self.invitation_url, payload, format="json")
+        response = self.client.post(
+            self.invitation_url,
+            payload,
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @patch("accounts.serializers.requests.request")
@@ -491,7 +505,11 @@ class EmployeeInvitationTests(APITestCase):
             "role": self.role.pk,
             "business": 999,
         }
-        response = self.client.post(self.invitation_url, payload, format="json")
+        response = self.client.post(
+            self.invitation_url,
+            payload,
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @patch("accounts.serializers.requests.request")
@@ -506,7 +524,11 @@ class EmployeeInvitationTests(APITestCase):
             "role": self.role.pk,
             "business": self.business.pk,
         }
-        response = self.client.post(self.invitation_url, payload, format="json")
+        response = self.client.post(
+            self.invitation_url,
+            payload,
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_employee_invitation_confirm_valid(self):

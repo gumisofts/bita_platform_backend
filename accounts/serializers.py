@@ -18,7 +18,6 @@ from .models import (
     Business,
     Category,
     EmailChangeRequest,
-    Employee,
     Password,
     PhoneChangeRequest,
     Role,
@@ -316,7 +315,10 @@ class EmployeeInvitationSerializer(serializers.Serializer):
           {request.scheme}://{request.get_host()}/accounts/employee-invitation-confirm/{business.id}/{role.id}/{uid}/{token}/
           """
         email_message = (
-            f"Click the link below to accept the invitation to join {business.name} as a {role.role_name}:\n\n"
+            f"""
+            Click the link below to accept the invitation
+            to join {business.name} as a {role.role_name}:\n\n
+            """
             + invitation_url
         )
         email_subject = "Employee Invitation"
