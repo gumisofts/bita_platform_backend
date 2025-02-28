@@ -12,7 +12,18 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import Business, EmailChangeRequest, Password, PhoneChangeRequest
+from .models import (
+    Address,
+    Branch,
+    Business,
+    Category,
+    EmailChangeRequest,
+    Employee,
+    Password,
+    PhoneChangeRequest,
+    Role,
+    RolePermission,
+)
 
 User = get_user_model()
 
@@ -262,3 +273,71 @@ class SetNewPasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data["password"])
         user.save()
         return user
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = "__all__"
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = "__all__"
+
+
+class RoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Role
+        fields = "__all__"
+
+
+class RolePermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RolePermission
+        fields = "__all__"
+
+
+class EmployeeInvitationSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    business_id = serializers.IntegerField()
+    role_id = serializers.IntegerField()
+
+    def save(self):
+        user = User.objects.get(id=self.validated_data["user_id"])
+        business = Business.objects.get(id=self.validated_data["business_id"])
+        role = Role.objects.get(id=self.validated_data["role_id"])
+        # Send email to user
+        request = self.context.get("request")
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        invitation_url = f"""
+          {request.scheme}://{request.get_host()}/accounts/employee-invitation-confirm/{business.id}/{role.id}/{uid}/{token}/
+          """
+        email_message = (
+            f"Click the link below to accept the invitation to join {business.name} as a {role.role_name}:\n\n"
+            + invitation_url
+        )
+        email_subject = "Employee Invitation"
+        recipients = user.email
+        payload = json.dumps(
+            {
+                "subject": email_subject,
+                "message": email_message,
+                "recipients": recipients,
+            }
+        )
+        notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
+        email_url = os.environ.get("EMAIL_URL")
+        headers = {
+            "Authorization": f"Api-Key {notification_api_key}",
+            "Content-Type": "application/json",
+        }
+        requests.request("POST", email_url, headers=headers, data=payload)
+
+
+class BranchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Branch
+        fields = "__all__"

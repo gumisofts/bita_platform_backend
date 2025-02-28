@@ -11,6 +11,13 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from accounts.consumers import TestConsumer
 
 from .views import (
+    BranchViewSet,
+    AddressViewSet,
+    CategoryViewSet,
+    RoleViewSet,
+    RolePermissionViewSet,
+    EmployeeInvitationView,
+    EmployeeInvitationConfirmView,
     BusinessViewSet,
     CustomTokenObtainPairView,
     EmailChangeConfirmView,
@@ -30,6 +37,11 @@ auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
 router.register(r"businesses", BusinessViewSet)
+router.register(r"categories", CategoryViewSet)
+router.register(r"roles", RoleViewSet)
+router.register(r"role-permissions", RolePermissionViewSet)
+router.register(r"addresses", AddressViewSet)
+router.register(r"branches", BranchViewSet)
 
 urlpatterns = [
     path("", api_documentation, name="api_documentation"),
@@ -85,5 +97,15 @@ urlpatterns = [
         "email-change-confirm/<uidb64>/<token>/",
         EmailChangeConfirmView.as_view(),
         name="email-change-confirm",
+    ),
+    path(
+        "employee-invitation/",
+        EmployeeInvitationView.as_view(),
+        name="employee-invitation",
+    ),
+    path(
+        "employee-invitation-confirm/<business_id>/<role_id>/<uidb64>/<token>/",
+        EmployeeInvitationConfirmView.as_view(),
+        name="employee-invitation-confirm",
     ),
 ] + router.urls

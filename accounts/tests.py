@@ -9,7 +9,7 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import EmailChangeRequest, PhoneChangeRequest
+from .models import Address, Business, EmailChangeRequest, PhoneChangeRequest, Role
 
 User = get_user_model()
 
@@ -418,3 +418,111 @@ class LoginTests(APITestCase):
         payload = {"identifier": self.user.email, "password": "wrongpassword"}
         response = self.client.post(self.login_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class EmployeeInvitationTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="user@example.com",
+            phone_number="912345678",
+            first_name="Test",
+            last_name="User",
+            password="testpass",
+        )
+        self.role = Role.objects.create(role_name="Sales", role_code=1)
+        self.business = Business.objects.create(
+            name="Test Business",
+            owner=self.user,
+            business_type=1,
+            address=Address.objects.create(
+                lat=0.0,
+                lng=0.0,
+                plus_code=123456,
+                sublocality="Suburb",
+                locality="City",
+                admin_1="State",
+                admin_2="Region",
+                country="Country",
+            ),
+        )
+        self.invitation_url = reverse("employee-invitation")
+
+    @patch("accounts.serializers.requests.request")
+    def test_create_employee_invitation(self, mock_request):
+        """
+        Test that a user can send an invitation to another user.
+        """
+        mock_request.return_value.status_code = 200
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "user_id": self.user.id,
+            "business_id": self.business.id,
+            "role_id": self.role.id,
+        }
+        response = self.client.post(self.invitation_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("detail", response.data)
+        self.assertIn("sent", response.data["detail"].lower())
+
+    @patch("accounts.serializers.requests.request")
+    def test_create_employee_invitation_invalid_role(self, mock_request):
+        """
+        Test that an invitation with an invalid role returns an error.
+        """
+        mock_request.return_value.status_code = 200
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "email": "user@example.com",
+            "role": 999,
+            "business": self.business.pk,
+        }
+        response = self.client.post(self.invitation_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("accounts.serializers.requests.request")
+    def test_create_employee_invitation_invalid_business(self, mock_request):
+        """
+        Test that an invitation with an invalid business returns an error.
+        """
+        mock_request.return_value.status_code = 200
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "email": "user@example.com",
+            "role": self.role.pk,
+            "business": 999,
+        }
+        response = self.client.post(self.invitation_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("accounts.serializers.requests.request")
+    def test_create_employee_invitation_invalid_email(self, mock_request):
+        """
+        Test that an invitation with an invalid email returns an error.
+        """
+        mock_request.return_value.status_code = 200
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "email": "invalidemail",
+            "role": self.role.pk,
+            "business": self.business.pk,
+        }
+        response = self.client.post(self.invitation_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_employee_invitation_confirm_valid(self):
+        """
+        Test that providing a valid uid, token, business, and role
+        creates an Employee instance.
+        """
+        uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        confirm_url = reverse(
+            "employee-invitation-confirm",
+            args=[self.business.pk, self.role.pk, uidb64, token],
+        )
+        response = self.client.post(confirm_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Verify that the Employee instance was created
+        employee = self.user.employee_set.get()
+        self.assertEqual(employee.role, self.role)
+        self.assertEqual(employee.business, self.business)
