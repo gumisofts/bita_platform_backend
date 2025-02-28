@@ -9,9 +9,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "accounts",
-            """
-            0016_alter_phonechangerequest_new_phone_alter_user_groups_and_more
-            """,
+            "0016_alter_phonechangerequest_new_phone",
         ),
     ]
 
