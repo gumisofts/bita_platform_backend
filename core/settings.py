@@ -5,7 +5,6 @@ from pathlib import Path
 from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
-from datetime import timedelta
 
 load_dotenv()
 load_dotenv(".env.production", override=True)
@@ -80,7 +79,7 @@ ASGI_APPLICATION = "core.asgi.app"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    "prod": {
+    "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("PG_DB_NAME", "dev"),
         "USER": env("PG_USER", "dev"),
@@ -89,10 +88,6 @@ DATABASES = {
         "PORT": env("PG_PORT", "5432"),
         "CONN_MAX_AGE": None,
         "OPTIONS": {"sslmode": env("PG_SSL_MODE")},
-    },
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
     },
 }
 
@@ -132,6 +127,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
+STATIC_ROOT = BASE_DIR / "static"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

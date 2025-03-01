@@ -13,10 +13,10 @@ class EmailOrPhoneBackend(ModelBackend):
                 return None
         else:
             try:
-                user = UserModel.objects.get(phone=username)
+                user = UserModel.objects.get(phone_number=username)
             except UserModel.DoesNotExist:
                 return None
 
-        if user and user.check_password(password) and self.user_can_authenticate(user):
+        if user.check_password(password) and self.user_can_authenticate(user):
             return user
         return None

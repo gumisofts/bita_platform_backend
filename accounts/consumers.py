@@ -1,6 +1,7 @@
-from asgiref.sync import async_to_sync
-from channels.generic.websocket import (AsyncJsonWebsocketConsumer,
-                                        JsonWebsocketConsumer)
+from channels.generic.websocket import (
+    AsyncJsonWebsocketConsumer,
+    JsonWebsocketConsumer,
+)
 
 
 class DeliveryConsumer(JsonWebsocketConsumer):

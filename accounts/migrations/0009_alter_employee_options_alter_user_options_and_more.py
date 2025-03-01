@@ -10,7 +10,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("accounts", "0008_alter_business_options_alter_customer_options_and_more"),
+        (
+            "accounts",
+            "0008_alter_business_options_alter_customer_options_and_more",
+        ),
     ]
 
     operations = [
@@ -38,7 +41,11 @@ class Migration(migrations.Migration):
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
                     "token",
-                    models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        unique=True,
+                    ),
                 ),
                 ("email", models.EmailField(max_length=254)),
                 ("first_name", models.CharField(max_length=255)),
