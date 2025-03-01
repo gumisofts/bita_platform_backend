@@ -10,4 +10,6 @@ urlpatterns = [
     path("api/", include("notification.urls")),
     # inventory-module urls
     path("inventory/", include("inventory.urls")),
+    # financials urls
+    path("financial/", include("financials.urls")),
 ]
