@@ -117,12 +117,10 @@ class Employee(models.Model):
         on_delete=models.SET_NULL,
         null=True,
     )
-    business = (
-        models.ForeignKey(
-            Business,
-            on_delete=models.SET_NULL,
-            null=True,
-        ),
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.SET_NULL,
+        null=True,
     )
     role = models.ForeignKey(
         Role,
@@ -131,7 +129,7 @@ class Employee(models.Model):
     )
 
     def __str__(self):
-        return f"{self.user.email} - {self.role} at {self.business.name}"
+        return f"{self.user.email} - {self.role} at {self.business}"
 
 
 class BusinessActivity(models.Model):

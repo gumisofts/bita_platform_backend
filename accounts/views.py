@@ -15,14 +15,30 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
 
-from .models import Business, EmailChangeRequest, PhoneChangeRequest
+from .models import (
+    Address,
+    Branch,
+    Business,
+    Category,
+    EmailChangeRequest,
+    Employee,
+    PhoneChangeRequest,
+    Role,
+    RolePermission,
+)
 from .serializers import (
+    AddressSerializer,
+    BranchSerializer,
     BusinessSerializer,
+    CategorySerializer,
     CustomTokenObtainPairSerializer,
     EmailChangeRequestSerializer,
+    EmployeeInvitationSerializer,
     PasswordChangeSerializer,
     PasswordResetSerializer,
     PhoneChangeRequestSerializer,
+    RolePermissionSerializer,
+    RoleSerializer,
     SetNewPasswordSerializer,
     UserSerializer,
 )
@@ -338,6 +354,77 @@ class JWTTokenVerifyView(TokenVerifyView):
             {"detail": "Token is valid", "user": user_data},
             status=status.HTTP_200_OK,
         )
+
+
+class AddressViewSet(viewsets.ModelViewSet):
+    queryset = Address.objects.all()
+    serializer_class = AddressSerializer
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+
+class RoleViewSet(viewsets.ModelViewSet):
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+
+
+class RolePermissionViewSet(viewsets.ModelViewSet):
+    queryset = RolePermission.objects.all()
+    serializer_class = RolePermissionSerializer
+
+
+class EmployeeInvitationView(generics.GenericAPIView):
+    serializer_class = EmployeeInvitationSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {"detail": "Employee invitation sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class EmployeeInvitationConfirmView(generics.GenericAPIView):
+
+    def post(self, request, business_id, role_id, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response(
+                {"detail": "Invalid link."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not default_token_generator.check_token(user, token):
+            return Response(
+                {"detail": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            business = Business.objects.get(pk=business_id)
+            role = Role.objects.get(pk=role_id)
+        except (Business.DoesNotExist, Role.DoesNotExist):
+            return Response(
+                {"detail": "Invalid business or role."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        Employee.objects.create(user=user, business=business, role=role)
+        return Response(
+            {"detail": "Employee added to the business."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class BranchViewSet(viewsets.ModelViewSet):
+    queryset = Branch.objects.all()
+    serializer_class = BranchSerializer
 
 
 def api_documentation(request):
