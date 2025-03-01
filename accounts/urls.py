@@ -1,21 +1,36 @@
 from channels.routing import URLRouter
 from django.urls import path
-from drf_spectacular.views import (SpectacularAPIView, SpectacularRedocView,
-                                   SpectacularSwaggerView)
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.consumers import TestConsumer
 
-from .views import (AddressViewSet, BranchViewSet, BusinessViewSet,
-                    CategoryViewSet, CustomTokenObtainPairView,
-                    EmailChangeConfirmView, EmailChangeRequestView,
-                    EmployeeInvitationConfirmView, EmployeeInvitationView,
-                    JWTTokenVerifyView, PasswordChangeView,
-                    PasswordResetConfirmView, PasswordResetView,
-                    PhoneChangeConfirmView, PhoneChangeRequestView,
-                    RolePermissionViewSet, RoleViewSet, UserViewSet,
-                    api_documentation)
+from .views import (
+    AddressViewSet,
+    BranchViewSet,
+    BusinessViewSet,
+    CategoryViewSet,
+    CustomTokenObtainPairView,
+    EmailChangeConfirmView,
+    EmailChangeRequestView,
+    EmployeeInvitationConfirmView,
+    EmployeeInvitationView,
+    JWTTokenVerifyView,
+    PasswordChangeView,
+    PasswordResetConfirmView,
+    PasswordResetView,
+    PhoneChangeConfirmView,
+    PhoneChangeRequestView,
+    RolePermissionViewSet,
+    RoleViewSet,
+    UserViewSet,
+    api_documentation,
+)
 
 auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])
 

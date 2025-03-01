@@ -9,8 +9,7 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import (Address, Business, EmailChangeRequest, PhoneChangeRequest,
-                     Role)
+from .models import Address, Business, EmailChangeRequest, PhoneChangeRequest, Role
 
 User = get_user_model()
 

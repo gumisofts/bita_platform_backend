@@ -12,8 +12,17 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import (Address, Branch, Business, Category, EmailChangeRequest,
-                     Password, PhoneChangeRequest, Role, RolePermission)
+from .models import (
+    Address,
+    Branch,
+    Business,
+    Category,
+    EmailChangeRequest,
+    Password,
+    PhoneChangeRequest,
+    Role,
+    RolePermission,
+)
 
 User = get_user_model()
 

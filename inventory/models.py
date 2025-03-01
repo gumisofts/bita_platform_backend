@@ -102,10 +102,10 @@ class SuppliedItem(models.Model):
     price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
     )
-    batch_number=models.CharField(max_length=255)
-    expiry_date=models.DateTimeField()
-    man_date=models.DateTimeField()
-    barcode=models.CharField(max_length=255,unique=True)
+    batch_number = models.CharField(max_length=255)
+    expiry_date = models.DateTimeField()
+    man_date = models.DateTimeField()
+    barcode = models.CharField(max_length=255, unique=True)
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.SET_NULL,
