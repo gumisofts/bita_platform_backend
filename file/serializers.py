@@ -1,6 +1,7 @@
-from rest_framework.serializers import FileField, ModelSerializer
-from .models import FileModel
 from rest_framework import serializers
+from rest_framework.serializers import FileField, ModelSerializer
+
+from .models import FileModel
 
 
 class FileDownloadSerializer(serializers.Serializer):
@@ -35,5 +36,5 @@ class FileUploadSerializer(ModelSerializer):
 
     class Meta:
         model = FileModel
-        fields = ['file', 'alt_text']
-        read_only_fields = ['stored_as']
+        fields = ["file", "alt_text"]
+        read_only_fields = ["stored_as"]

@@ -26,7 +26,10 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("password", models.CharField(max_length=128, verbose_name="password")),
+                (
+                    "password",
+                    models.CharField(max_length=128, verbose_name="password"),
+                ),
                 (
                     "last_login",
                     models.DateTimeField(
@@ -37,14 +40,17 @@ class Migration(migrations.Migration):
                     "is_superuser",
                     models.BooleanField(
                         default=False,
-                        help_text="Designates that this user has all permissions without explicitly assigning them.",
+                        help_text="Designates that this user \
+                            has all permissions without \
+                            explicitly assigning them.",
                         verbose_name="superuser status",
                     ),
                 ),
                 (
                     "date_joined",
                     models.DateTimeField(
-                        default=django.utils.timezone.now, verbose_name="date joined"
+                        default=django.utils.timezone.now,
+                        verbose_name="date joined",
                     ),
                 ),
                 ("username", models.CharField(max_length=125)),
@@ -55,7 +61,10 @@ class Migration(migrations.Migration):
                         max_length=15,
                         validators=[
                             django.core.validators.RegexValidator(
-                                message="Phone number must be entered in the format: '912345678 / 712345678'. Up to 9 digits allowed.",
+                                message="Phone number must be \
+                                    entered in the format: \
+                                    '912345678 / 712345678'. \
+                                    Up to 9 digits allowed.",
                                 regex="^(9|7)\\d{8}$",
                             )
                         ],
@@ -69,7 +78,9 @@ class Migration(migrations.Migration):
                     "groups",
                     models.ManyToManyField(
                         blank=True,
-                        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        help_text="The groups this user belongs to. \
+                            A user will get all permissions granted \
+                            to each of their groups.",
                         related_name="user_set",
                         related_query_name="user",
                         to="auth.group",
