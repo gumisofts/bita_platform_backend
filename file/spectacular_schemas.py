@@ -1,11 +1,7 @@
 from django.core.files import File
-from drf_spectacular.utils import (
-    OpenApiExample,
-    OpenApiParameter,
-    OpenApiResponse,
-    OpenApiTypes,
-    extend_schema,
-)
+from drf_spectacular.utils import (OpenApiExample, OpenApiParameter,
+                                   OpenApiResponse, OpenApiTypes,
+                                   extend_schema)
 
 from .serializers import FileUploadSerializer
 

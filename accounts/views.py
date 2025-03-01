@@ -4,44 +4,25 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from drf_spectacular.utils import (
-    OpenApiExample,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import (OpenApiExample, extend_schema,
+                                   extend_schema_view)
 from rest_framework import generics, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
 
-from .models import (
-    Address,
-    Branch,
-    Business,
-    Category,
-    EmailChangeRequest,
-    Employee,
-    PhoneChangeRequest,
-    Role,
-    RolePermission,
-)
-from .serializers import (
-    AddressSerializer,
-    BranchSerializer,
-    BusinessSerializer,
-    CategorySerializer,
-    CustomTokenObtainPairSerializer,
-    EmailChangeRequestSerializer,
-    EmployeeInvitationSerializer,
-    PasswordChangeSerializer,
-    PasswordResetSerializer,
-    PhoneChangeRequestSerializer,
-    RolePermissionSerializer,
-    RoleSerializer,
-    SetNewPasswordSerializer,
-    UserSerializer,
-)
+from .models import (Address, Branch, Business, Category, EmailChangeRequest,
+                     Employee, PhoneChangeRequest, Role, RolePermission)
+from .serializers import (AddressSerializer, BranchSerializer,
+                          BusinessSerializer, CategorySerializer,
+                          CustomTokenObtainPairSerializer,
+                          EmailChangeRequestSerializer,
+                          EmployeeInvitationSerializer,
+                          PasswordChangeSerializer, PasswordResetSerializer,
+                          PhoneChangeRequestSerializer,
+                          RolePermissionSerializer, RoleSerializer,
+                          SetNewPasswordSerializer, UserSerializer)
 
 User = get_user_model()
 
