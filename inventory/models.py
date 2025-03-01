@@ -1,6 +1,7 @@
-from accounts.models import Branch, Business, Category
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
+
+from accounts.models import Branch, Business, Category
 from file.models import FileModel
 
 
