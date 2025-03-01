@@ -91,14 +91,24 @@ class FileModel(models.Model):
         from PIL import Image
 
         # Read the image from S3
-        response = requests.get(self.file.url, stream=True)
-        response.raise_for_status()
-        img = Image.open(BytesIO(response.content))
+        # response = requests.get(self.file.url, stream=True)
+        # response.raise_for_status()
+        # img = Image.open(BytesIO(response.content))
+
+        with self.file.open("rb") as f:
+            img = Image.open(f)
 
         if img.mode in ("RGBA", "LA"):
             background = Image.new("RGB", img.size, (255, 255, 255))
             background.paste(img, mask=img.split()[-1])
             img = background
+            # pallete image alpha extraction
+        elif img.mode == "P":
+            img = img.convert("RGB")
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            alpha = img.split()[-1] if img.mode == "RGBA" else None
+            if alpha:
+                background.paste(img, mask=alpha)
 
         # Resize for optimized version
         optimized = img.copy()
