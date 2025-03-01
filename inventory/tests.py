@@ -49,7 +49,6 @@ class TestItemViewSet(APITestCase):
     def test_filter_by_returnable(self):
         url = "/inventory/items/?returnable=true"
         response = self.client.get(url)
-        print(response.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         for item in response.data["results"]:
             self.assertTrue(item["is_returnable"])
