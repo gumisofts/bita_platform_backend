@@ -1,10 +1,9 @@
-# from django.urls import path
-# from django.urls.conf import include
-# from rest_framework.routers import DefaultRouter
+from django.urls import path
+from rest_framework.routers import DefaultRouter
 
-# from . import views
+from inventory.views import *
 
-# router = DefaultRouter()
+router = DefaultRouter()
 # router.register("items", views.ItemViewSet, basename="items")
 # router.register("categories", views.CategoryViewSet, basename="categories")
 # router.register("supply", views.SupplyViewSet, basename="supplies")
@@ -18,4 +17,4 @@
 
 
 # # URLConf
-# urlpatterns = router.urls
+urlpatterns = []
