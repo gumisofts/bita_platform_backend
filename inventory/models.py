@@ -1,11 +1,12 @@
 import enum
+
 import requests
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext as _
-from django.core.validators import RegexValidator
-from accounts.models import Business, Branch, Category
+
+from accounts.models import Branch, Business, Category
 from file.models import FileModel
 
 
