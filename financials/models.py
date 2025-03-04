@@ -2,10 +2,11 @@ import uuid
 
 from django.db import models
 
+from inventory.models import Item
+
 
 class Order(models.Model):
     class StatusChoices(models.TextChoices):
-        PENDING = "PENDING", "Pending"
         PROCESSING = "PROCESSING", "Processing"
         COMPLETED = "COMPLETED", "Completed"
         CANCELLED = "CANCELLED", "Cancelled"
@@ -14,9 +15,8 @@ class Order(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer_id = models.UUIDField()
     employee_id = models.UUIDField()
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(
-        max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING
+        max_length=20, choices=StatusChoices.choices, default=StatusChoices.PROCESSING
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -27,8 +27,11 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item = models.OneToOneField(
+        Item,
+        on_delete=models.CASCADE,
+    )
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
-    item_id = models.UUIDField()
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
@@ -52,13 +55,14 @@ class Transaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(
         Order,
-        related_name="transactions",
+        related_name="transaction",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
     type = models.CharField(max_length=20, choices=TransactionType.choices)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    total_paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    total_left_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)
     created_at = models.DateTimeField(auto_now_add=True)
 
