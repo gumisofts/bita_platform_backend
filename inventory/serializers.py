@@ -1,3 +1,14 @@
+from rest_framework import serializers
+
+from .models import Item
+
+
+class ItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Item
+        fields = "__all__"
+
+
 # from rest_framework import serializers
 
 # from .models import (
@@ -72,7 +83,11 @@
 # class StockMovementSerializer(serializers.ModelSerializer):
 #     class Meta:
 #         model = StockMovement
-#         fields = ["id", "supply", "from_store", "to_store", "quantity", "reason"]
+#         fields = [
+#               "id",
+#               "supply",
+#               "from_store",
+#               "to_store", "quantity", "reason"]
 
 
 # class ReturnRecallSerializer(serializers.ModelSerializer):
@@ -102,7 +117,8 @@
 
 #         file_id = upload_to_file_service(file)
 
-#         item_image = ItemImage.objects.create(file_id=file_id, **validated_data)
+#         item_image = ItemImage.objects.create(
+#               file_id=file_id, **validated_data)
 
 #         return item_image
 
@@ -118,7 +134,8 @@
 #         if supply and quantity and quantity > supply.quantity:
 #             raise serializers.ValidationError(
 #                 {
-#                     "quantity": "Reservation quantity cannot exceed available supply quantity."
+#                     "quantity": "Reservation quantity cannot
+#                               exceed available supply quantity."
 #                 }
 #             )
 #         return data
