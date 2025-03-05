@@ -1,4 +1,5 @@
 import enum
+import uuid
 
 import requests
 from django.core.exceptions import ValidationError
@@ -6,22 +7,17 @@ from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext as _
 
-from accounts.models import Branch, Business, Category
-from file.models import FileModel
+
 
 
 class Item(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField()
     selling_quota = models.PositiveBigIntegerField()
-    category = models.ForeignKey(
-        Category,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
+    category =models.IntegerField()
     inventory_unit = models.CharField(max_length=255)
-    business = models.ForeignKey(Business, on_delete=models.CASCADE)
+    business =  models.IntegerField()
     notify_below = models.PositiveBigIntegerField()
     is_returnable = models.BooleanField()
     make_online_available = models.BooleanField()
@@ -38,8 +34,9 @@ class Item(models.Model):
 
 
 class ItemImage(models.Model):
-    item = models.OneToOneField(Item, on_delete=models.CASCADE)
-    file = models.OneToOneField(FileModel, on_delete=models.CASCADE)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item =  models.IntegerField()
+    file =  models.IntegerField()
 
     class Meta:
         db_table = "item_image"
@@ -51,6 +48,7 @@ class ItemImage(models.Model):
 
 
 class Supplier(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField()
     phone_number = models.CharField(
@@ -65,7 +63,7 @@ class Supplier(models.Model):
         unique=True,
         blank=True,
     )
-    business = models.ForeignKey(Business, on_delete=models.CASCADE)
+    business =  models.IntegerField()
 
     class Meta:
         db_table = "supplier"
@@ -77,15 +75,11 @@ class Supplier(models.Model):
 
 
 class Supply(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     supply_date = models.DateTimeField(auto_now_add=True)
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
-    recipt = models.OneToOneField(
-        FileModel,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
+    branch =  models.IntegerField()
+    recipt =  models.IntegerField()
 
     class Meta:
         db_table = "supply"
@@ -97,8 +91,9 @@ class Supply(models.Model):
 
 
 class SuppliedItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     quantity = models.PositiveIntegerField()
-    item = models.ManyToManyField(Supply, related_name="supplied_items")
+    item =  models.IntegerField()
     price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
     )
@@ -112,7 +107,7 @@ class SuppliedItem(models.Model):
         null=True,
         blank=True,
     )
-    business = models.ForeignKey(Business, on_delete=models.CASCADE)
+    business =  models.IntegerField()
     timestamp = models.DateField(auto_now_add=True)
     discount = models.PositiveIntegerField()
     supply = models.ManyToManyField(Supply)
