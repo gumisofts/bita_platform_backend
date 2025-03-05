@@ -8,16 +8,14 @@ from django.db import models
 from django.utils.translation import gettext as _
 
 
-
-
 class Item(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField()
     selling_quota = models.PositiveBigIntegerField()
-    category =models.IntegerField()
+    category = models.IntegerField()
     inventory_unit = models.CharField(max_length=255)
-    business =  models.IntegerField()
+    business = models.IntegerField()
     notify_below = models.PositiveBigIntegerField()
     is_returnable = models.BooleanField()
     make_online_available = models.BooleanField()
@@ -35,8 +33,8 @@ class Item(models.Model):
 
 class ItemImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    item =  models.IntegerField()
-    file =  models.IntegerField()
+    item = models.IntegerField()
+    file = models.IntegerField()
 
     class Meta:
         db_table = "item_image"
@@ -63,7 +61,7 @@ class Supplier(models.Model):
         unique=True,
         blank=True,
     )
-    business =  models.IntegerField()
+    business = models.IntegerField()
 
     class Meta:
         db_table = "supplier"
@@ -78,8 +76,8 @@ class Supply(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     supply_date = models.DateTimeField(auto_now_add=True)
-    branch =  models.IntegerField()
-    recipt =  models.IntegerField()
+    branch = models.IntegerField()
+    recipt = models.IntegerField()
 
     class Meta:
         db_table = "supply"
@@ -93,7 +91,7 @@ class Supply(models.Model):
 class SuppliedItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     quantity = models.PositiveIntegerField()
-    item =  models.IntegerField()
+    item = models.IntegerField()
     price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
     )
@@ -107,7 +105,7 @@ class SuppliedItem(models.Model):
         null=True,
         blank=True,
     )
-    business =  models.IntegerField()
+    business = models.IntegerField()
     timestamp = models.DateField(auto_now_add=True)
     discount = models.PositiveIntegerField()
     supply = models.ManyToManyField(Supply)

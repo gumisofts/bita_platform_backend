@@ -9,5 +9,7 @@ urlpatterns = [
     # notification-module urls
     path("api/", include("notification.urls")),
     # inventory-module urls
-    path("api/v1/inventory/", include("inventory.urls")),
+    path("inventory/", include("inventory.urls")),
+    # financials urls
+    path("financial/", include("financials.urls")),
 ]
