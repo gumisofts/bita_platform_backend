@@ -1,119 +1,29 @@
-from django.contrib.postgres.search import TrigramSimilarity
-from rest_framework import viewsets
+from rest_framework import status, viewsets
+from rest_framework.response import Response
 
-from .models import Item
-from .serializers import ItemSerializer
-
-
-class ItemViewSet(viewsets.ModelViewSet):
-    queryset = Item.objects.all()
-    serializer_class = ItemSerializer
-
-    def get_queryset(self):
-        queryset = Item.objects.all()
-        category_id = self.request.query_params.get("category_id")
-        if category_id:
-            queryset = queryset.filter(category_id=category_id)
-        business_id = self.request.query_params.get("business_id")
-        if business_id:
-            queryset = queryset.filter(business_id=business_id)
-        returnable = self.request.query_params.get("returnable")
-        if returnable and returnable.lower() == "true":
-            queryset = queryset.filter(is_returnable=True)
-        elif returnable and returnable.lower() == "false":
-            queryset = queryset.filter(is_returnable=False)
-        online = self.request.query_params.get("online")
-        if online and online.lower() == "true":
-            queryset = queryset.filter(make_online_available=True)
-        elif online and online.lower() == "false":
-            queryset = queryset.filter(make_online_available=False)
-        search_term = self.request.query_params.get("search")
-        if search_term:
-            queryset = (
-                queryset.annotate(
-                    similarity=TrigramSimilarity("name", search_term) * 2
-                    + TrigramSimilarity("description", search_term)
-                )
-                .filter(similarity__gt=0.1)
-                .order_by("-similarity")
-            )
-
-        return queryset
+from .models import SuppliedItem, Supply
+from .serializers import SuppliedItemSerializer, SupplySerializer
 
 
-# from django.conf import settings
-# from django.contrib.postgres.search import TrigramSimilarity
-# from django.db.models.aggregates import Count
-# from django.shortcuts import render
-# from rest_framework.viewsets import GenericViewSet, ModelViewSet
+class SupplyViewSetV1(viewsets.ModelViewSet):
+    queryset = Supply.objects.all()
+    serializer_class = SupplySerializer
 
-# from .models import (
-#     Category,
-#     Item,
-#     ItemImage,
-#     Location,
-#     ReturnRecall,
-#     StockMovement,
-#     Store,
-#     Supply,
-#     SupplyReservation,
-# )
-# from .serializers import (
-#     CategorySerializer,
-#     ItemImageSerializer,
-#     ItemSerializer,
-#     LocationSerializer,
-#     ReturnRecallSerializer,
-#     StockMovementSerializer,
-#     StoreSerializer,
-#     SupplyReservationSerializer,
-#     SupplySerializer,
-# )
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
 
-# # Create your views here.
+        supplied_items_data = request.data.get("supplied_items", [])
+        for item_data in supplied_items_data:
+            SuppliedItem.objects.create(supply=serializer.instance, **item_data)
+
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
 
 
-# class CategoryViewSet(ModelViewSet):
-#     queryset = Category.objects.annotate(items_count=Count("items")).all()
-#     serializer_class = CategorySerializer
-
-
-# class SupplyViewSet(ModelViewSet):
-#     queryset = Supply.objects.all()
-#     serializer_class = SupplySerializer
-
-
-# class StoreViewSet(ModelViewSet):
-#     queryset = Store.objects.all()
-#     serializer_class = StoreSerializer
-
-
-# class LocationViewSet(ModelViewSet):
-#     queryset = Location.objects.all()
-#     serializer_class = LocationSerializer
-
-
-# class StockMovementViewSet(ModelViewSet):
-#     queryset = StockMovement.objects.all()
-#     serializer_class = StockMovementSerializer
-
-
-# class ItemImageViewSet(ModelViewSet):
-#     queryset = ItemImage.objects.all()
-#     serializer_class = ItemImageSerializer
-
-
-# class SupplyReservationViewSet(ModelViewSet):
-#     queryset = SupplyReservation.objects.all()
-#     serializer_class = SupplyReservationSerializer
-
-#     @extend_schema(parameters=settings.SUPPLY_RESERVATION_LIST_QUERY_PARAMETERS)
-#     def list(self, request, *args, **kwargs):
-#         return super().list(request, *args, **kwargs)
-
-#     def get_queryset(self):
-#         queryset = super().get_queryset()
-#         status_param = self.request.query_params.get("status")
-#         if status_param:
-#             queryset = queryset.filter(status=status_param)
-#         return queryset
+class SuppliedItemViewSetV1(viewsets.ModelViewSet):
+    queryset = SuppliedItem.objects.all()
+    serializer_class = SuppliedItemSerializer
