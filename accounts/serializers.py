@@ -299,9 +299,9 @@ class RolePermissionSerializer(serializers.ModelSerializer):
 
 
 class EmployeeInvitationSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField()
-    business_id = serializers.IntegerField()
-    role_id = serializers.IntegerField()
+    user_id = serializers.UUIDField()
+    business_id = serializers.UUIDField()
+    role_id = serializers.UUIDField()
 
     def save(self):
         user = User.objects.get(id=self.validated_data["user_id"])
