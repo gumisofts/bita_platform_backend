@@ -11,10 +11,6 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        (
-            "accounts",
-            "0018_alter_phonechangerequest_new_phone_alter_user_groups_and_more",
-        ),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
