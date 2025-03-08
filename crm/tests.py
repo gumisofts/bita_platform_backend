@@ -1,10 +1,11 @@
 import datetime
 
-from accounts.models import Business
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from accounts.models import Business
 
 from .models import Customer, GiftCard
 
