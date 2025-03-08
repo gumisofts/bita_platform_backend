@@ -24,6 +24,12 @@ class Customer(models.Model):
 
 
 class GiftCard(models.Model):
+    GIFT_CARD_TYPE_CHOICES = [
+        (1, "Specific Item"),
+        (2, "Business Item"),
+        (3, "Platform Item"),
+    ]
+
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
     owner = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
     created_by = models.ForeignKey(
@@ -32,3 +38,4 @@ class GiftCard(models.Model):
     redeemed = models.BooleanField(default=False)
     redeemed_at = models.DateTimeField(null=True)
     expires_at = models.DateTimeField()
+    type = models.IntegerField(choices=GIFT_CARD_TYPE_CHOICES)
