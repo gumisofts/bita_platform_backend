@@ -33,7 +33,10 @@ class GiftCard(models.Model):
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
     owner = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
     created_by = models.ForeignKey(
-        get_user_model(), on_delete=models.SET_NULL, null=True
+        get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_giftcards",
     )
     redeemed = models.BooleanField(default=False)
     redeemed_at = models.DateTimeField(null=True)
