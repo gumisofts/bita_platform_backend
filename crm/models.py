@@ -1,3 +1,4 @@
+from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.core.validators import RegexValidator
 from django.db import models
@@ -6,6 +7,7 @@ from accounts.models import Business
 
 
 class Customer(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     email = models.EmailField(unique=True)
     phone_number = models.CharField(
         max_length=15,
@@ -24,6 +26,7 @@ class Customer(models.Model):
 
 
 class GiftCard(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     GIFT_CARD_TYPE_CHOICES = [
         (1, "Specific Item"),
         (2, "Business Item"),
