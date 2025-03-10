@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
 from django.db import models
@@ -8,7 +6,6 @@ from .manager import CustomUserManager
 
 
 class User(AbstractUser):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     username = models.CharField(max_length=255, blank=True, null=True)
     email = models.EmailField(unique=True, blank=True)
     phone_number = models.CharField(
@@ -36,7 +33,6 @@ class User(AbstractUser):
 
 
 class Address(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     lat = models.FloatField()
     lng = models.FloatField()
     plus_code = models.IntegerField()
@@ -53,7 +49,6 @@ class Address(models.Model):
 
 
 class Category(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -63,7 +58,6 @@ class Category(models.Model):
 
 
 class Business(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     business_type_choices = [
         (1, "Retail"),
         (2, "Wholesale"),
@@ -96,7 +90,6 @@ class Business(models.Model):
 
 
 class Role(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     role_name = models.CharField(max_length=255)
     role_code = models.IntegerField()
 
@@ -106,7 +99,6 @@ class Permission(models.Model):
 
 
 class RolePermission(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     permission = models.ForeignKey(
         Permission,
         on_delete=models.SET_NULL,
@@ -120,7 +112,6 @@ class RolePermission(models.Model):
 
 
 class Employee(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -142,7 +133,6 @@ class Employee(models.Model):
 
 
 class BusinessActivity(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     MODEL_CHOICES = [
         (1, "User"),
         (2, "Address"),
@@ -178,7 +168,6 @@ class BusinessActivity(models.Model):
 
 
 class PhoneChangeRequest(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -199,7 +188,6 @@ class PhoneChangeRequest(models.Model):
 
 
 class EmailChangeRequest(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -211,7 +199,6 @@ class EmailChangeRequest(models.Model):
 
 
 class Branch(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True)
     business = models.ForeignKey(
@@ -224,7 +211,6 @@ class Branch(models.Model):
 
 
 class Password(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
