@@ -1,7 +1,7 @@
 import logging
 import os
-import uuid
 from io import BytesIO
+from uuid import uuid4
 
 from django.db import models
 from django.utils.timezone import now
@@ -36,7 +36,7 @@ def file_upload_to(instance, filename):
 
 
 class FileModel(models.Model):
-    id = models.AutoField(primary_key=True)
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     stored_as = models.CharField(max_length=255, unique=True, blank=True, null=True)
 
@@ -63,7 +63,7 @@ class FileModel(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.stored_as:
-            self.stored_as = uuid.uuid4().hex  # Generate a unique ID
+            self.stored_as = uuid4().hex  # Generate a unique ID
             # self.file_extension = os.path.splitext(self.file.name)[1].lower()  # Extract file extension
             self.file_extension = os.path.splitext(self.file.name)[
                 1
