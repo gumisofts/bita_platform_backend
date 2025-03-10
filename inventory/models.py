@@ -1,16 +1,14 @@
-import enum
+from uuid import uuid4
 
-import requests
-from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
-from django.utils.translation import gettext as _
 
 from accounts.models import Branch, Business, Category
 from file.models import FileModel
 
 
 class Item(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField()
     selling_quota = models.PositiveBigIntegerField()
@@ -38,6 +36,7 @@ class Item(models.Model):
 
 
 class ItemImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     item = models.OneToOneField(Item, on_delete=models.CASCADE)
     file = models.OneToOneField(FileModel, on_delete=models.CASCADE)
 
@@ -51,6 +50,7 @@ class ItemImage(models.Model):
 
 
 class Supplier(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField()
     phone_number = models.CharField(
@@ -77,6 +77,7 @@ class Supplier(models.Model):
 
 
 class Supply(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     supply_date = models.DateTimeField(auto_now_add=True)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
@@ -97,11 +98,16 @@ class Supply(models.Model):
 
 
 class SuppliedItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     quantity = models.PositiveIntegerField()
     item = models.ManyToManyField(Supply, related_name="supplied_items")
     price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
     )
+    batch_number = models.CharField(max_length=255)
+    expiry_date = models.DateTimeField()
+    man_date = models.DateTimeField()
+    barcode = models.CharField(max_length=255, unique=True)
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.SET_NULL,

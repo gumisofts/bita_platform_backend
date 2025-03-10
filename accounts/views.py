@@ -4,11 +4,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from drf_spectacular.utils import (
-    OpenApiExample,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiExample, extend_schema, extend_schema_view
 from rest_framework import generics, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
