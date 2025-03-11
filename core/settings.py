@@ -6,10 +6,9 @@ from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
 
-load_dotenv()
+load_dotenv(override=True)
 load_dotenv(".env.production", override=True)
 env = os.getenv
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = env("SECRET_KEY", get_random_secret_key())
@@ -17,7 +16,6 @@ SECRET_KEY = env("SECRET_KEY", get_random_secret_key())
 DEBUG = env("DEBUG", False) == "True"
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-
 
 # Application definition
 
@@ -42,6 +40,7 @@ INSTALLED_APPS = [
     "notification",
     "inventory",
     "crm",
+    "financials",
 ]
 
 MIDDLEWARE = [
@@ -82,9 +81,9 @@ ASGI_APPLICATION = "core.asgi.app"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("PG_DB_NAME", "dev"),
-        "USER": env("PG_USER", "dev"),
-        "PASSWORD": env("PG_PASSWORD", "developer@123"),
+        "NAME": env("PG_DB_NAME"),
+        "USER": env("PG_USER"),
+        "PASSWORD": env("PG_PASSWORD"),
         "HOST": env("PG_HOST", "localhost"),
         "PORT": env("PG_PORT", "5432"),
         "CONN_MAX_AGE": None,
@@ -189,10 +188,6 @@ AUTHENTICATION_BACKENDS = [
     "accounts.backends.EmailOrPhoneBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
-
-# TODO Remove these
-EMAIL_URL = ""
-NOTIFICATION_API_KEY = ""
 
 
 # AWS Credentials
