@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     "storages",
     "notification",
     "inventory",
-    "crm",
 ]
 
 MIDDLEWARE = [
