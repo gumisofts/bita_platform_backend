@@ -10,6 +10,4 @@ urlpatterns = [
     path("api/", include("notification.urls")),
     # inventory-module urls
     path("inventory/", include("inventory.urls")),
-    # crm-module urls
-    path("crm/", include("crm.urls")),
 ]
