@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
+from rest_framework.exceptions import NotFound
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import (
@@ -234,9 +235,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             password=password,
         )
         if not user:
-            raise serializers.ValidationError(
-                "No user with these credentials.",
-            )
+            raise NotFound("No user with these credentials.")
 
         refresh = self.get_token(user)
         data = {
