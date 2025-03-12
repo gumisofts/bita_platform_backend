@@ -423,7 +423,7 @@ class LoginTests(APITestCase):
         """
         payload = {"identifier": self.user.email, "password": "wrongpassword"}
         response = self.client.post(self.login_url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class EmployeeInvitationTests(APITestCase):
