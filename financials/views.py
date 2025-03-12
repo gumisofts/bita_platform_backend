@@ -2,9 +2,10 @@ from django.db import transaction as db_transaction
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 
+from inventory.models import SuppliedItem
+
 from .models import Order, OrderItem, Transaction
 from .serializers import OrderItemSerializer, OrderSerializer, TransactionSerializer
-from inventory.models import SuppliedItem
 
 
 class OrderViewSet(viewsets.ModelViewSet):

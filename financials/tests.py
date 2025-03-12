@@ -1,14 +1,10 @@
 import uuid
 
 from django.test import TestCase
-from mixer.backend.django import mixer
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from inventory.models import Item, SuppliedItem
-
-
-from .models import Order, OrderItem, Transaction
+from .models import Order, Transaction
 
 
 class OrderAPITestCase(TestCase):

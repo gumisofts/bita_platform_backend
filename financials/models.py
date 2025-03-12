@@ -1,7 +1,9 @@
 import uuid
-from django.db import models
-from inventory.models import Item
 from decimal import Decimal
+
+from django.db import models
+
+from inventory.models import Item
 
 
 class Order(models.Model):
