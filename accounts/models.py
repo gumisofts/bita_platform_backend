@@ -10,7 +10,7 @@ from .manager import CustomUserManager
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     username = models.CharField(max_length=255, blank=True, null=True)
-    email = models.EmailField(unique=True, blank=True)
+    email = models.EmailField(unique=True, blank=True, null=True)
     phone_number = models.CharField(
         max_length=15,
         validators=[
@@ -22,6 +22,7 @@ class User(AbstractUser):
         ],
         unique=True,
         blank=True,
+        null=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -32,7 +33,7 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["first_name"]
 
     def __str__(self):
-        return self.email
+        return self.email or self.username or str(self.id)
 
 
 class Address(models.Model):

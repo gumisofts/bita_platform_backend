@@ -343,3 +343,8 @@ class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
         fields = "__all__"
+
+
+# Used to specify an empty serializer used by redocs UI for schema generation
+class EmptySerializer(serializers.Serializer):
+    pass
