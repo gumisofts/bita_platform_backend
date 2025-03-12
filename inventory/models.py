@@ -100,7 +100,7 @@ class Supply(models.Model):
 class SuppliedItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     quantity = models.PositiveIntegerField()
-    item = models.ManyToManyField(Supply, related_name="supplied_items")
+    item = models.ManyToManyField(Item, related_name="supplied_items")
     price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
     )
