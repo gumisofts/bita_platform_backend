@@ -14,7 +14,13 @@ def validate_phone(phone):
 
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, email=None, phone_number=None, password=None, **extra_fields):
+    def create_user(
+        self,
+        email=None,
+        phone_number=None,
+        password=None,
+        **extra_fields,
+    ):
         """Create and return a regular user."""
         if phone_number:
             validate_phone(phone_number)
