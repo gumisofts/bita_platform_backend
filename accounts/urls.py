@@ -93,7 +93,7 @@ urlpatterns = (
             name="phone-change",
         ),
         path(
-            "phone-change-confirm/<uidb64>/<token>/",
+            "phone-change-confirm/<str:uidb64>/<str:token>/",
             PhoneChangeConfirmView.as_view(),
             name="phone-change-confirm",
         ),
@@ -103,7 +103,7 @@ urlpatterns = (
             name="email-change",
         ),
         path(
-            "email-change-confirm/<uidb64>/<token>/",
+            "email-change-confirm/<str:uidb64>/<str:token>/",
             EmailChangeConfirmView.as_view(),
             name="email-change-confirm",
         ),
@@ -114,7 +114,7 @@ urlpatterns = (
         ),
         path(
             """
-        employee-invitation-confirm/<business_id>/<role_id>/<uidb64>/<token>/
+        employee-invitation-confirm/<uuid:business_id>/<uuid:role_id>/<str:uidb64>/<str:token>/
         """,
             EmployeeInvitationConfirmView.as_view(),
             name="employee-invitation-confirm",

@@ -6,10 +6,12 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from drf_spectacular.utils import (
     OpenApiExample,
+    OpenApiParameter,
+    OpenApiTypes,
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, serializers, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
@@ -34,6 +36,7 @@ from .serializers import (
     CustomTokenObtainPairSerializer,
     EmailChangeRequestSerializer,
     EmployeeInvitationSerializer,
+    EmptySerializer,
     PasswordChangeSerializer,
     PasswordResetSerializer,
     PhoneChangeRequestSerializer,
@@ -116,6 +119,8 @@ class PhoneChangeRequestView(generics.GenericAPIView):
 
 
 class PhoneChangeConfirmView(generics.GenericAPIView):
+    serializer_class = EmptySerializer
+
     def post(self, request, uidb64, token):
         try:
             uid = force_str(urlsafe_base64_decode(uidb64))
@@ -167,6 +172,8 @@ class EmailChangeRequestView(generics.GenericAPIView):
 
 
 class EmailChangeConfirmView(generics.GenericAPIView):
+    serializer_class = EmptySerializer
+
     def post(self, request, uidb64, token):
         try:
             uid = force_str(urlsafe_base64_decode(uidb64))
@@ -226,11 +233,13 @@ class PasswordResetView(generics.GenericAPIView):
         )
 
 
-@extend_schema_view(
-    post=extend_schema(
-        summary="Password Reset Confirm",
-        description="Confirm the password reset by setting a new password.",
-    ),
+@extend_schema(
+    summary="Password Reset Confirm",
+    description="Confirm the password reset by setting a new password.",
+    parameters=[
+        OpenApiParameter("uidb64", OpenApiTypes.STR, location="path"),
+        OpenApiParameter("token", OpenApiTypes.STR, location="path"),
+    ],
 )
 class PasswordResetConfirmView(generics.GenericAPIView):
     serializer_class = SetNewPasswordSerializer
@@ -295,38 +304,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
-@extend_schema_view(
-    list=extend_schema(
-        summary="List Businesses",
-        description="Retrieve a list of all businesses. (Admin only)",
-    ),
-    retrieve=extend_schema(
-        summary="Retrieve Business",
-        description="Retrieve a single business by its ID. \
-            (Admin or the business owner queried)",
-    ),
-    create=extend_schema(
-        summary="Create Business",
-        description="Create a new business.",
-    ),
-    update=extend_schema(
-        summary="Update Business",
-        description="Update a business completely.",
-    ),
-    partial_update=extend_schema(
-        summary="Partial Update Business",
-        description="Partially update a business instance.",
-    ),
-    destroy=extend_schema(
-        summary="Delete Business",
-        description="Delete a business instance.",
-    ),
-)
-@extend_schema_view(
-    post=extend_schema(
-        summary="Token verification",
-        description="Verify the token and return user data.",
-    )
+@extend_schema(
+    summary="Token verification",
+    description="Verify the token and return user data.",
 )
 class JWTTokenVerifyView(TokenVerifyView):
     permission_classes = (AllowAny,)
@@ -391,7 +371,19 @@ class EmployeeInvitationView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    operation_id="employeeInvitationConfirm",
+    summary="Confirm an employee invitation",
+    parameters=[
+        OpenApiParameter("business_id", OpenApiTypes.UUID, location="path"),
+        OpenApiParameter("role_id", OpenApiTypes.UUID, location="path"),
+        OpenApiParameter("uidb64", OpenApiTypes.STR, location="path"),
+        OpenApiParameter("token", OpenApiTypes.STR, location="path"),
+    ],
+    responses={200: EmptySerializer},
+)
 class EmployeeInvitationConfirmView(generics.GenericAPIView):
+    serializer_class = EmptySerializer
 
     def post(self, request, business_id, role_id, uidb64, token):
         try:
