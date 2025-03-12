@@ -26,7 +26,6 @@ from .views import (
     PasswordResetView,
     PhoneChangeConfirmView,
     PhoneChangeRequestView,
-    RolePermissionViewSet,
     RoleViewSet,
     UserViewSet,
     api_documentation,
@@ -39,7 +38,6 @@ router.register(r"users", UserViewSet)
 router.register(r"businesses", BusinessViewSet)
 router.register(r"categories", CategoryViewSet)
 router.register(r"roles", RoleViewSet)
-router.register(r"role-permissions", RolePermissionViewSet)
 router.register(r"addresses", AddressViewSet)
 router.register(r"branches", BranchViewSet)
 

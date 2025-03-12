@@ -97,12 +97,14 @@ class Business(models.Model):
 
 class Role(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    business = models.ForeignKey(
+        Business, on_delete=models.CASCADE, related_name="roles"
+    )
     role_name = models.CharField(max_length=255)
     role_code = models.IntegerField()
-
-
-# class Permission(Permission):
-#     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    permissions = models.ManyToManyField(
+        Permission, related_name="roles", through="RolePermission"
+    )
 
 
 class RolePermission(models.Model):
@@ -118,6 +120,8 @@ class RolePermission(models.Model):
         null=True,
     )
 
+    created_at = models.DateTimeField(auto_now_add=True)
+
 
 class Employee(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -132,9 +136,7 @@ class Employee(models.Model):
         null=True,
     )
     role = models.ForeignKey(
-        Role,
-        on_delete=models.SET_NULL,
-        null=True,
+        Role, on_delete=models.SET_NULL, null=True, related_name="employees"
     )
 
     def __str__(self):
