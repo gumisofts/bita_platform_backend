@@ -14,14 +14,12 @@ def validate_phone(phone):
 
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, email, phone_number, password=None, **extra_fields):
+    def create_user(self, email=None, phone_number=None, password=None, **extra_fields):
         """Create and return a regular user."""
-        if not email:
-            raise ValueError("The Email field must be set")
-        if not phone_number:
-            raise ValueError("The Phone field must be set")
-        validate_phone(phone_number)
-        email = self.normalize_email(email)
+        if phone_number:
+            validate_phone(phone_number)
+        if email:
+            email = self.normalize_email(email)
         user = self.model(
             email=email,
             phone_number=phone_number,
@@ -33,8 +31,8 @@ class CustomUserManager(BaseUserManager):
 
     def create_superuser(
         self,
-        email,
-        phone_number,
+        email=None,
+        phone_number=None,
         password=None,
         **extra_fields,
     ):
