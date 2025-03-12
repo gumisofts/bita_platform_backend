@@ -1,8 +1,7 @@
 import uuid
-
 from django.db import models
-
 from inventory.models import Item
+from decimal import Decimal
 
 
 class Order(models.Model):
@@ -15,6 +14,9 @@ class Order(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer_id = models.UUIDField()
     employee_id = models.UUIDField()
+    total_payable = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00")
+    )
     status = models.CharField(
         max_length=20, choices=StatusChoices.choices, default=StatusChoices.PROCESSING
     )

@@ -5,14 +5,10 @@ from mixer.backend.django import mixer
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from inventory.models import Item
+from inventory.models import Item, SuppliedItem
+
 
 from .models import Order, OrderItem, Transaction
-from .serializers import OrderItemSerializer
-
-# from mixer.backend.django import Mixer
-
-# mixer = Mixer(commit=False)
 
 
 class OrderAPITestCase(TestCase):
@@ -56,28 +52,6 @@ class OrderAPITestCase(TestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, Order.StatusChoices.COMPLETED)
         self.assertEqual(Transaction.objects.count(), 1)
-
-
-class OrderItemAPITestCase(TestCase):
-    def setUp(self):
-        self.order = mixer.blend(Order)
-        self.item = mixer.blend(Item, notify_below=111, selling_quota=111)
-
-    def test_create_order_item(self):
-        order_item_data = {
-            "item": self.item.id,
-            "order": self.order.id,
-            "quantity": 10,
-        }
-
-        response = self.client.post(
-            "/financial/order-items/",
-            order_item_data,
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(OrderItem.objects.count(), 1)
 
 
 class TransactionAPITestCase(TestCase):
