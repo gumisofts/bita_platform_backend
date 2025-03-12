@@ -20,7 +20,6 @@ from .models import (
     Employee,
     PhoneChangeRequest,
     Role,
-    RolePermission,
 )
 from .serializers import (
     AddressSerializer,
@@ -365,11 +364,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class RoleViewSet(viewsets.ModelViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-
-
-class RolePermissionViewSet(viewsets.ModelViewSet):
-    queryset = RolePermission.objects.all()
-    serializer_class = RolePermissionSerializer
 
 
 class EmployeeInvitationView(generics.GenericAPIView):
