@@ -1,0 +1,32 @@
+{
+    "dev": {
+        "aws_region": "eu-north-1",
+        "django_settings": "core.settings",
+        "exclude": [
+            "boto3",
+            "dateutil",
+            "botocore",
+            "s3transfer",
+            "concurrent"
+        ],
+        "profile_name": "default",
+        "project_name": "bita-platform-b",
+        "runtime": "python3.12",
+        "s3_bucket": "zappa-khobnv213"
+    },
+    "pro": {
+        "aws_region": "eu-north-1",
+        "django_settings": "core.settings",
+        "exclude": [
+            "boto3",
+            "dateutil",
+            "botocore",
+            "s3transfer",
+            "concurrent"
+        ],
+        "profile_name": "default",
+        "project_name": "bita-platform-b",
+        "runtime": "python3.12",
+        "s3_bucket": "zappa-khobnv213"
+    }
+}
