@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from django.db import models
 
@@ -15,6 +16,9 @@ class Order(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer_id = models.UUIDField()
     employee_id = models.UUIDField()
+    total_payable = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00")
+    )
     status = models.CharField(
         max_length=20, choices=StatusChoices.choices, default=StatusChoices.PROCESSING
     )
@@ -27,13 +31,12 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    item = models.OneToOneField(
+    item = models.ForeignKey(
         Item,
         on_delete=models.CASCADE,
     )
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
-    price = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
         return f"Item {self.item_id} in Order {self.order.id}"

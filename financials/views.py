@@ -2,6 +2,8 @@ from django.db import transaction as db_transaction
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 
+from inventory.models import SuppliedItem
+
 from .models import Order, OrderItem, Transaction
 from .serializers import OrderItemSerializer, OrderSerializer, TransactionSerializer
 
@@ -68,6 +70,37 @@ class OrderItemViewSet(viewsets.ModelViewSet):
     queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
     http_method_names = ["post"]
+
+    def create(self, request, *args, **kwargs):
+        with db_transaction.atomic():
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            # Save the new OrderItem
+            order_item = serializer.save()
+            # Get the associated Order
+            order = order_item.order
+
+            # Get the latest supply price of the item
+            latest_supply = (
+                SuppliedItem.objects.filter(item=order_item.item)
+                .order_by("-timestamp")
+                .first()
+            )
+
+            if latest_supply:
+                item_unit_price = latest_supply.price
+            else:
+                return Response(
+                    {"error": "No supply record found for this item."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Update the order's total_payable field
+            order.total_payable += item_unit_price * order_item.quantity
+            order.save()
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
