@@ -1,7 +1,8 @@
-from accounts.models import Role, Employee, Business
 from django.contrib.auth.models import Permission
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
+
+from accounts.models import Business, Employee, Role
 
 
 @receiver([post_save], sender=Business)

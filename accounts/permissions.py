@@ -1,8 +1,8 @@
-from rest_framework.permissions import BasePermission, SAFE_METHODS
-
-from .models import Business, Employee, User, Role
 from django.contrib.auth.models import Permission
 from django.db.models import Q
+from rest_framework.permissions import SAFE_METHODS, BasePermission
+
+from .models import Business, Employee, Role, User
 
 
 def has_bussiness_permission(request, model, bussiness: Business):
