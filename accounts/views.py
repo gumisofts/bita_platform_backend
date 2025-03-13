@@ -51,6 +51,7 @@ User = get_user_model()
 
 @extend_schema(
     summary="User Management",
+    tags=["Accounts"],
     description="Retrieve, create, update, or delete users.",
 )
 @extend_schema_view(
@@ -104,6 +105,9 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class PhoneChangeRequestView(generics.GenericAPIView):
     serializer_class = PhoneChangeRequestSerializer
 
@@ -118,6 +122,9 @@ class PhoneChangeRequestView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class PhoneChangeConfirmView(generics.GenericAPIView):
     serializer_class = EmptySerializer
 
@@ -156,6 +163,9 @@ class PhoneChangeConfirmView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class EmailChangeRequestView(generics.GenericAPIView):
     serializer_class = EmailChangeRequestSerializer
 
@@ -171,6 +181,9 @@ class EmailChangeRequestView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class EmailChangeConfirmView(generics.GenericAPIView):
     serializer_class = EmptySerializer
 
@@ -208,11 +221,17 @@ class EmailChangeConfirmView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class BusinessViewSet(viewsets.ModelViewSet):
     queryset = Business.objects.all()
     serializer_class = BusinessSerializer
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 @extend_schema_view(
     post=extend_schema(
         summary="Password Reset",
@@ -235,6 +254,7 @@ class PasswordResetView(generics.GenericAPIView):
 
 @extend_schema(
     summary="Password Reset Confirm",
+    tags=["Accounts"],
     description="Confirm the password reset by setting a new password.",
     parameters=[
         OpenApiParameter("uidb64", OpenApiTypes.STR, location="path"),
@@ -267,6 +287,9 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 @extend_schema_view(
     put=extend_schema(
         summary="Password Change",
@@ -293,6 +316,9 @@ class PasswordChangeView(generics.UpdateAPIView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 @extend_schema_view(
     post=extend_schema(
         summary="Login",
@@ -306,6 +332,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 @extend_schema(
     summary="Token verification",
+    tags=["Accounts"],
     description="Verify the token and return user data.",
 )
 class JWTTokenVerifyView(TokenVerifyView):
@@ -336,26 +363,41 @@ class JWTTokenVerifyView(TokenVerifyView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class AddressViewSet(viewsets.ModelViewSet):
     queryset = Address.objects.all()
     serializer_class = AddressSerializer
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class RoleViewSet(viewsets.ModelViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class RolePermissionViewSet(viewsets.ModelViewSet):
     queryset = RolePermission.objects.all()
     serializer_class = RolePermissionSerializer
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class EmployeeInvitationView(generics.GenericAPIView):
     serializer_class = EmployeeInvitationSerializer
 
@@ -374,6 +416,7 @@ class EmployeeInvitationView(generics.GenericAPIView):
 @extend_schema(
     operation_id="employeeInvitationConfirm",
     summary="Confirm an employee invitation",
+    tags=["Accounts"],
     parameters=[
         OpenApiParameter("business_id", OpenApiTypes.UUID, location="path"),
         OpenApiParameter("role_id", OpenApiTypes.UUID, location="path"),
@@ -414,6 +457,9 @@ class EmployeeInvitationConfirmView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
