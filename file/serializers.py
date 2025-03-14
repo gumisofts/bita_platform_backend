@@ -38,3 +38,9 @@ class FileUploadSerializer(ModelSerializer):
         model = FileModel
         fields = ["file", "alt_text"]
         read_only_fields = ["stored_as"]
+
+
+class FileMetadataSerializer(serializers.Serializer):
+    file_name = serializers.CharField()
+    file_size = serializers.IntegerField()
+    alt_text = serializers.CharField(required=False, allow_blank=True)
