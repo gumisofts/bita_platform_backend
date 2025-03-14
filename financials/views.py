@@ -1,11 +1,17 @@
 from django.db import transaction as db_transaction
 from rest_framework import status, viewsets
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from inventory.models import SuppliedItem
 
-from .models import Order, OrderItem, Transaction
-from .serializers import OrderItemSerializer, OrderSerializer, TransactionSerializer
+from .models import BusinessPaymentMethod, Order, OrderItem, Transaction
+from .serializers import (
+    BusinessPaymentMethodSerializer,
+    OrderItemSerializer,
+    OrderSerializer,
+    TransactionSerializer,
+)
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -107,3 +113,32 @@ class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     http_method_names = ["get", "post"]
+
+
+# CRUD for Business Payment Methods
+class BusinessPaymentMethodViewSet(viewsets.ModelViewSet):
+    queryset = BusinessPaymentMethod.objects.all()
+    serializer_class = BusinessPaymentMethodSerializer
+
+    def get_queryset(self):
+        business_id = self.request.query_params.get("business_id")
+        if business_id:
+            return self.queryset.filter(business_id=business_id)
+        return self.queryset
+
+
+@api_view(["GET"])
+def get_business_payment_methods(request, business_id):
+    # Fetch system-wide default payment methods
+    default_methods = [
+        {"id": None, "name": value} for key, value in Transaction.PaymentMethod.choices
+    ]
+
+    # Fetch custom payment methods for the business
+    custom_methods = BusinessPaymentMethod.objects.filter(
+        business_id=business_id
+    ).values("id", "name")
+
+    all_methods = list(default_methods) + list(custom_methods)
+
+    return Response(all_methods)

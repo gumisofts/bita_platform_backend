@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.db import models
 
+from accounts.models import Business
 from inventory.models import Item
 
 
@@ -71,3 +72,21 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"Transaction {self.id} - {self.type} ({self.amount})"
+
+
+# Business - PaymentMethod management/mapping model
+class BusinessPaymentMethod(models.Model):
+    # id = models.BigIntegerField(primary_key=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey(
+        Business,
+        related_name="payment_methods",
+        on_delete=models.CASCADE,
+    )
+    payment_method = models.CharField(
+        max_length=20, choices=Transaction.PaymentMethod.choices
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.business.name} - {self.payment_method}"
