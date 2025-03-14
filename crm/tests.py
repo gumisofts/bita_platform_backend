@@ -83,6 +83,41 @@ class CustomerAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Customer.objects.filter(id=customer.id).exists())
 
+    def filter_customers_by_business(self):
+        # Create an additional business and two customers
+        business2 = Business.objects.create(
+            name="Business 2",
+            owner=self.user,
+            business_type=2,
+        )
+        Customer.objects.create(
+            email="custA1@example.com",
+            phone_number="712345678",
+            full_name="Customer A1",
+            business=self.business,
+        )
+        Customer.objects.create(
+            email="custA2@example.com",
+            phone_number="712345679",
+            full_name="Customer A2",
+            business=self.business,
+        )
+        # Customer for business2
+        Customer.objects.create(
+            email="custB1@example.com",
+            phone_number="712345680",
+            full_name="Customer B1",
+            business=business2,
+        )
+        response = self.client.get(
+            f"{self.list_url}?business={self.business.id}",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for cust in response.data:
+            self.assertEqual(cust["business"], str(self.business.id))
+        self.assertEqual(len(response.data), 2)
+
 
 class GiftCardAPITests(APITestCase):
     def setUp(self):
@@ -112,6 +147,20 @@ class GiftCardAPITests(APITestCase):
             ).isoformat(),
             "type": 1,  # Specific Item
         }
+
+        # Create an extra user and business for filtering tests
+        self.other_user = User.objects.create_user(
+            email="otheruser@example.com",
+            phone_number="912345679",
+            first_name="Other",
+            last_name="User",
+            password="pass123",
+        )
+        self.other_business = Business.objects.create(
+            name="Other Business",
+            owner=self.other_user,
+            business_type=2,
+        )
         self.list_url = "/crm/giftcards/"
 
     def test_create_giftcard(self):
@@ -167,3 +216,133 @@ class GiftCardAPITests(APITestCase):
         response = self.client.delete(detail_url, format="json")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(GiftCard.objects.filter(id=giftcard.id).exists())
+
+    def test_filter_giftcards_by_business(self):
+        # Create giftcards for different businesses
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.user,
+            created_by=self.user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=1,
+        )
+        GiftCard.objects.create(
+            business=self.other_business,
+            owner=self.user,
+            created_by=self.user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=1,
+        )
+        response = self.client.get(
+            f"{self.list_url}?business={self.business.id}", format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for gc in response.data["results"]:
+            self.assertEqual(gc["business"], self.business.id)
+
+    def test_filter_giftcards_by_owner(self):
+        # Create giftcards with different owners
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.user,
+            created_by=self.user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=1,
+        )
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.other_user,
+            created_by=self.other_user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=2,
+        )
+        response = self.client.get(
+            f"{self.list_url}?owner={self.other_user.id}", format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for gc in response.data["results"]:
+            self.assertEqual(gc["owner"], self.other_user.id)
+
+    def test_filter_giftcards_by_creator(self):
+        # Create giftcards with different creators
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.user,
+            created_by=self.user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=3,
+        )
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.user,
+            created_by=self.other_user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=3,
+        )
+        response = self.client.get(
+            f"{self.list_url}?creator={self.other_user.id}", format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for gc in response.data["results"]:
+            self.assertEqual(gc["created_by"], self.other_user.id)
+
+    def test_filter_giftcards_by_redeemed(self):
+        # Create giftcards with redeemed True and False
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.user,
+            created_by=self.user,
+            redeemed=True,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=1,
+        )
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.user,
+            created_by=self.user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=1,
+        )
+        response_true = self.client.get(
+            f"{self.list_url}?redeemed=true",
+            format="json",
+        )
+        self.assertEqual(response_true.status_code, status.HTTP_200_OK)
+        for gc in response_true.data["results"]:
+            self.assertTrue(gc["redeemed"])
+        response_false = self.client.get(
+            f"{self.list_url}?redeemed=false", format="json"
+        )
+        self.assertEqual(response_false.status_code, status.HTTP_200_OK)
+        for gc in response_false.data["results"]:
+            self.assertFalse(gc["redeemed"])
+
+    def test_filter_giftcards_by_type(self):
+        # Create giftcards with different types
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.user,
+            created_by=self.user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=1,
+        )
+        GiftCard.objects.create(
+            business=self.business,
+            owner=self.user,
+            created_by=self.user,
+            redeemed=False,
+            expires_at=timezone.now() + datetime.timedelta(days=30),
+            type=2,
+        )
+        response = self.client.get(f"{self.list_url}?type=2", format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for gc in response.data["results"]:
+            self.assertEqual(gc["type"], 2)
