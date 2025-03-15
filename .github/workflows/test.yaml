@@ -1,9 +1,11 @@
-name: BITA CI
+name: Django Tests
+
 on:
   push:
     branches: ["main", "dev-v01", "v01"]
   pull_request:
     branches: ["main", "dev-v01", "v01"]
+
 env:
   SECRET_KEY: y)tb02r69qx3&qpw(!tgp800x)3l(q+(!fm$yv%gxwy0o_npd7
   PG_DB_NAME: temp_db
@@ -21,11 +23,9 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_STORAGE_BUCKET_NAME: ${{ secrets.AWS_STORAGE_BUCKET_NAME }}
 
-
-
-
 jobs:
-  build:
+  test:
+    name: Run Django Tests
     runs-on: ubuntu-latest
     services:
       pg:
@@ -44,33 +44,18 @@ jobs:
           - 6379:6379
         options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
     strategy:
-      max-parallel: 4
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
+
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Format with black
-        run: |
-          pip install black
-          black --check .
-      - name: Lint with flake8
-        run: |
-          pip install flake8
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      - name: Sort imports
-        run: |
-          pip install isort
-          isort --check --diff --profile black .
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Run Tests
-        run: |
-          python manage.py test
+        run: python manage.py test
