@@ -2,8 +2,8 @@ name: Deploy on production lambda
 
 on:
   push:
-    branches:
-      - [main]
+    branches: 
+     - main
 
 jobs:
   deploy:

@@ -3,7 +3,8 @@ name: Deploy dev on lambda
 on:
   push:
     branches:
-      - [dev-v01]
+      - dev-v01
+      
 
 jobs:
   deploy:
