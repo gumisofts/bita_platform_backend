@@ -14,7 +14,7 @@
         "runtime": "python3.12",
         "s3_bucket": "zappa-khobnv213"
     },
-    "pro": {
+    "v1": {
         "aws_region": "eu-north-1",
         "django_settings": "core.settings",
         "exclude": [

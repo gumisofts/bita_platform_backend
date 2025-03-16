@@ -1,9 +1,9 @@
-name: Deploy with Zappa
+name: Deploy on production lambda
 
 on:
   push:
     branches:
-      - main
+      - [main]
 
 jobs:
   deploy:
@@ -29,4 +29,4 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-north-1
         run: |
-          zappa deploy dev || zappa update dev
+          zappa deploy v1 || zappa update v1
