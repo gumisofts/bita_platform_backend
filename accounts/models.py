@@ -47,11 +47,11 @@ class Address(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     lat = models.FloatField()
     lng = models.FloatField()
-    plus_code = models.IntegerField()
-    sublocality = models.CharField(max_length=255)
-    locality = models.CharField(max_length=255)
+    plus_code = models.IntegerField(null=True, blank=True)
+    sublocality = models.CharField(max_length=255, null=True)
+    locality = models.CharField(max_length=255, null=True)
+    admin_2 = models.CharField(max_length=255, null=True)
     admin_1 = models.CharField(max_length=255)
-    admin_2 = models.CharField(max_length=255)
     country = models.CharField(max_length=255)
 
     def __str__(self):
