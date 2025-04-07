@@ -25,6 +25,7 @@ jobs:
       - name: Copy Environment Variables and Secrets
         run: | 
           echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+          echo "DEBUG=${{ vars.DEBUG }}" >> .env
           echo "PG_DB_NAME=${{ vars.PG_DB_NAME }}" >> .env
           echo "PG_USER=${{ vars.PG_USER }}" >> .env
           echo "PG_PASSWORD=${{ secrets.PG_PASSWORD }}" >> .env
