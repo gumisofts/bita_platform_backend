@@ -9,7 +9,7 @@
             "s3transfer",
             "concurrent"
         ],
-        "profile_name": "default",
+        "profile_name": "bita",
         "project_name": "bita-platform-b",
         "runtime": "python3.12",
         "s3_bucket": "zappa-khobnv213"
@@ -24,7 +24,7 @@
             "s3transfer",
             "concurrent"
         ],
-        "profile_name": "default",
+        "profile_name": "bita",
         "project_name": "bita-platform-b",
         "runtime": "python3.12",
         "s3_bucket": "zappa-khobnv213"
