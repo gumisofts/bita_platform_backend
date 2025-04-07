@@ -6,7 +6,6 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
-
 urlpatterns = [
     # path(
     #     "docs/",

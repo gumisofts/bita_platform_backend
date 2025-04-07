@@ -6,13 +6,18 @@ from datetime import timedelta
 import requests
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
+
 from accounts.utils import *
+
 from .models import (
     Address,
     Branch,
@@ -24,9 +29,6 @@ from .models import (
     Role,
     RolePermission,
 )
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from django.core.exceptions import ValidationError
 
 User = get_user_model()
 

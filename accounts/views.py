@@ -12,16 +12,19 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import generics, status, viewsets
+from rest_framework.mixins import CreateModelMixin, ListModelMixin
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
-    TokenVerifyView,
     TokenRefreshView,
+    TokenVerifyView,
 )
-from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from rest_framework.mixins import CreateModelMixin, ListModelMixin
+
+from accounts.serializers import *
+
 from .models import (
     Address,
     Branch,
@@ -33,7 +36,6 @@ from .models import (
     Role,
     RolePermission,
 )
-from accounts.serializers import *
 
 User = get_user_model()
 

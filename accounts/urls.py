@@ -9,7 +9,6 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.consumers import TestConsumer
-
 from accounts.views import *
 
 auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])

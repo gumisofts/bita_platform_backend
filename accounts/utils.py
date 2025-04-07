@@ -1,6 +1,6 @@
-from google.oauth2 import id_token
-from google.auth.transport import requests
 from django.conf import settings
+from google.auth.transport import requests
+from google.oauth2 import id_token
 
 
 def get_required_user_actions(user):
