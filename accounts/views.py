@@ -15,8 +15,13 @@ from rest_framework import generics, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
-
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenVerifyView,
+    TokenRefreshView,
+)
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.mixins import CreateModelMixin, ListModelMixin
 from .models import (
     Address,
     Branch,
@@ -28,23 +33,7 @@ from .models import (
     Role,
     RolePermission,
 )
-from .serializers import (
-    AddressSerializer,
-    BranchSerializer,
-    BusinessSerializer,
-    CategorySerializer,
-    CustomTokenObtainPairSerializer,
-    EmailChangeRequestSerializer,
-    EmployeeInvitationSerializer,
-    EmptySerializer,
-    PasswordChangeSerializer,
-    PasswordResetSerializer,
-    PhoneChangeRequestSerializer,
-    RolePermissionSerializer,
-    RoleSerializer,
-    SetNewPasswordSerializer,
-    UserSerializer,
-)
+from accounts.serializers import *
 
 User = get_user_model()
 
@@ -105,9 +94,6 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
 class PhoneChangeRequestView(generics.GenericAPIView):
     serializer_class = PhoneChangeRequestSerializer
 
@@ -122,9 +108,33 @@ class PhoneChangeRequestView(generics.GenericAPIView):
         )
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
+class RegisterViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = RegisterSerializer
+
+
+class LoginViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = LoginSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+
+class LoginWithGoogleViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = LoginWithGoogleIdTokenSerializer
+
+
+class RefreshLoginViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = RefreshLoginSerializer
+
+
+class ResetRequestViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = ResetPasswordRequestSerializer
+
+
 class PhoneChangeConfirmView(generics.GenericAPIView):
     serializer_class = EmptySerializer
 
@@ -163,9 +173,6 @@ class PhoneChangeConfirmView(generics.GenericAPIView):
         )
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
 class EmailChangeRequestView(generics.GenericAPIView):
     serializer_class = EmailChangeRequestSerializer
 

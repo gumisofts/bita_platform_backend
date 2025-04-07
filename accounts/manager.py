@@ -14,6 +14,9 @@ def validate_phone(phone):
 
 
 class CustomUserManager(BaseUserManager):
+    def create(self, **kwargs):
+        return self.create_user(**kwargs)
+
     def create_user(
         self,
         email=None,
@@ -31,8 +34,9 @@ class CustomUserManager(BaseUserManager):
             phone_number=phone_number,
             **extra_fields,
         )
-        user.set_password(password)
-        user.save(using=self._db)
+        if password:
+            user.set_password(password)
+        user.save()
         return user
 
     def create_superuser(

@@ -185,6 +185,8 @@ SPECTACULAR_SETTINGS = {
 
 AUTHENTICATION_BACKENDS = [
     "accounts.backends.EmailOrPhoneBackend",
+    "accounts.backends.PhoneBackend",
+    "accounts.backends.EmailBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 
@@ -195,6 +197,7 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
 AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "eu-north-1")
 
+GOOGLE_WEB_CLIENT_ID = env("GOOGLE_WEB_CLIENT_ID")
 # S3 Storage Configuration
 AWS_S3_CUSTOM_DOMAIN = None
 AWS_S3_OBJECT_PARAMETERS = {

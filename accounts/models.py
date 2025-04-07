@@ -9,7 +9,7 @@ from .manager import CustomUserManager
 
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    username = models.CharField(max_length=255, blank=True, null=True)
+    username = None
     email = models.EmailField(unique=True, blank=True, null=True)
     phone_number = models.CharField(
         max_length=15,
@@ -24,6 +24,9 @@ class User(AbstractUser):
         blank=True,
         null=True,
     )
+    is_email_verified = models.BooleanField(default=False)
+    is_phone_verified = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -31,6 +34,10 @@ class User(AbstractUser):
 
     USERNAME_FIELD = "phone_number"
     REQUIRED_FIELDS = ["first_name"]
+
+    @staticmethod
+    def normalize_phone(phone_number):
+        return phone_number
 
     def __str__(self):
         return self.email or self.username or str(self.id)

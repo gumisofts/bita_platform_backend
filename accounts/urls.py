@@ -10,32 +10,23 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.consumers import TestConsumer
 
-from .views import (
-    AddressViewSet,
-    BranchViewSet,
-    BusinessViewSet,
-    CategoryViewSet,
-    CustomTokenObtainPairView,
-    EmailChangeConfirmView,
-    EmailChangeRequestView,
-    EmployeeInvitationConfirmView,
-    EmployeeInvitationView,
-    JWTTokenVerifyView,
-    PasswordChangeView,
-    PasswordResetConfirmView,
-    PasswordResetView,
-    PhoneChangeConfirmView,
-    PhoneChangeRequestView,
-    RolePermissionViewSet,
-    RoleViewSet,
-    UserViewSet,
-    api_documentation,
-)
+from accounts.views import *
 
 auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
+router.register(r"auth/register", RegisterViewset, basename="auth-register")
+router.register(
+    r"auth/refresh/login", RefreshLoginViewset, basename="auth-refresh-login"
+)
+router.register(
+    r"auth/reset/password", ResetRequestViewset, basename="auth-reset-password"
+)
+router.register(r"auth/login", LoginViewset, basename="auth-login")
+router.register(
+    r"auth/google/login", LoginWithGoogleViewset, basename="auth-google-login"
+)
 router.register(r"businesses", BusinessViewSet)
 router.register(r"categories", CategoryViewSet)
 router.register(r"roles", RoleViewSet)
@@ -45,32 +36,10 @@ router.register(r"branches", BranchViewSet)
 
 urlpatterns = (
     [
-        path("", api_documentation, name="api_documentation"),
-        path(
-            "token/",
-            CustomTokenObtainPairView.as_view(),
-            name="token_obtain_pair",
-        ),
-        path(
-            "token/refresh/",
-            TokenRefreshView.as_view(),
-            name="token_refresh",
-        ),
         path(
             "token/verify/",
             JWTTokenVerifyView.as_view(),
             name="token_verify",
-        ),
-        path("schema/", SpectacularAPIView.as_view(), name="schema"),
-        path(
-            "swagger/",
-            SpectacularSwaggerView.as_view(url_name="schema"),
-            name="swagger-ui",
-        ),
-        path(
-            "redoc/",
-            SpectacularRedocView.as_view(url_name="schema"),
-            name="redoc",
         ),
         path(
             "password-reset/",

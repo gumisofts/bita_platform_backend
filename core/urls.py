@@ -1,15 +1,36 @@
 from django.contrib import admin
 from django.urls import include, path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
+
 
 urlpatterns = [
+    # path(
+    #     "docs/",
+    # ),
+    path(
+        "docs/swagger/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+    path(
+        "redoc/",
+        SpectacularRedocView.as_view(url_name="schema"),
+        name="redoc",
+    ),
+    path(
+        "",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+    path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("admin/", admin.site.urls),
-    path("", include("accounts.urls")),
-    # file urls
+    path("accounts/", include("accounts.urls")),
     path("file/", include("file.urls")),
-    # inventory-module urls
     path("inventory/", include("inventory.urls")),
-    # crm-module urls
     path("crm/", include("crm.urls")),
-    # financials urls
     path("financial/", include("financials.urls")),
 ]

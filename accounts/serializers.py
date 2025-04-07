@@ -12,7 +12,7 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
+from accounts.utils import *
 from .models import (
     Address,
     Branch,
@@ -24,6 +24,9 @@ from .models import (
     Role,
     RolePermission,
 )
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
@@ -347,3 +350,186 @@ class BranchSerializer(serializers.ModelSerializer):
 # Used to specify an empty serializer used by redocs UI for schema generation
 class EmptySerializer(serializers.Serializer):
     pass
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, max_length=255)
+
+    class Meta:
+        exclude = [
+            "groups",
+            "user_permissions",
+            "is_staff",
+            "is_superuser",
+            "last_login",
+        ]
+        model = User
+        read_only_fields = (
+            "last_login",
+            "is_active",
+            "date_joined",
+            "is_email_verified",
+            "is_phone_verified",
+        )
+
+
+class UserReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        exclude = [
+            "groups",
+            "user_permissions",
+            "is_staff",
+            "is_superuser",
+            "last_login",
+            "password",
+        ]
+
+
+class LoginSerializer(serializers.Serializer):
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+    user = UserReadSerializer(read_only=True)
+    password = serializers.CharField(write_only=True)
+    email = serializers.CharField(write_only=True, required=False)
+    phone_number = serializers.CharField(write_only=True, required=False)
+    actions = serializers.ListField(read_only=True)
+
+    def validate(self, attrs):
+
+        attrs = super().validate(attrs)
+
+        user = authenticate(self.context.get("request"), **attrs)
+
+        if not user:
+            raise ValidationError(
+                {
+                    key: ["No user found with the given credentials"]
+                    for key in attrs.keys()
+                },
+                400,
+            )
+
+        attrs["user"] = user
+
+        return attrs
+
+    def create(self, validated_data):
+        user = validated_data.pop("user")
+
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+
+        return {
+            "user": user,
+            "refresh": refresh_token,
+            "access": access_token,
+            "actions": get_required_user_actions(user),
+        }
+
+
+class RefreshLoginSerializer(serializers.Serializer):
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        try:
+            refresh = RefreshToken(attrs.get("refresh"), verify=True)
+            attrs["refresh"] = refresh
+        except TokenError:
+            raise ValidationError({"refresh": ["invalid token"]}, 400)
+
+        return attrs
+
+    def create(self, validated_data):
+        refresh = validated_data.pop("refresh")
+        access_token = str(refresh.access_token)
+
+        refresh.set_jti()
+        refresh.set_exp()
+        refresh.set_iat()
+
+        return {
+            "refresh": str(refresh),
+            "access": access_token,
+        }
+
+
+class LoginWithGoogleIdTokenSerializer(serializers.Serializer):
+    id_token = serializers.CharField(write_only=True)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+    user = UserReadSerializer(read_only=True)
+    actions = serializers.ListField(read_only=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        userInfo = verify_google_id_token(attrs.get("id_token"))
+        if not userInfo:
+            raise ValidationError({"id_token": ["invalid id token"]}, 400)
+        return userInfo
+
+    def create(self, validated_data):
+        email = validated_data.pop("email")
+        first_name = validated_data.pop("given_name")
+        last_name = validated_data.pop("family_name")
+        user = User.objects.filter(email=email).first()
+
+        if not user:
+
+            user = User.objects.create(
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                is_email_verified=True,
+                is_active=True,
+            )
+        else:
+            user.is_email_verified = True
+
+            user.save()
+
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+
+        return {
+            "user": user,
+            "refresh": refresh_token,
+            "access": access_token,
+            "actions": get_required_user_actions(user),
+        }
+
+
+class ResetPasswordRequestSerializer(serializers.Serializer):
+    email = serializers.CharField(read_only=True, required=False)
+    phone_number = serializers.CharField(read_only=True, required=False)
+    detail = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        user = User.objects.filter(**attrs).first()
+
+        if not user:
+            raise ValidationError(
+                {key: [f"no user found with given {key}"] for key in attrs.keys()}, 404
+            )
+        attrs["user"] = user
+        return attrs
+
+    def create(self, validated_data):
+        email = validated_data.get("email")
+        phone_number = validated_data.get("phone_number")
+        user = validated_data.get("user")
+
+        if email:
+            # TODO handle email sending
+            pass
+        if phone_number:
+            # TODO handle phone sending
+            pass
+        return {"detail": "success"}
