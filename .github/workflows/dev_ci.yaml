@@ -46,7 +46,7 @@ jobs:
             cd ~/
             mkdir .aws
             cd .aws
-            echo "[potion]" >> credentials
+            echo "[bita]" >> credentials
             echo "aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}" >> credentials
             echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> credentials
             echo "region = ${{ secrets.AWS_S3_REGION_NAME }}" >> credentials
