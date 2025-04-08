@@ -73,10 +73,10 @@ class Category(models.Model):
 class Business(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     business_type_choices = [
-        (1, "Retail"),
-        (2, "Wholesale"),
-        (3, "Manufacturing"),
-        (4, "Service"),
+        ("retail", "Retail"),
+        ("whole_sale", "Wholesale"),
+        ("manufacturing", "Manufacturing"),
+        ("service", "Service"),
     ]
     name = models.CharField(max_length=255)
     owner = models.ForeignKey(
@@ -85,16 +85,14 @@ class Business(models.Model):
         related_name="businesses",
         null=True,
     )
-    business_type = models.IntegerField(choices=business_type_choices)
+    business_type = models.CharField(choices=business_type_choices, max_length=255)
     address = models.ForeignKey(
         Address,
         on_delete=models.SET_NULL,
         null=True,
     )
-    category = models.ForeignKey(
+    category = models.ManyToManyField(
         Category,
-        on_delete=models.SET_NULL,
-        null=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     # Files and Images

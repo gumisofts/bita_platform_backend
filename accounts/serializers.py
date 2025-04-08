@@ -154,10 +154,25 @@ class EmailChangeRequestSerializer(serializers.Serializer):
         requests.request("POST", email_url, headers=headers, data=payload)
 
 
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        exclude = []
+
+
 class BusinessSerializer(serializers.ModelSerializer):
+    owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    address = AddressSerializer()
+
     class Meta:
         model = Business
         fields = "__all__"
+
+    def create(self, validated_data):
+        address = validated_data.pop("address")
+        address = Address.objects.create(**address)
+        validated_data["address"] = address
+        return super().create(validated_data)
 
 
 class PasswordResetSerializer(serializers.Serializer):
