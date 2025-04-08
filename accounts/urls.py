@@ -14,13 +14,16 @@ from accounts.views import *
 auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])
 
 router = DefaultRouter()
-router.register(r"users", UserViewSet)
+router.register(r"users", UserViewSet, basename="users")
 router.register(r"auth/register", RegisterViewset, basename="auth-register")
 router.register(
     r"auth/refresh/login", RefreshLoginViewset, basename="auth-refresh-login"
 )
 router.register(
-    r"auth/reset/password", ResetRequestViewset, basename="auth-reset-password"
+    r"auth/password/reset", ResetRequestViewset, basename="auth-password-reset"
+)
+router.register(
+    r"auth/password/change", PasswordChangeViewset, basename="auth-password-change"
 )
 router.register(r"auth/login", LoginViewset, basename="auth-login")
 router.register(
@@ -49,11 +52,6 @@ urlpatterns = (
             "password-reset-confirm/<uidb64>/<token>/",
             PasswordResetConfirmView.as_view(),
             name="password-reset-confirm",
-        ),
-        path(
-            "password-change/",
-            PasswordChangeView.as_view(),
-            name="password-change",
         ),
         path(
             "phone-change/",

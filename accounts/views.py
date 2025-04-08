@@ -12,7 +12,13 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import generics, status, viewsets
-from rest_framework.mixins import CreateModelMixin, ListModelMixin
+from rest_framework.mixins import (
+    CreateModelMixin,
+    ListModelMixin,
+    RetrieveModelMixin,
+    DestroyModelMixin,
+    UpdateModelMixin,
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -40,52 +46,9 @@ from .models import (
 User = get_user_model()
 
 
-@extend_schema(
-    summary="User Management",
-    tags=["Accounts"],
-    description="Retrieve, create, update, or delete users.",
-)
-@extend_schema_view(
-    list=extend_schema(
-        summary="List Users",
-        description="Retrieve a list of all users. (Admin only)",
-    ),
-    create=extend_schema(
-        summary="Create User",
-        description="Create a new user. (Registration endpoint)",
-        examples=[
-            OpenApiExample(
-                "Example 1",
-                value={
-                    "email": "user@example.com",
-                    "first_name": "string",
-                    "last_name": "string",
-                    "phone": "924530740",
-                    "password": "password",
-                },
-                request_only=True,  # Ensures this is only for requests
-            ),
-        ],
-    ),
-    retrieve=extend_schema(
-        summary="Retrieve User",
-        description="Retrieve a single user by its ID. \
-            (Admin or the user queried)",
-    ),
-    update=extend_schema(
-        summary="Update User",
-        description="Update a user completely.",
-    ),
-    partial_update=extend_schema(
-        summary="Partial Update User",
-        description="Partially update a user instance.",
-    ),
-    destroy=extend_schema(
-        summary="Delete User",
-        description="Delete a user instance.",
-    ),
-)
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(
+    ListModelMixin, RetrieveModelMixin, DestroyModelMixin, GenericViewSet
+):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
@@ -190,9 +153,6 @@ class EmailChangeRequestView(generics.GenericAPIView):
         )
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
 class EmailChangeConfirmView(generics.GenericAPIView):
     serializer_class = EmptySerializer
 
@@ -236,15 +196,6 @@ class BusinessViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
-@extend_schema_view(
-    post=extend_schema(
-        summary="Password Reset",
-        description="Send a password reset link to the user's email.",
-    ),
-)
 class PasswordResetView(generics.GenericAPIView):
     serializer_class = PasswordResetSerializer
 
@@ -259,15 +210,6 @@ class PasswordResetView(generics.GenericAPIView):
         )
 
 
-@extend_schema(
-    summary="Password Reset Confirm",
-    tags=["Accounts"],
-    description="Confirm the password reset by setting a new password.",
-    parameters=[
-        OpenApiParameter("uidb64", OpenApiTypes.STR, location="path"),
-        OpenApiParameter("token", OpenApiTypes.STR, location="path"),
-    ],
-)
 class PasswordResetConfirmView(generics.GenericAPIView):
     serializer_class = SetNewPasswordSerializer
 
@@ -294,54 +236,12 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         )
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
-@extend_schema_view(
-    put=extend_schema(
-        summary="Password Change",
-        description="Change the user's password.",
-    ),
-)
-class PasswordChangeView(generics.UpdateAPIView):
+class PasswordChangeViewset(UpdateModelMixin, GenericViewSet):
     serializer_class = PasswordChangeSerializer
-    http_method_names = ["put"]
-
-    def get_object(self):
-        return self.request.user
-
-    def update(self, request, *args, **kwargs):
-        user = self.get_object()
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user)
-        update_session_auth_hash(request, user)  # Keep the user logged in
-        return Response(
-            {"detail": "Password has been changed."}, status=status.HTTP_200_OK
-        )
+    permission_classes = [IsAuthenticated]
+    queryset = User.objects.filter()
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
-@extend_schema_view(
-    post=extend_schema(
-        summary="Login",
-        description="Obtain a new access token by \
-            exchanging username and password.",
-    ),
-)
-class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
-
-
-@extend_schema(
-    summary="Token verification",
-    tags=["Accounts"],
-    description="Verify the token and return user data.",
-)
 class JWTTokenVerifyView(TokenVerifyView):
     permission_classes = (AllowAny,)
 

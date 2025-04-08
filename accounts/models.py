@@ -5,6 +5,11 @@ from django.core.validators import RegexValidator
 from django.db import models
 
 from .manager import CustomUserManager
+from django.contrib.auth.hashers import (
+    check_password,
+    is_password_usable,
+    make_password,
+)
 
 
 class User(AbstractUser):
@@ -238,5 +243,9 @@ class Password(models.Model):
         null=True,
         related_name="user_passwords",
     )
-    password = models.TextField()
+    password = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @staticmethod
+    def hash_password(password):
+        return make_password(password)

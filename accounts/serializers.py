@@ -34,24 +34,16 @@ User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True)
-
     class Meta:
         model = User
-        fields = "__all__"
-
-    def create(self, validated_data):
-        email = validated_data.get("email")
-        phone = validated_data.get("phone_number")
-        if email is None or phone is None:
-            raise serializers.ValidationError("Email or phone is required.")
-        password = validated_data.pop("password", None)
-        user = super().create(validated_data)
-        if password:
-            user.set_password(password)
-            Password.objects.create(user=user, password=user.password)
-            user.save()
-        return user
+        exclude = [
+            "groups",
+            "user_permissions",
+            "is_staff",
+            "is_superuser",
+            "last_login",
+            "password",
+        ]
 
     def update(self, instance, validated_data):
         for field in [
@@ -237,23 +229,42 @@ class PasswordResetSerializer(serializers.Serializer):
 class PasswordChangeSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True)
-    new_password_confirm = serializers.CharField(write_only=True)
-
-    def validate_old_password(self, value):
-        user = self.context["request"].user
-        if not user.check_password(value):
-            raise serializers.ValidationError("Old password is not correct.")
-        return value
+    status = serializers.CharField(read_only=True)
 
     def validate(self, attrs):
-        if attrs["new_password"] != attrs["new_password_confirm"]:
-            raise serializers.ValidationError("New passwords do not match.")
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        errors = {}
+        print(Password.hash_password("Hello,World!"))
+        print(Password.hash_password("Hello,World!"))
+        password = (
+            Password.objects.filter(
+                password=Password.hash_password(attrs.get("new_password"))
+            )
+            .order_by("created_at")
+            .first()
+        )
+        if not instance.check_password(attrs.get("old_password")):
+            errors["old_password"] = ["Old password is not correct."]
+
+        if password:
+            errors["new_password"] = [
+                "you cannot use one of your old passwords as new password"
+            ]
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
         return attrs
 
-    def save(self, user):
-        user.set_password(self.validated_data["new_password"])
-        user.save()
-        return user
+    def update(self, instance, validated_data):
+        old_password = instance.password
+        instance.set_password(validated_data.get("new_password"))
+        instance.save()
+
+        Password.objects.create(password=old_password)
+
+        return {"status": "password changed successfully"}
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
