@@ -47,7 +47,7 @@ class Address(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     lat = models.FloatField()
     lng = models.FloatField()
-    plus_code = models.IntegerField(null=True, blank=True)
+    plus_code = models.CharField(null=True, blank=True)
     sublocality = models.CharField(max_length=255, null=True)
     locality = models.CharField(max_length=255, null=True)
     admin_2 = models.CharField(max_length=255, null=True)
@@ -95,6 +95,7 @@ class Business(models.Model):
         Category,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     # Files and Images
 
     def __str__(self):
