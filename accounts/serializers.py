@@ -159,6 +159,24 @@ class AddressSerializer(serializers.ModelSerializer):
         model = Address
         exclude = []
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        lat = attrs.get("lat")
+        lng = attrs.get("lng")
+
+        errors = {}
+
+        if lat < -90 or lat > 90:
+            errors["lat"] = "latitude should be between -90 and 90"
+
+        if lng < -90 or lng > 90:
+            errors["lng"] = "longitude should be between -180 and 180"
+
+        if errors:
+            raise ValidationError(errors)
+
+        return attrs
+
 
 class BusinessSerializer(serializers.ModelSerializer):
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
