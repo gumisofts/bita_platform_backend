@@ -169,7 +169,7 @@ class AddressSerializer(serializers.ModelSerializer):
         if lat < -90 or lat > 90:
             errors["lat"] = "latitude should be between -90 and 90"
 
-        if lng < -90 or lng > 90:
+        if lng < -180 or lng > 180:
             errors["lng"] = "longitude should be between -180 and 180"
 
         if errors:
