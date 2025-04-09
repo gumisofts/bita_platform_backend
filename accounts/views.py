@@ -14,9 +14,9 @@ from drf_spectacular.utils import (
 from rest_framework import generics, status, viewsets
 from rest_framework.mixins import (
     CreateModelMixin,
+    DestroyModelMixin,
     ListModelMixin,
     RetrieveModelMixin,
-    DestroyModelMixin,
     UpdateModelMixin,
 )
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -242,6 +242,14 @@ class PasswordChangeViewset(UpdateModelMixin, GenericViewSet):
     queryset = User.objects.filter()
 
 
+class ResetPasswordRequestViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = ResetPasswordRequestSerializer
+
+
+class ConfirmResetPasswordRequestViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = ConfirmResetPasswordRequestViewsetSerializer
+
+
 class JWTTokenVerifyView(TokenVerifyView):
     permission_classes = (AllowAny,)
 
@@ -276,33 +284,23 @@ class AddressViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
-class CategoryViewSet(viewsets.ModelViewSet):
+class CategoryViewSet(ListModelMixin, GenericViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
-class RoleViewSet(viewsets.ModelViewSet):
+class RoleViewSet(ListModelMixin, GenericViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
+    permission_classes = [IsAuthenticated]
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
 class RolePermissionViewSet(viewsets.ModelViewSet):
     queryset = RolePermission.objects.all()
     serializer_class = RolePermissionSerializer
+    permission_classes = [IsAuthenticated]
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
 class EmployeeInvitationView(generics.GenericAPIView):
     serializer_class = EmployeeInvitationSerializer
 

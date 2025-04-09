@@ -1,15 +1,15 @@
 from uuid import uuid4
 
-from django.contrib.auth.models import AbstractUser, Permission
-from django.core.validators import RegexValidator
-from django.db import models
-
-from .manager import CustomUserManager
 from django.contrib.auth.hashers import (
     check_password,
     is_password_usable,
     make_password,
 )
+from django.contrib.auth.models import AbstractUser, Permission
+from django.core.validators import RegexValidator
+from django.db import models
+
+from .manager import CustomUserManager
 
 
 class User(AbstractUser):
@@ -249,3 +249,12 @@ class Password(models.Model):
     @staticmethod
     def hash_password(password):
         return make_password(password)
+
+
+class ResetPasswordRequest(models.Model):
+    email = models.CharField(max_length=255, blank=True, null=True)
+    phone_number = models.CharField(max_length=255, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    code = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)

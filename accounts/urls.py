@@ -23,7 +23,17 @@ router.register(
     r"auth/password/reset", ResetRequestViewset, basename="auth-password-reset"
 )
 router.register(
+    r"auth/password/reset/confirm",
+    ConfirmResetPasswordRequestViewset,
+    basename="auth-password-reset-confirm",
+)
+router.register(
     r"auth/password/change", PasswordChangeViewset, basename="auth-password-change"
+)
+router.register(
+    r"auth/password/reset/request",
+    ResetPasswordRequestViewset,
+    basename="auth-password-reset-request",
 )
 router.register(r"auth/login", LoginViewset, basename="auth-login")
 router.register(

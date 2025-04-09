@@ -1,6 +1,7 @@
 from django.conf import settings
 from google.auth.transport import requests
 from google.oauth2 import id_token
+import secrets
 
 
 def get_required_user_actions(user):
@@ -33,3 +34,7 @@ def verify_google_id_token(token):
     except ValueError:
         # Invalid token
         pass
+
+
+def generate_secure_six_digits():
+    return str(secrets.randbelow(900000) + 100000)

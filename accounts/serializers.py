@@ -4,7 +4,7 @@ import re
 from datetime import timedelta
 
 import requests
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import authenticate, get_user_model, password_validation
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -18,17 +18,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
 
 from accounts.utils import *
 
-from .models import (
-    Address,
-    Branch,
-    Business,
-    Category,
-    EmailChangeRequest,
-    Password,
-    PhoneChangeRequest,
-    Role,
-    RolePermission,
-)
+from accounts.models import *
 
 User = get_user_model()
 
@@ -550,10 +540,14 @@ class LoginWithGoogleIdTokenSerializer(serializers.Serializer):
         }
 
 
-class ResetPasswordRequestSerializer(serializers.Serializer):
-    email = serializers.CharField(read_only=True, required=False)
-    phone_number = serializers.CharField(read_only=True, required=False)
+class ResetPasswordRequestSerializer(serializers.ModelSerializer):
+    email = serializers.CharField(write_only=True, required=False)
+    phone_number = serializers.CharField(write_only=True, required=False)
     detail = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = ResetPasswordRequest
+        exclude = ["user", "code", "is_used"]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -565,17 +559,92 @@ class ResetPasswordRequestSerializer(serializers.Serializer):
                 {key: [f"no user found with given {key}"] for key in attrs.keys()}, 404
             )
         attrs["user"] = user
+        code = generate_secure_six_digits()
+        # TODO send the generated code
+        print(code)
+        attrs["code"] = make_password(code)
+        # print(
+        #     check_password(
+        #         "365964",
+        #         "pbkdf2_sha256$870000$iFc8hOEUtU2ujSJQN7bQi4$/XB6vqvHnjG83yi1Pe4Yf1J91ZGQaS/0TrmF0Zrd0EY=",
+        #     )
+        # )
         return attrs
 
     def create(self, validated_data):
-        email = validated_data.get("email")
-        phone_number = validated_data.get("phone_number")
-        user = validated_data.get("user")
+        super().create(validated_data)
+        return {"detail": "success"}
 
-        if email:
-            # TODO handle email sending
-            pass
-        if phone_number:
-            # TODO handle phone sending
-            pass
+
+class ConfirmResetPasswordRequestViewsetSerializer(serializers.Serializer):
+    code = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+
+    email = serializers.CharField(required=False, write_only=True)
+    phone_number = serializers.CharField(required=False, write_only=True)
+
+    detail = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        if not attrs.get("email") and not attrs.get("phone_number"):
+            raise ValidationError(
+                {
+                    "email": ["both email and phone_number could not be empty"],
+                    "phone_number": ["both email and phone_number could not be empty"],
+                },
+                400,
+            )
+        code = attrs.pop("code")
+        new_password = attrs.pop("new_password")
+
+        user = User.objects.filter(**attrs).first()
+
+        if not user:
+            raise ValidationError(
+                {key: [f"no user found with the given {key}"] for key in attrs.key()},
+                400,
+            )
+
+        try:
+            password_validation.validate_password(new_password, user)
+        except ValidationError as e:
+            raise ValidationError({"password": e})
+
+        attrs["user"] = user
+
+        obj = (
+            ResetPasswordRequest.objects.filter(**attrs)
+            .order_by("created_at")
+            .filter(is_used=False)
+            .last()
+        )
+
+        if not obj:
+            raise ValidationError(
+                {"detail": "no reset request found for the given user"}, 400
+            )
+
+        if not check_password(code, obj.code):
+
+            raise ValidationError({"code": ["invalid code"]}, 400)
+
+        attrs["reset_request"] = obj
+        attrs["new_password"] = new_password
+
+        return attrs
+
+    def create(self, validated_data):
+
+        user = validated_data.pop("user")
+
+        new_password = validated_data.pop("new_password")
+
+        user.set_password(new_password)
+
+        obj = validated_data.pop("reset_request")
+        obj.is_used = True
+        obj.save()
+
         return {"detail": "success"}

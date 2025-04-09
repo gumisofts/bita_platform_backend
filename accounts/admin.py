@@ -74,7 +74,12 @@ class CategoryAdmin(admin.ModelAdmin):
     list_display = ["name", "created_at", "updated_at"]
 
 
+class ResetRequestAdmin(admin.ModelAdmin):
+    list_display = ["email", "phone_number", "user", "code"]
+
+
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Address, AddressAdmin)
 admin.site.register(Business, BusinessAdmin)
 admin.site.register(Category, CategoryAdmin)
+admin.site.register(ResetPasswordRequest,ResetRequestAdmin)
