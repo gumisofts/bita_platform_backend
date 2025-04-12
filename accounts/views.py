@@ -190,10 +190,12 @@ class EmailChangeConfirmView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    tags=["Accounts"],
+)
 class BusinessViewSet(viewsets.ModelViewSet):
     queryset = Business.objects.all()
     serializer_class = BusinessSerializer
-    permission_classes = [IsAuthenticated]
 
 
 class PasswordResetView(generics.GenericAPIView):
