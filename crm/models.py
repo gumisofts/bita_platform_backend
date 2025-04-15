@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
-from django.core.validators import RegexValidator, MinValueValidator, EmailValidator
+from django.core.validators import EmailValidator, MinValueValidator, RegexValidator
 from django.db import models
 
 from accounts.models import Business

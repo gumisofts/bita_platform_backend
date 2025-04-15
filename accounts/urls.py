@@ -49,22 +49,17 @@ router.register(
     ConfirmVerificationCodeViewset,
     basename="auth-verification-resend",
 )
-router.register(r"businesses", BusinessViewSet)
-router.register(r"categories", CategoryViewSet)
-router.register(r"roles", RoleViewSet)
-router.register(r"role-permissions", RolePermissionViewSet)
-router.register(r"addresses", AddressViewSet)
-router.register(r"branches", BranchViewSet)
+router.register(r"businesses", BusinessViewSet, basename="businesses")
+router.register(r"categories", CategoryViewSet, basename="categories")
+router.register(r"roles", RoleViewSet, basename="roles")
+router.register(r"role-permissions", RolePermissionViewSet, basename="role-permissions")
+router.register(r"addresses", AddressViewSet, basename="addresses")
+router.register(r"branches", BranchViewSet, basename="branches")
 
 urlpatterns = [
     path(
         "token/verify/",
         JWTTokenVerifyView.as_view(),
-        name="token_verify",
-    ),
-    path(
-        "employee-invitation/",
-        EmployeeInvitationView.as_view(),
-        name="employee-invitation",
+        name="token-verify",
     ),
 ] + router.urls

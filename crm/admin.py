@@ -1,6 +1,6 @@
 from django.contrib import admin
-from .models import Customer, GiftCard
 
+from .models import Customer, GiftCard
 
 # class GiftCardTransactionInline(admin.TabularInline):
 #     model = GiftCardTransaction

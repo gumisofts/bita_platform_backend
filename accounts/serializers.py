@@ -16,9 +16,8 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
 
-from accounts.utils import *
-
 from accounts.models import *
+from accounts.utils import *
 
 User = get_user_model()
 
@@ -297,21 +296,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
-class SetNewPasswordSerializer(serializers.Serializer):
-    password = serializers.CharField(write_only=True)
-    password_confirm = serializers.CharField(write_only=True)
-
-    def validate(self, attrs):
-        if attrs["password"] != attrs["password_confirm"]:
-            raise serializers.ValidationError("Passwords do not match.")
-        return attrs
-
-    def save(self, user):
-        user.set_password(self.validated_data["password"])
-        user.save()
-        return user
-
-
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
@@ -336,56 +320,10 @@ class RolePermissionSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class EmployeeInvitationSerializer(serializers.Serializer):
-    user_id = serializers.UUIDField()
-    business_id = serializers.UUIDField()
-    role_id = serializers.UUIDField()
-
-    def save(self):
-        user = User.objects.get(id=self.validated_data["user_id"])
-        business = Business.objects.get(id=self.validated_data["business_id"])
-        role = Role.objects.get(id=self.validated_data["role_id"])
-        # Send email to user
-        request = self.context.get("request")
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        invitation_url = f"""
-          {request.scheme}://{request.get_host()}/accounts/employee-invitation-confirm/{business.id}/{role.id}/{uid}/{token}/
-          """
-        email_message = (
-            f"""
-            Click the link below to accept the invitation
-            to join {business.name} as a {role.role_name}:\n\n
-            """
-            + invitation_url
-        )
-        email_subject = "Employee Invitation"
-        recipients = user.email
-        payload = json.dumps(
-            {
-                "subject": email_subject,
-                "message": email_message,
-                "recipients": recipients,
-            }
-        )
-        notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
-        email_url = os.environ.get("EMAIL_URL")
-        headers = {
-            "Authorization": f"Api-Key {notification_api_key}",
-            "Content-Type": "application/json",
-        }
-        requests.request("POST", email_url, headers=headers, data=payload)
-
-
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
         fields = "__all__"
-
-
-# Used to specify an empty serializer used by redocs UI for schema generation
-class EmptySerializer(serializers.Serializer):
-    pass
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -596,16 +534,11 @@ class ResetPasswordRequestSerializer(serializers.ModelSerializer):
                 {key: [f"no user found with given {key}"] for key in attrs.keys()}, 404
             )
         attrs["user"] = user
-        code = generate_secure_six_digits()
+        # code = generate_secure_six_digits()
+        code = str(123456)  # TODO change this on production
         # TODO send the generated code
         print(code)
         attrs["code"] = make_password(code)
-        # print(
-        #     check_password(
-        #         "365964",
-        #         "pbkdf2_sha256$870000$iFc8hOEUtU2ujSJQN7bQi4$/XB6vqvHnjG83yi1Pe4Yf1J91ZGQaS/0TrmF0Zrd0EY=",
-        #     )
-        # )
         return attrs
 
     def create(self, validated_data):
@@ -685,13 +618,6 @@ class ConfirmResetPasswordRequestViewsetSerializer(serializers.Serializer):
         obj.save()
 
         return {"detail": "success"}
-
-
-class VerificationCodeSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = VerificationCode
-        exclude = []
 
 
 class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):

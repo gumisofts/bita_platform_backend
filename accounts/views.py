@@ -59,20 +59,6 @@ class UserViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class PhoneChangeRequestView(generics.GenericAPIView):
-    serializer_class = PhoneChangeRequestSerializer
-
-    def post(self, request):
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {"detail": "Phone change request sent."}, status=status.HTTP_200_OK
-        )
-
-
 class RegisterViewset(CreateModelMixin, GenericViewSet):
     serializer_class = RegisterSerializer
 
@@ -107,142 +93,9 @@ class ResetRequestViewset(CreateModelMixin, GenericViewSet):
     serializer_class = ResetPasswordRequestSerializer
 
 
-class PhoneChangeConfirmView(generics.GenericAPIView):
-    serializer_class = EmptySerializer
-
-    def post(self, request, uidb64, token):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response(
-                {"detail": "Invalid link."}, status=status.HTTP_400_BAD_REQUEST
-            )
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Invalid or expired token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        phone_request = (
-            PhoneChangeRequest.objects.filter(
-                user=user,
-                expires_at__gte=timezone.now(),
-            )
-            .order_by("-created_at")
-            .first()
-        )
-        if not phone_request:
-            return Response(
-                {"detail": "No valid phone change request found"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        user.phone_number = phone_request.new_phone
-        user.save()
-        phone_request.delete()
-        return Response(
-            {"detail": "Phone number has been changed."},
-            status=status.HTTP_200_OK,
-        )
-
-
-class EmailChangeRequestView(generics.GenericAPIView):
-    serializer_class = EmailChangeRequestSerializer
-
-    def post(self, request):
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {"detail": "Email change confirmation link sent."},
-            status=status.HTTP_200_OK,
-        )
-
-
-class EmailChangeConfirmView(generics.GenericAPIView):
-    serializer_class = EmptySerializer
-
-    def post(self, request, uidb64, token):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response(
-                {"detail": "Invalid link."}, status=status.HTTP_400_BAD_REQUEST
-            )
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Invalid or expired token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        email_request = (
-            EmailChangeRequest.objects.filter(
-                user=user,
-                expires_at__gte=timezone.now(),
-            )
-            .order_by("-created_at")
-            .first()
-        )
-        if not email_request:
-            return Response(
-                {"detail": "No valid email change request found"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        user.email = email_request.new_email
-        user.save()
-        email_request.delete()
-        return Response(
-            {"detail": "Email has been changed."}, status=status.HTTP_200_OK
-        )
-
-
-@extend_schema(
-    tags=["Accounts"],
-)
 class BusinessViewSet(viewsets.ModelViewSet):
     queryset = Business.objects.all()
     serializer_class = BusinessSerializer
-
-
-class PasswordResetView(generics.GenericAPIView):
-    serializer_class = PasswordResetSerializer
-
-    def post(self, request):
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {"detail": "Password reset link sent."}, status=status.HTTP_200_OK
-        )
-
-
-class PasswordResetConfirmView(generics.GenericAPIView):
-    serializer_class = SetNewPasswordSerializer
-
-    def post(self, request, uidb64, token):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response(
-                {"detail": "Invalid link."}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Invalid or expired token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user)
-        return Response(
-            {"detail": "Password has been reset."}, status=status.HTTP_200_OK
-        )
 
 
 class PasswordChangeViewset(UpdateModelMixin, GenericViewSet):
@@ -310,79 +163,10 @@ class RolePermissionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
-class EmployeeInvitationView(generics.GenericAPIView):
-    serializer_class = EmployeeInvitationSerializer
-
-    def post(self, request):
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {"detail": "Employee invitation sent."},
-            status=status.HTTP_200_OK,
-        )
-
-
-# @extend_schema(
-#     operation_id="employeeInvitationConfirm",
-#     summary="Confirm an employee invitation",
-#     tags=["Accounts"],
-#     parameters=[
-#         OpenApiParameter("business_id", OpenApiTypes.UUID, location="path"),
-#         OpenApiParameter("role_id", OpenApiTypes.UUID, location="path"),
-#         OpenApiParameter("uidb64", OpenApiTypes.STR, location="path"),
-#         OpenApiParameter("token", OpenApiTypes.STR, location="path"),
-#     ],
-#     responses={200: EmptySerializer},
-# )
-# class EmployeeInvitationConfirmView(generics.GenericAPIView):
-#     serializer_class = EmptySerializer
-
-#     def post(self, request, business_id, role_id, uidb64, token):
-#         try:
-#             uid = force_str(urlsafe_base64_decode(uidb64))
-#             user = User.objects.get(pk=uid)
-#         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-#             return Response(
-#                 {"detail": "Invalid link."},
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-#         if not default_token_generator.check_token(user, token):
-#             return Response(
-#                 {"detail": "Invalid or expired token."},
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-#         try:
-#             business = Business.objects.get(pk=business_id)
-#             role = Role.objects.get(pk=role_id)
-#         except (Business.DoesNotExist, Role.DoesNotExist):
-#             return Response(
-#                 {"detail": "Invalid business or role."},
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-#         Employee.objects.create(user=user, business=business, role=role)
-#         return Response(
-#             {"detail": "Employee added to the business."},
-#             status=status.HTTP_200_OK,
-#         )
-
-
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
 
 
-def api_documentation(request):
-    return render(request, "index.html")
-
-
 class ConfirmVerificationCodeViewset(CreateModelMixin, GenericViewSet):
     serializer_class = ConfirmVerificationCodeSerializer
-
-
-# Password Change
-# Invitation to Business
-# Login
-# Signup

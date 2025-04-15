@@ -6,8 +6,6 @@ from accounts.models import *
 
 @receiver(pre_save, sender=User)
 def on_user_created(sender, instance, **kwargs):
-    print(kwargs)
-    print(instance.id)
 
     if kwargs.get("send_verification"):
         pass
