@@ -5,59 +5,19 @@ from .models import *
 
 
 class CustomUserAdmin(UserAdmin):
-    model = User
     list_display = (
-        "username",
+        "id",
         "email",
         "phone_number",
-        "id",
+        "first_name",
+        "last_name",
+        "is_phone_verified",
+        "is_email_verified",
         "is_staff",
         "is_active",
     )
     list_filter = ("is_staff", "is_active")
-    fieldsets = (
-        (None, {"fields": ("email", "password")}),
-        (
-            "Personal Info",
-            {
-                "fields": (
-                    "phone_number",
-                    "first_name",
-                    "last_name",
-                )
-            },
-        ),
-        (
-            "Permissions",
-            {
-                "fields": (
-                    "is_staff",
-                    "is_active",
-                    "is_superuser",
-                    "groups",
-                    "user_permissions",
-                )
-            },
-        ),
-    )
-    add_fieldsets = (
-        (
-            None,
-            {
-                "classes": ("wide",),
-                "fields": (
-                    "email",
-                    "phone_number",
-                    "password1",
-                    "password2",
-                    "is_staff",
-                    "is_active",
-                ),
-            },
-        ),
-    )
-    search_fields = ("email",)
-    ordering = ("email",)
+    ordering = ("phone_number",)
 
 
 class AddressAdmin(admin.ModelAdmin):
@@ -78,8 +38,15 @@ class ResetRequestAdmin(admin.ModelAdmin):
     list_display = ["email", "phone_number", "user", "code"]
 
 
+class VerificationCodeAdmin(admin.ModelAdmin):
+    list_display = ["id", "email", "phone_number", "user", "is_used"]
+
+    ordering = ["created_at"]
+
+
+admin.site.register(VerificationCode, VerificationCodeAdmin)
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Address, AddressAdmin)
 admin.site.register(Business, BusinessAdmin)
 admin.site.register(Category, CategoryAdmin)
-admin.site.register(ResetPasswordRequest,ResetRequestAdmin)
+admin.site.register(ResetPasswordRequest, ResetRequestAdmin)

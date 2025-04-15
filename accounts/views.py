@@ -316,53 +316,50 @@ class EmployeeInvitationView(generics.GenericAPIView):
         )
 
 
-@extend_schema(
-    operation_id="employeeInvitationConfirm",
-    summary="Confirm an employee invitation",
-    tags=["Accounts"],
-    parameters=[
-        OpenApiParameter("business_id", OpenApiTypes.UUID, location="path"),
-        OpenApiParameter("role_id", OpenApiTypes.UUID, location="path"),
-        OpenApiParameter("uidb64", OpenApiTypes.STR, location="path"),
-        OpenApiParameter("token", OpenApiTypes.STR, location="path"),
-    ],
-    responses={200: EmptySerializer},
-)
-class EmployeeInvitationConfirmView(generics.GenericAPIView):
-    serializer_class = EmptySerializer
+# @extend_schema(
+#     operation_id="employeeInvitationConfirm",
+#     summary="Confirm an employee invitation",
+#     tags=["Accounts"],
+#     parameters=[
+#         OpenApiParameter("business_id", OpenApiTypes.UUID, location="path"),
+#         OpenApiParameter("role_id", OpenApiTypes.UUID, location="path"),
+#         OpenApiParameter("uidb64", OpenApiTypes.STR, location="path"),
+#         OpenApiParameter("token", OpenApiTypes.STR, location="path"),
+#     ],
+#     responses={200: EmptySerializer},
+# )
+# class EmployeeInvitationConfirmView(generics.GenericAPIView):
+#     serializer_class = EmptySerializer
 
-    def post(self, request, business_id, role_id, uidb64, token):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response(
-                {"detail": "Invalid link."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Invalid or expired token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            business = Business.objects.get(pk=business_id)
-            role = Role.objects.get(pk=role_id)
-        except (Business.DoesNotExist, Role.DoesNotExist):
-            return Response(
-                {"detail": "Invalid business or role."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        Employee.objects.create(user=user, business=business, role=role)
-        return Response(
-            {"detail": "Employee added to the business."},
-            status=status.HTTP_200_OK,
-        )
+#     def post(self, request, business_id, role_id, uidb64, token):
+#         try:
+#             uid = force_str(urlsafe_base64_decode(uidb64))
+#             user = User.objects.get(pk=uid)
+#         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+#             return Response(
+#                 {"detail": "Invalid link."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+#         if not default_token_generator.check_token(user, token):
+#             return Response(
+#                 {"detail": "Invalid or expired token."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+#         try:
+#             business = Business.objects.get(pk=business_id)
+#             role = Role.objects.get(pk=role_id)
+#         except (Business.DoesNotExist, Role.DoesNotExist):
+#             return Response(
+#                 {"detail": "Invalid business or role."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+#         Employee.objects.create(user=user, business=business, role=role)
+#         return Response(
+#             {"detail": "Employee added to the business."},
+#             status=status.HTTP_200_OK,
+#         )
 
 
-@extend_schema(
-    tags=["Accounts"],
-)
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
@@ -370,6 +367,10 @@ class BranchViewSet(viewsets.ModelViewSet):
 
 def api_documentation(request):
     return render(request, "index.html")
+
+
+class ConfirmVerificationCodeViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = ConfirmVerificationCodeSerializer
 
 
 # Password Change

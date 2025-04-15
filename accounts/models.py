@@ -258,3 +258,23 @@ class ResetPasswordRequest(models.Model):
     code = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     is_used = models.BooleanField(default=False)
+
+
+class VerificationCode(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    code = models.CharField(max_length=255)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="codes")
+    phone_number = models.CharField(
+        max_length=255, validators=[], null=True, blank=True
+    )
+    email = models.CharField(max_length=255, validators=[], null=True, blank=True)
+    is_used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, force_insert=False, *args, **kwargs):
+        print(kwargs)
+        print(args)
+        if force_insert:
+            self.code = make_password(self.code)
+        return super().save(force_insert=force_insert, *args, **kwargs)

@@ -6,6 +6,8 @@ from django.db import models
 
 from accounts.models import Business
 
+User = get_user_model()
+
 
 class Customer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -35,7 +37,7 @@ class GiftCard(models.Model):
     ]
 
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
-    owner = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
     created_by = models.ForeignKey(
         get_user_model(),
         on_delete=models.SET_NULL,

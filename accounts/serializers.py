@@ -408,6 +408,43 @@ class RegisterSerializer(serializers.ModelSerializer):
             "is_phone_verified",
         )
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        if "phone_number" not in attrs and "email" not in attrs:
+            raise ValidationError(
+                {
+                    "phone_number": "either email or phone_number is required",
+                    "email": "either email or phone_number is required",
+                }
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        user = super().create(validated_data)
+        email = validated_data.get("email")
+        phone_number = validated_data.get("phone_number")
+
+        if email:
+            VerificationCode.objects.create(
+                user=user,
+                code="123456",
+                email=email,
+                # phone_number=phone_number,
+                expires_at=timezone.now() + timedelta(minutes=5),
+            )
+        if phone_number:
+            VerificationCode.objects.create(
+                user=user,
+                code="123456",
+                # email=email,
+                phone_number=phone_number,
+                expires_at=timezone.now() + timedelta(minutes=5),
+            )
+
+        return user
+
 
 class UserReadSerializer(serializers.ModelSerializer):
     class Meta:
@@ -648,3 +685,75 @@ class ConfirmResetPasswordRequestViewsetSerializer(serializers.Serializer):
         obj.save()
 
         return {"detail": "success"}
+
+
+class VerificationCodeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = VerificationCode
+        exclude = []
+
+
+class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):
+    code = serializers.CharField(write_only=True)
+    phone_number = serializers.CharField(write_only=True, required=False)
+    email = serializers.CharField(write_only=True, required=False)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+    user = UserReadSerializer(read_only=True)
+
+    class Meta:
+        model = VerificationCode
+        exclude = ["is_used", "expires_at", "created_at"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        if not "phone_number" in attrs and not "email" in attrs:
+            raise ValidationError(
+                {
+                    "phone_number": "either phone_number or email is required",
+                    "email": "either phone_number or email is required",
+                },
+                400,
+            )
+        if "phone_number" in attrs and "email" in attrs:
+            raise ValidationError(
+                {
+                    "phone_number": "cannot include both email and phone_number",
+                    "email": "cannot include both email and phone_number",
+                }
+            )
+
+        code = attrs.pop("code")
+
+        instance = (
+            VerificationCode.objects.filter(is_used=False, **attrs)
+            .order_by("created_at")
+            .last()
+        )
+
+        if not instance or not check_password(code, instance.code):
+            raise ValidationError({"code": "invalid verification code"}, 400)
+
+        attrs["instance"] = instance
+
+        return attrs
+
+    def create(self, validated_data):
+
+        instance = validated_data.get("instance")
+
+        if "phone_number" in validated_data:
+
+            instance.user.is_phone_verified = True
+        else:
+
+            instance.user.is_email_verified = True
+
+        instance.user.save()
+        instance.detail = "success"
+        instance.is_used = True
+        instance.save()
+
+        return instance
