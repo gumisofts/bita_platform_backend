@@ -627,6 +627,7 @@ class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):
     access = serializers.CharField(read_only=True)
     refresh = serializers.CharField(read_only=True)
     user = UserReadSerializer(read_only=True)
+    actions = serializers.ListField(read_only=True)
 
     class Meta:
         model = VerificationCode
