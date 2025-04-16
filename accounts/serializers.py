@@ -682,4 +682,13 @@ class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):
         instance.is_used = True
         instance.save()
 
-        return instance
+        refresh = RefreshToken.for_user(instance.user)
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+
+        return {
+            "user": instance.user,
+            "refresh": refresh_token,
+            "access": access_token,
+            "actions": get_required_user_actions(instance.user),
+        }
