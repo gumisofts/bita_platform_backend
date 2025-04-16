@@ -45,9 +45,9 @@ router.register(
     basename="auth-verification-confirm",
 )
 router.register(
-    r"auth/verifications/resend",
-    ConfirmVerificationCodeViewset,
-    basename="auth-verification-resend",
+    r"auth/verifications/send",
+    SendVerificationCodeViewset,
+    basename="auth-verification-send",
 )
 router.register(r"businesses", BusinessViewSet, basename="businesses")
 router.register(r"categories", CategoryViewSet, basename="categories")
