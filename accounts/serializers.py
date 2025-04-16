@@ -638,16 +638,16 @@ class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):
         if not "phone_number" in attrs and not "email" in attrs:
             raise ValidationError(
                 {
-                    "phone_number": "either phone_number or email is required",
-                    "email": "either phone_number or email is required",
+                    "phone_number": ["either phone_number or email is required"],
+                    "email": ["either phone_number or email is required"],
                 },
                 400,
             )
         if "phone_number" in attrs and "email" in attrs:
             raise ValidationError(
                 {
-                    "phone_number": "cannot include both email and phone_number",
-                    "email": "cannot include both email and phone_number",
+                    "phone_number": ["cannot include both email and phone_number"],
+                    "email": ["cannot include both email and phone_number"],
                 }
             )
 
@@ -660,7 +660,7 @@ class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):
         )
 
         if not instance or not check_password(code, instance.code):
-            raise ValidationError({"code": "invalid verification code"}, 400)
+            raise ValidationError({"code": ["invalid verification code"]}, 400)
 
         attrs["instance"] = instance
 

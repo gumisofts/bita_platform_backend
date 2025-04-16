@@ -40,12 +40,12 @@ router.register(
     r"auth/google/login", LoginWithGoogleViewset, basename="auth-google-login"
 )
 router.register(
-    r"auth/verification/confirm",
+    r"auth/verifications/confirm",
     ConfirmVerificationCodeViewset,
     basename="auth-verification-confirm",
 )
 router.register(
-    r"auth/verification/resend",
+    r"auth/verifications/resend",
     ConfirmVerificationCodeViewset,
     basename="auth-verification-resend",
 )
