@@ -693,3 +693,48 @@ class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):
             "access": access_token,
             "actions": get_required_user_actions(instance.user),
         }
+
+
+class SendVerificationCodeSerializer(serializers.Serializer):
+    email = serializers.CharField(write_only=True, required=False)
+    phone_number = serializers.CharField(write_only=True, required=False)
+
+    detail = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+
+        # Validate Resend
+
+        attrs = super().validate(attrs)
+
+        user = User.objects.filter(**attrs).first()
+        if not user:
+            raise ValidationError(
+                {key: [f"no unverified user with this {key}"]} for key in attrs
+            )
+
+        attrs["user"] = user
+
+        return attrs
+
+    def create(self, validated_data):
+        email = validated_data.get("email")
+        phone_number = validated_data.get("phone_number")
+        user = validated_data.get("user")
+        if email:
+            VerificationCode.objects.create(
+                user=user,
+                code="123456",
+                email=email,
+                # phone_number=phone_number,
+                expires_at=timezone.now() + timedelta(minutes=5),
+            )
+        if phone_number:
+            VerificationCode.objects.create(
+                user=user,
+                code="123456",
+                # email=email,
+                phone_number=phone_number,
+                expires_at=timezone.now() + timedelta(minutes=5),
+            )
+        return {"detail": "success"}
