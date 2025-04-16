@@ -36,10 +36,9 @@ class Customer(models.Model):
 
 class GiftCard(models.Model):
     STATUS_CHOICES = [
-        ('active', 'Active'),
-        ('used', 'Used'),
-        ('expired', 'Expired'),
-
+        ("active", "Active"),
+        ("used", "Used"),
+        ("expired", "Expired"),
     ]
     code = models.UUIDField(default=uuid4, editable=False, unique=True)
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
@@ -48,7 +47,8 @@ class GiftCard(models.Model):
         User,
         on_delete=models.SET_NULL,
         null=True,
-        related_name="created_giftcards",)
+        related_name="created_giftcards",
+    )
 
     customer = models.ForeignKey(
         Customer, on_delete=models.CASCADE, related_name="gift_cards"
@@ -59,13 +59,12 @@ class GiftCard(models.Model):
     remaining_value = models.DecimalField(
         max_digits=10, decimal_places=2, validators=[MinValueValidator(0)]
     )
-    status = models.CharField(
-        max_length=10, choices=STATUS_CHOICES, default='active')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="active")
     expires_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"Gift card ({self.code}) ({self.customer})"
@@ -73,13 +72,14 @@ class GiftCard(models.Model):
 
 class GiftCardTransaction(models.Model):
     gift_card = models.ForeignKey(
-        GiftCard, on_delete=models.CASCADE, related_name='transactions')
+        GiftCard, on_delete=models.CASCADE, related_name="transactions"
+    )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"Transaction of {self.amount} for {self.gift_card}"

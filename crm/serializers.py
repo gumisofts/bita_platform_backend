@@ -1,6 +1,5 @@
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
-from django.core.exceptions import ValidationError
 
 from .models import Customer, GiftCard, GiftCardTransaction
 
@@ -8,17 +7,16 @@ from .models import Customer, GiftCard, GiftCardTransaction
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ['id', 'email', 'full_name',
-                  'business', 'phone_number', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ["id", "email", "full_name", "business", "phone_number", "created_at"]
+        read_only_fields = ["id", "created_at"]
 
 
 class GiftCardTransactionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = GiftCardTransaction
-        fields = ['id', 'amount', 'description', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ["id", "amount", "description", "created_at"]
+        read_only_fields = ["id", "created_at"]
 
     def create(self, validated_data):
         amount = validated_data.pop("amount")
@@ -26,7 +24,7 @@ class GiftCardTransactionSerializer(serializers.ModelSerializer):
         original_value = GiftCard.objects.get(original_value=original_value)
 
         if GiftCard.status == "used":
-            raise ValidationError['Already used card']
+            raise ValidationError["Already used card"]
 
 
 class GiftCardSerializer(serializers.ModelSerializer):
