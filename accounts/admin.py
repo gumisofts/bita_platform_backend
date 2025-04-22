@@ -44,8 +44,14 @@ class VerificationCodeAdmin(admin.ModelAdmin):
     ordering = ["created_at"]
 
 
+class IndustryAdmin(admin.ModelAdmin):
+    list_display = ["name", "created_at"]
+    ordering = []
+
+
 admin.site.register(VerificationCode, VerificationCodeAdmin)
 admin.site.register(User, CustomUserAdmin)
+admin.site.register(Industry, IndustryAdmin)
 admin.site.register(Address, AddressAdmin)
 admin.site.register(Business, BusinessAdmin)
 admin.site.register(Category, CategoryAdmin)

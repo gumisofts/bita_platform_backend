@@ -193,3 +193,7 @@ class SendVerificationCodeViewset(CreateModelMixin, GenericViewSet):
 class IndustryViewset(ListModelMixin, GenericViewSet):
     serializer_class = IndustrySerializer
     queryset = Industry.objects.filter(is_active=True)
+
+class BusinessImageViewset(ListModelMixin,GenericViewSet):
+    serializer_class=BusinessImageSerializer
+    queryset=BusinessImage.objects.filter()

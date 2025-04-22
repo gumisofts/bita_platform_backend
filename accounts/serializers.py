@@ -744,3 +744,9 @@ class IndustrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Industry
         exclude = []
+
+
+class BusinessImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinessImage
+        exclude = []

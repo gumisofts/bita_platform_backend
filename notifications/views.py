@@ -6,11 +6,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .spectacular_schemas import send_email_schema
-
 
 @csrf_exempt
-@send_email_schema
 @api_view(("POST",))
 def send_single_email(request):
     try:

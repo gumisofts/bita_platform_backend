@@ -36,10 +36,11 @@ INSTALLED_APPS = [
     "accounts",
     "files",
     "storages",
-    "notification",
     "inventories",
+    "notifications",
     "crms",
     "financials",
+    "markets",
 ]
 
 MIDDLEWARE = [

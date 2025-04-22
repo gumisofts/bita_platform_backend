@@ -99,6 +99,10 @@ class Business(models.Model):
     category = models.ManyToManyField(
         Category,
     )
+    background_image = models.ForeignKey(
+        "files.FileMeta", on_delete=models.SET_NULL, null=True, blank=True
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     # Files and Images
@@ -284,10 +288,28 @@ class VerificationCode(models.Model):
 class Industry(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
-    image = models.UUIDField(default=uuid4)
-    is_active=models.BooleanField(default=True)
+    image = models.ForeignKey(
+        "files.FileMeta", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
+
+class BusinessImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    business = models.OneToOneField(
+        Business, on_delete=models.CASCADE, related_name="business_images"
+    )
+    image = models.ManyToManyField(
+        "files.FileMeta", blank=True, related_name="business_images"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "updated_at"]
