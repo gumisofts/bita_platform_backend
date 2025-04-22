@@ -3,6 +3,11 @@ from django.contrib.auth.admin import UserAdmin
 
 from .models import *
 
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
+from django.utils.html import format_html
+
 
 class CustomUserAdmin(UserAdmin):
     list_display = (
@@ -49,10 +54,33 @@ class IndustryAdmin(admin.ModelAdmin):
     ordering = []
 
 
+class PermissionAdmin(admin.ModelAdmin):
+    list_display = ["id", "name", "codename", "content_type"]
+    ordering = ["id"]
+    list_filter = []
+
+
+class ContentTypeAdmin(admin.ModelAdmin):
+    list_display = ["id", "model", "app_label"]
+    ordering = ["id"]
+    list_filter = ["app_label"]
+    list_select_related = []
+
+
+class RoleAdmin(admin.ModelAdmin):
+    list_display = ["id", "role_name", "business"]
+    ordering = ["id"]
+    list_filter = ["business"]
+    list_select_related = []
+
+
 admin.site.register(VerificationCode, VerificationCodeAdmin)
+admin.site.register(Permission, PermissionAdmin)
+admin.site.register(ContentType, ContentTypeAdmin)
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Industry, IndustryAdmin)
 admin.site.register(Address, AddressAdmin)
 admin.site.register(Business, BusinessAdmin)
 admin.site.register(Category, CategoryAdmin)
+admin.site.register(Role, RoleAdmin)
 admin.site.register(ResetPasswordRequest, ResetRequestAdmin)

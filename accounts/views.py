@@ -31,17 +31,7 @@ from rest_framework_simplejwt.views import (
 
 from accounts.serializers import *
 
-from .models import (
-    Address,
-    Branch,
-    Business,
-    Category,
-    EmailChangeRequest,
-    Employee,
-    PhoneChangeRequest,
-    Role,
-    RolePermission,
-)
+from accounts.models import *
 
 User = get_user_model()
 
@@ -157,10 +147,10 @@ class RoleViewSet(ListModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
 
 
-class RolePermissionViewSet(viewsets.ModelViewSet):
-    queryset = RolePermission.objects.all()
-    serializer_class = RolePermissionSerializer
-    permission_classes = [IsAuthenticated]
+# class RolePermissionViewSet(viewsets.ModelViewSet):
+#     queryset = RolePermission.objects.all()
+#     serializer_class = RolePermissionSerializer
+#     permission_classes = [IsAuthenticated]
 
 
 class BranchViewSet(viewsets.ModelViewSet):
@@ -194,6 +184,7 @@ class IndustryViewset(ListModelMixin, GenericViewSet):
     serializer_class = IndustrySerializer
     queryset = Industry.objects.filter(is_active=True)
 
-class BusinessImageViewset(ListModelMixin,GenericViewSet):
-    serializer_class=BusinessImageSerializer
-    queryset=BusinessImage.objects.filter()
+
+class BusinessImageViewset(ListModelMixin, GenericViewSet):
+    serializer_class = BusinessImageSerializer
+    queryset = BusinessImage.objects.filter()

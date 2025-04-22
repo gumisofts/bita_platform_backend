@@ -314,10 +314,10 @@ class RoleSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class RolePermissionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RolePermission
-        fields = "__all__"
+# class RolePermissionSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = RolePermission
+#         fields = "__all__"
 
 
 class BranchSerializer(serializers.ModelSerializer):

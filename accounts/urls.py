@@ -52,7 +52,6 @@ router.register(
 router.register(r"businesses", BusinessViewSet, basename="businesses")
 router.register(r"categories", CategoryViewSet, basename="categories")
 router.register(r"roles", RoleViewSet, basename="roles")
-router.register(r"role-permissions", RolePermissionViewSet, basename="role-permissions")
 router.register(r"addresses", AddressViewSet, basename="addresses")
 router.register(r"branches", BranchViewSet, basename="branches")
 router.register(r"industries", IndustryViewset, basename="industries")
