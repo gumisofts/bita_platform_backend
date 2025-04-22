@@ -188,3 +188,8 @@ class SendVerificationCodeViewset(CreateModelMixin, GenericViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+
+class IndustryViewset(ListModelMixin, GenericViewSet):
+    serializer_class = IndustrySerializer
+    queryset = Industry.objects.filter(is_active=True)

@@ -17,7 +17,7 @@ class CustomUserAdmin(UserAdmin):
         "is_active",
     )
     list_filter = ("is_staff", "is_active")
-    ordering = ("phone_number",)
+    ordering = ("date_joined",)
 
 
 class AddressAdmin(admin.ModelAdmin):
@@ -26,8 +26,8 @@ class AddressAdmin(admin.ModelAdmin):
 
 
 class BusinessAdmin(admin.ModelAdmin):
-    list_display = []
-    list_filter = []
+    list_display = ["id", "name", "business_type", "created_at", "updated_at"]
+    list_filter = ["created_at"]
 
 
 class CategoryAdmin(admin.ModelAdmin):

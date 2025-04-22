@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.db import models
 
 from accounts.models import Business
-from inventory.models import Item
+from inventories.models import Item
 
 
 class Order(models.Model):

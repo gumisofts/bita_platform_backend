@@ -34,11 +34,11 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
     "accounts",
-    "file",
+    "files",
     "storages",
     "notification",
-    "inventory",
-    "crm",
+    "inventories",
+    "crms",
     "financials",
 ]
 

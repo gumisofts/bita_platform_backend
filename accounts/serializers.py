@@ -738,3 +738,9 @@ class SendVerificationCodeSerializer(serializers.Serializer):
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
         return {"detail": "success"}
+
+
+class IndustrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Industry
+        exclude = []

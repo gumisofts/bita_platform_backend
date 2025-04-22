@@ -252,6 +252,7 @@ class Password(models.Model):
 
 
 class ResetPasswordRequest(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
     email = models.CharField(max_length=255, blank=True, null=True)
     phone_number = models.CharField(max_length=255, blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -278,3 +279,15 @@ class VerificationCode(models.Model):
         if force_insert:
             self.code = make_password(self.code)
         return super().save(force_insert=force_insert, *args, **kwargs)
+
+
+class Industry(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    image = models.UUIDField(default=uuid4)
+    is_active=models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
