@@ -7,9 +7,8 @@ from botocore.config import Config
 from django.conf import settings
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from files.models import *
 
-import boto3
+from files.models import *
 
 s3 = boto3.client("s3")
 

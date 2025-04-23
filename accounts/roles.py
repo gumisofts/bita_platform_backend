@@ -1,9 +1,8 @@
 from accounts.models import *
 from crms.models import *
+from financials.models import *
 from inventories.models import *
 from notifications.models import *
-from financials.models import *
-
 
 OwnerFullAccessModels = [
     Business,

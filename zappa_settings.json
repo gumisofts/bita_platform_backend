@@ -12,7 +12,8 @@
         "profile_name": "bita",
         "project_name": "bita-platform-b",
         "runtime": "python3.12",
-        "s3_bucket": "zappa-khobnv213"
+        "s3_bucket": "zappa-khobnv213",
+        "slim_handler": true
     },
     "pro": {
         "aws_region": "eu-north-1",

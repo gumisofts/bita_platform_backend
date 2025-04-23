@@ -29,9 +29,8 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
-from accounts.serializers import *
-
 from accounts.models import *
+from accounts.serializers import *
 
 User = get_user_model()
 

@@ -1,12 +1,11 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-
-from .models import *
-
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
+
+from .models import *
 
 
 class CustomUserAdmin(UserAdmin):

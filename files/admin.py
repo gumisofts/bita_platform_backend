@@ -1,8 +1,9 @@
-from django.contrib import admin
-from files.models import FileMeta
-from django.utils.translation import gettext_lazy as _
-from django.utils.safestring import mark_safe
 from django.conf import settings
+from django.contrib import admin
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
+
+from files.models import FileMeta
 
 
 class FileMetaAdmin(admin.ModelAdmin):
