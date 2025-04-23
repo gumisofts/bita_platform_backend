@@ -1,10 +1,10 @@
 from rest_framework import viewsets
 
-from .models import Customer, GiftCard, GiftCardTransaction
+from .models import Customer, GiftCard, GiftCardTransfer
 from .serializers import (
     CustomerSerializer,
     GiftCardSerializer,
-    GiftCardTransactionSerializer,
+    GiftCardTransferSerializer
 )
 
 
@@ -18,6 +18,6 @@ class GiftCardViewSet(viewsets.ModelViewSet):
     serializer_class = GiftCardSerializer
 
 
-class GiftCardTransactionViewSet(viewsets.ModelViewSet):
-    queryset = GiftCardTransaction.objects.all()
-    serializer_class = GiftCardTransactionSerializer
+class GiftCardTransferViewSet(viewsets.ModelViewSet):
+    queryset = GiftCardTransfer.objects.all()
+    serializer_class = GiftCardTransferSerializer

@@ -1,11 +1,10 @@
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
-from django.core.validators import EmailValidator, MinValueValidator, RegexValidator
+from django.core.validators import EmailValidator, RegexValidator
 from django.db import models
 
 from accounts.models import Business
-from financials.models import Order
 
 User = get_user_model()
 
@@ -36,32 +35,40 @@ class Customer(models.Model):
 
 class GiftCard(models.Model):
     STATUS_CHOICES = [
+        ("new", "New"),
         ("active", "Active"),
-        ("used", "Used"),
+        ("issued", "issued"),
+        ("redeemed", "redeemed"),
         ("expired", "Expired"),
     ]
-    code = models.UUIDField(default=uuid4, editable=False, unique=True)
-    business = models.ForeignKey(Business, on_delete=models.CASCADE)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="created_giftcards",
-    )
+    CARD_TYPE = [
+        ('platform', 'Platform'),
+        ('business', 'Business'),
+    ]
 
-    customer = models.ForeignKey(
-        Customer, on_delete=models.CASCADE, related_name="gift_cards"
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.IntegerField()
+    created_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="created_giftcards")
+    issued_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="issued_giftcards")
+
+    products = models.ManyToManyField('inventories.Item', blank=True)
+
+    current_owner = models.ForeignKey(
+        "Customer", on_delete=models.SET_NULL,
+        blank=True, null=True,
+        related_name="owned_giftcards"
     )
-    original_value = models.DecimalField(
-        max_digits=10, decimal_places=2, validators=[MinValueValidator(0)]
-    )
-    remaining_value = models.DecimalField(
-        max_digits=10, decimal_places=2, validators=[MinValueValidator(0)]
-    )
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="active")
-    expires_at = models.DateTimeField()
+    expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default="active")
+    card_type = models.CharField(
+        max_length=30, choices=CARD_TYPE, default='business')
 
     class Meta:
         ordering = ["-created_at"]
@@ -70,16 +77,13 @@ class GiftCard(models.Model):
         return f"Gift card ({self.code}) ({self.customer})"
 
 
-class GiftCardTransaction(models.Model):
+class GiftCardTransfer(models.Model):
     gift_card = models.ForeignKey(
-        GiftCard, on_delete=models.CASCADE, related_name="transactions"
-    )
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    description = models.TextField()
+        GiftCard, related_name='gift_cards', on_delete=models.CASCADE)
+    from_customer = models.ForeignKey(
+        Customer, related_name='gift_card_transfer',
+        on_delete=models.SET_NULL, null=True)
+    to_customer = models.ForeignKey(
+        Customer, related_name='gift_card_receiver',
+        on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Transaction of {self.amount} for {self.gift_card}"

@@ -1,11 +1,5 @@
 from django.contrib import admin
-
-from .models import Customer, GiftCard, GiftCardTransaction
-
-
-class GiftCardTransactionInline(admin.TabularInline):
-    model = GiftCardTransaction
-    extra = 0
+from .models import *
 
 
 class CustomerAdmin(admin.ModelAdmin):
@@ -14,14 +8,16 @@ class CustomerAdmin(admin.ModelAdmin):
 
 
 class GiftCardAdmin(admin.ModelAdmin):
-    list_display = ("code", "customer", "original_value", "remaining_value", "status")
-    inlines = [GiftCardTransactionInline]
+    list_display = ("id", "created_by", "issued_by",
+                    "current_owner", "expires_at", "status")
+    ordering = ('-created_at',)
 
 
-class GiftCardTransactionAdmin(admin.ModelAdmin):
-    list_display = ("gift_card", "amount", "created_at")
+class GiftCardTransferAdmin(admin.ModelAdmin):
+    list_display = ("gift_card", 'from_customer', "to_customer")
+    ordering = ('-created_at',)
 
 
 admin.site.register(Customer, CustomerAdmin)
 admin.site.register(GiftCard, GiftCardAdmin)
-admin.site.register(GiftCardTransaction, GiftCardTransactionAdmin)
+admin.site.register(GiftCardTransfer, GiftCardTransferAdmin)

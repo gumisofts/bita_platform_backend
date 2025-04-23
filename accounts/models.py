@@ -52,7 +52,7 @@ class Address(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     lat = models.FloatField()
     lng = models.FloatField()
-    plus_code = models.CharField(null=True, blank=True)
+    plus_code = models.CharField(max_length=15, null=True, blank=True)
     sublocality = models.CharField(max_length=255, null=True)
     locality = models.CharField(max_length=255, null=True)
     admin_2 = models.CharField(max_length=255, null=True)
@@ -90,7 +90,8 @@ class Business(models.Model):
         related_name="businesses",
         null=True,
     )
-    business_type = models.CharField(choices=business_type_choices, max_length=255)
+    business_type = models.CharField(
+        choices=business_type_choices, max_length=255)
     address = models.ForeignKey(
         Address,
         on_delete=models.SET_NULL,
@@ -263,11 +264,13 @@ class ResetPasswordRequest(models.Model):
 class VerificationCode(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     code = models.CharField(max_length=255)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="codes")
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="codes")
     phone_number = models.CharField(
         max_length=255, validators=[], null=True, blank=True
     )
-    email = models.CharField(max_length=255, validators=[], null=True, blank=True)
+    email = models.CharField(
+        max_length=255, validators=[], null=True, blank=True)
     is_used = models.BooleanField(default=False)
     expires_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
