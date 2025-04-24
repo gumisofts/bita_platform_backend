@@ -309,15 +309,15 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class RoleSerializer(serializers.ModelSerializer):
+    permissions = serializers.SerializerMethodField()
+
+    def get_permissions(self, obj):
+
+        return map(lambda x: x.codename, obj.permissions.all().values("codename"))
+
     class Meta:
         model = Role
         fields = "__all__"
-
-
-# class RolePermissionSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = RolePermission
-#         fields = "__all__"
 
 
 class BranchSerializer(serializers.ModelSerializer):

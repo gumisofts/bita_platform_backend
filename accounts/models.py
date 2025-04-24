@@ -149,6 +149,7 @@ class Employee(models.Model):
         Role,
         on_delete=models.SET_NULL,
         null=True,
+        related_name="employees",
     )
     branch = models.ForeignKey(
         "Branch",

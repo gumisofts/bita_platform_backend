@@ -140,16 +140,10 @@ class CategoryViewSet(ListModelMixin, GenericViewSet):
     serializer_class = CategorySerializer
 
 
-class RoleViewSet(ListModelMixin, GenericViewSet):
+class RoleViewset(RetrieveModelMixin, GenericViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
     permission_classes = [IsAuthenticated]
-
-
-# class RolePermissionViewSet(viewsets.ModelViewSet):
-#     queryset = RolePermission.objects.all()
-#     serializer_class = RolePermissionSerializer
-#     permission_classes = [IsAuthenticated]
 
 
 class BranchViewSet(viewsets.ModelViewSet):
