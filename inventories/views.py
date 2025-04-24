@@ -30,14 +30,6 @@ class ItemViewSet(viewsets.ModelViewSet):
         search_term = self.request.query_params.get("search")
         if search_term:
             pass
-            # queryset = (
-            #     queryset.annotate(
-            #         similarity=TrigramSimilarity("name", search_term) * 2
-            #         + TrigramSimilarity("description", search_term)
-            #     )
-            #     .filter(similarity__gt=0.1)
-            #     .order_by("-similarity")
-            # )
             # TODO(Abeni)
 
         return queryset

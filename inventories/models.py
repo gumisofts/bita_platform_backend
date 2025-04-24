@@ -36,6 +36,10 @@ class ItemImage(models.Model):
     item = models.OneToOneField(Item, on_delete=models.CASCADE)
     file = models.OneToOneField(FileMeta, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_primary = models.BooleanField(default=False)
+    is_visible = models.BooleanField(default=True)
+    is_thumbnail = models.BooleanField(default=False)
 
     class Meta:
         db_table = "item_image"
@@ -64,10 +68,13 @@ class Supplier(models.Model):
     )
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = "supplier"
         get_latest_by = "id"
-        ordering = ["id"]
+        ordering = ["created_at", "updated_at"]
 
     def __str__(self):
         return self.name
@@ -85,10 +92,14 @@ class Supply(models.Model):
         blank=True,
     )
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = "supply"
         get_latest_by = "id"
-        ordering = ["id"]
+        ordering = ["created_at", "updated_at"]
+        unique_together = ("name", "branch")
 
     def __str__(self):
         return self.name
@@ -116,10 +127,13 @@ class SuppliedItem(models.Model):
     discount = models.PositiveIntegerField()
     supply = models.ManyToManyField(Supply)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = "supplied_item"
         get_latest_by = "id"
-        ordering = ["id"]
+        ordering = ["created_at", "updated_at"]
 
     def __str__(self):
         return self.item.name
@@ -135,4 +149,4 @@ class Pricing(models.Model):
     class Meta:
         db_table = "pricing"
         get_latest_by = "created_at"
-        ordering = ["created_at"]
+        ordering = ["created_at", "updated_at"]
