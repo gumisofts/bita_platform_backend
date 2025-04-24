@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from django.db import models
 
-from accounts.models import Business
 from inventories.models import Item
 
 
@@ -77,7 +76,7 @@ class Transaction(models.Model):
 class BusinessPaymentMethod(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     business = models.ForeignKey(
-        Business,
+        "business.Business",
         related_name="payment_methods",
         on_delete=models.CASCADE,
     )

@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "files",
     "storages",
     "inventories",
+    "business",
     "notifications",
     "crms",
     "financials",

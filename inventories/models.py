@@ -3,7 +3,6 @@ from uuid import uuid4
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
-from accounts.models import Branch, Business, Category
 from files.models import FileMeta
 
 
@@ -12,9 +11,11 @@ class Item(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     min_selling_quota = models.PositiveBigIntegerField(default=1)
-    categories = models.ManyToManyField(Category, blank=True, related_name="items")
+    categories = models.ManyToManyField(
+        "business.Category", blank=True, related_name="items"
+    )
     inventory_unit = models.CharField(max_length=255)
-    business = models.ForeignKey(Business, on_delete=models.CASCADE)
+    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     notify_below = models.PositiveBigIntegerField()
     is_returnable = models.BooleanField(default=False)
     is_visible_online = models.BooleanField(default=True)
@@ -33,8 +34,8 @@ class Item(models.Model):
 
 class ItemImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    item = models.OneToOneField(Item, on_delete=models.CASCADE)
-    file = models.OneToOneField(FileMeta, on_delete=models.CASCADE)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE)
+    file = models.ForeignKey(FileMeta, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_primary = models.BooleanField(default=False)
@@ -66,7 +67,7 @@ class Supplier(models.Model):
         unique=True,
         blank=True,
     )
-    business = models.ForeignKey(Business, on_delete=models.CASCADE)
+    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -82,9 +83,9 @@ class Supplier(models.Model):
 
 class Supply(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    name = models.CharField(max_length=255)
-    supply_date = models.DateTimeField(auto_now_add=True)
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
+    label = models.CharField(max_length=255)
+    supplied_date = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
     recipt = models.OneToOneField(
         FileMeta,
         on_delete=models.SET_NULL,
@@ -99,7 +100,7 @@ class Supply(models.Model):
         db_table = "supply"
         get_latest_by = "id"
         ordering = ["created_at", "updated_at"]
-        unique_together = ("name", "branch")
+        unique_together = ("label", "branch")
 
     def __str__(self):
         return self.name
@@ -122,7 +123,7 @@ class SuppliedItem(models.Model):
         null=True,
         blank=True,
     )
-    business = models.ForeignKey(Business, on_delete=models.CASCADE)
+    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     timestamp = models.DateField(auto_now_add=True)
     discount = models.PositiveIntegerField()
     supply = models.ManyToManyField(Supply)
