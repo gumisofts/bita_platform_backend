@@ -7,6 +7,7 @@ import requests
 from django.contrib.auth import authenticate, get_user_model, password_validation
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -309,18 +310,33 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class RoleSerializer(serializers.ModelSerializer):
+    permissions = serializers.SerializerMethodField()
+
+    def get_permissions(self, obj):
+
+        return map(lambda x: x.codename, obj.permissions.all())
+
     class Meta:
         model = Role
         fields = "__all__"
 
 
-class RolePermissionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RolePermission
-        fields = "__all__"
-
-
 class BranchSerializer(serializers.ModelSerializer):
+    current_user_role = serializers.SerializerMethodField()
+
+    def get_current_user_role(self, obj):
+
+        employee = Employee.objects.filter(
+            Q(branch=obj) | Q(branch=None),
+            user=self.context.get("request").user,
+            business=obj.business,
+        ).first()
+
+        if not employee:
+            return None
+
+        return employee.role.id if employee.role else None
+
     class Meta:
         model = Branch
         fields = "__all__"
@@ -738,3 +754,15 @@ class SendVerificationCodeSerializer(serializers.Serializer):
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
         return {"detail": "success"}
+
+
+class IndustrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Industry
+        exclude = []
+
+
+class BusinessImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinessImage
+        exclude = []

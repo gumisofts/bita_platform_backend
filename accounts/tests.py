@@ -4,10 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import Address, Branch, Business, Category, Role, RolePermission
-from accounts.serializers import UserSerializer
-
-User = get_user_model()
+from accounts.models import *
 
 
 def create_user(**kwargs):
@@ -83,15 +80,15 @@ class AccountsTestCase(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_role_list(self):
-        Role.objects.create(role_name="Manager", role_code=100)
-        url = reverse("roles-list")
+        role = Role.objects.create(role_name="Manager")
+        url = reverse("roles-detail", args=[role.id])
         res = self.client.get(url, **self.auth_header)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_branch_crud(self):
         url = reverse("branches-list")
         data = {"name": "Main Branch"}
-        res = self.client.post(url, data)
+        res = self.client.post(url, data, **self.auth_header)
         self.assertIn(
             res.status_code, [status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST]
         )

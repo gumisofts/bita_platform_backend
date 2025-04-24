@@ -61,7 +61,7 @@ class Address(models.Model):
 
     def __str__(self):
         return f"""
-        {self.sublocality}, {self.locality}, {self.admin_1}, {self.country}
+        {self.admin_1}, {self.country}:-({self.lat}, {self.lng})
         """
 
 
@@ -100,6 +100,10 @@ class Business(models.Model):
     category = models.ManyToManyField(
         Category,
     )
+    background_image = models.ForeignKey(
+        "files.FileMeta", on_delete=models.SET_NULL, null=True, blank=True
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     # Files and Images
@@ -111,25 +115,23 @@ class Business(models.Model):
 class Role(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     role_name = models.CharField(max_length=255)
-    role_code = models.IntegerField()
-
-
-# class Permission(Permission):
-#     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-
-
-class RolePermission(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    permission = models.ForeignKey(
+    # role_code = models.IntegerField()
+    permissions = models.ManyToManyField(
         Permission,
-        on_delete=models.SET_NULL,
-        null=True,
+        blank=True,
+        related_name="roles",
     )
-    role = models.ForeignKey(
-        Role,
-        on_delete=models.SET_NULL,
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
         null=True,
+        related_name="roles",
     )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.role_name} - {self.business.name}"
 
 
 class Employee(models.Model):
@@ -141,13 +143,20 @@ class Employee(models.Model):
     )
     business = models.ForeignKey(
         Business,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
     )
     role = models.ForeignKey(
         Role,
         on_delete=models.SET_NULL,
         null=True,
+        related_name="employees",
+    )
+    branch = models.ForeignKey(
+        "Branch",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="employees",
     )
 
     def __str__(self):
@@ -229,7 +238,7 @@ class Branch(models.Model):
     address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True)
     business = models.ForeignKey(
         Business,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -253,6 +262,7 @@ class Password(models.Model):
 
 
 class ResetPasswordRequest(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
     email = models.CharField(max_length=255, blank=True, null=True)
     phone_number = models.CharField(max_length=255, blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -281,3 +291,33 @@ class VerificationCode(models.Model):
         if force_insert:
             self.code = make_password(self.code)
         return super().save(force_insert=force_insert, *args, **kwargs)
+
+
+class Industry(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    image = models.ForeignKey(
+        "files.FileMeta", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+
+class BusinessImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    business = models.OneToOneField(
+        Business, on_delete=models.CASCADE, related_name="business_images"
+    )
+    image = models.ManyToManyField(
+        "files.FileMeta", blank=True, related_name="business_images"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "updated_at"]

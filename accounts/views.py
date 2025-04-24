@@ -29,19 +29,8 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
+from accounts.models import *
 from accounts.serializers import *
-
-from .models import (
-    Address,
-    Branch,
-    Business,
-    Category,
-    EmailChangeRequest,
-    Employee,
-    PhoneChangeRequest,
-    Role,
-    RolePermission,
-)
 
 User = get_user_model()
 
@@ -151,21 +140,16 @@ class CategoryViewSet(ListModelMixin, GenericViewSet):
     serializer_class = CategorySerializer
 
 
-class RoleViewSet(ListModelMixin, GenericViewSet):
+class RoleViewset(RetrieveModelMixin, GenericViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [IsAuthenticated]
-
-
-class RolePermissionViewSet(viewsets.ModelViewSet):
-    queryset = RolePermission.objects.all()
-    serializer_class = RolePermissionSerializer
     permission_classes = [IsAuthenticated]
 
 
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ConfirmVerificationCodeViewset(CreateModelMixin, GenericViewSet):
@@ -188,3 +172,13 @@ class SendVerificationCodeViewset(CreateModelMixin, GenericViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+
+class IndustryViewset(ListModelMixin, GenericViewSet):
+    serializer_class = IndustrySerializer
+    queryset = Industry.objects.filter(is_active=True)
+
+
+class BusinessImageViewset(ListModelMixin, GenericViewSet):
+    serializer_class = BusinessImageSerializer
+    queryset = BusinessImage.objects.filter()

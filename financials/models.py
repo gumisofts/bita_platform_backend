@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.db import models
 
 from accounts.models import Business
-from inventory.models import Item
+from inventories.models import Item
 
 
 class Order(models.Model):
@@ -74,9 +74,7 @@ class Transaction(models.Model):
         return f"Transaction {self.id} - {self.type} ({self.amount})"
 
 
-# Business - PaymentMethod management/mapping model
 class BusinessPaymentMethod(models.Model):
-    # id = models.BigIntegerField(primary_key=True)
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     business = models.ForeignKey(
         Business,
