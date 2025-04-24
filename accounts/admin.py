@@ -73,13 +73,25 @@ class RoleAdmin(admin.ModelAdmin):
     list_select_related = []
 
 
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "business", "role", "branch"]
+    # ordering = ["created_at"]
+
+
+class BranchAdmin(admin.ModelAdmin):
+    list_display = ["id", "name", "address", "business"]
+    ordering = ["created_at"]
+
+
 admin.site.register(VerificationCode, VerificationCodeAdmin)
 admin.site.register(Permission, PermissionAdmin)
 admin.site.register(ContentType, ContentTypeAdmin)
 admin.site.register(User, CustomUserAdmin)
+admin.site.register(Employee, EmployeeAdmin)
 admin.site.register(Industry, IndustryAdmin)
 admin.site.register(Address, AddressAdmin)
 admin.site.register(Business, BusinessAdmin)
+admin.site.register(Branch, BranchAdmin)
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(Role, RoleAdmin)
 admin.site.register(ResetPasswordRequest, ResetRequestAdmin)

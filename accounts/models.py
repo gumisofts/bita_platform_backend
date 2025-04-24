@@ -61,7 +61,7 @@ class Address(models.Model):
 
     def __str__(self):
         return f"""
-        {self.sublocality}, {self.locality}, {self.admin_1}, {self.country}
+        {self.admin_1}, {self.country}:-({self.lat}, {self.lng})
         """
 
 
@@ -142,7 +142,7 @@ class Employee(models.Model):
     )
     business = models.ForeignKey(
         Business,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
     )
     role = models.ForeignKey(
@@ -237,7 +237,7 @@ class Branch(models.Model):
     address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True)
     business = models.ForeignKey(
         Business,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)

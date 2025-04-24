@@ -149,6 +149,7 @@ class RoleViewset(RetrieveModelMixin, GenericViewSet):
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ConfirmVerificationCodeViewset(CreateModelMixin, GenericViewSet):
