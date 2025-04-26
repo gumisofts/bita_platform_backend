@@ -4,11 +4,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.validators import RegexValidator
 from django.db import models
+from core.models import BaseModel
 
 User = get_user_model()
 
 
-class Address(models.Model):
+class Address(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     lat = models.FloatField()
     lng = models.FloatField()
@@ -25,21 +26,19 @@ class Address(models.Model):
         """
 
 
-class Industry(models.Model):
+class Industry(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     image = models.ForeignKey(
         "files.FileMeta", null=True, blank=True, on_delete=models.SET_NULL
     )
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
 
 
-class Category(models.Model):
+class Category(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     industry = models.ForeignKey(Industry, on_delete=models.CASCADE, null=True)
@@ -47,14 +46,12 @@ class Category(models.Model):
     image = models.ForeignKey(
         "files.FileMeta", on_delete=models.SET_NULL, null=True, blank=True
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
 
 
-class Business(models.Model):
+class Business(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     business_type_choices = [
         ("retail", "Retail"),
@@ -75,22 +72,16 @@ class Business(models.Model):
         on_delete=models.SET_NULL,
         null=True,
     )
-    category = models.ManyToManyField(
-        Category,
-    )
+    categories = models.ManyToManyField(Category, related_name="businesses")
     background_image = models.ForeignKey(
         "files.FileMeta", on_delete=models.SET_NULL, null=True, blank=True
     )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    # Files and Images
 
     def __str__(self):
         return self.name
 
 
-class Role(models.Model):
+class Role(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     role_name = models.CharField(max_length=255)
     # role_code = models.IntegerField()
@@ -105,14 +96,12 @@ class Role(models.Model):
         null=True,
         related_name="roles",
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.role_name} - {self.business.name}"
 
 
-class Employee(models.Model):
+class Employee(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     user = models.ForeignKey(
         User,
@@ -141,7 +130,7 @@ class Employee(models.Model):
         return f"{self.user.email} - {self.role} at {self.business}"
 
 
-class BusinessActivity(models.Model):
+class BusinessActivity(BaseModel):
     MODEL_CHOICES = [
         (1, "User"),
         (2, "Address"),
@@ -177,7 +166,7 @@ class BusinessActivity(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
 
-class BusinessImage(models.Model):
+class BusinessImage(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     business = models.OneToOneField(
         Business, on_delete=models.CASCADE, related_name="business_images"
@@ -186,14 +175,11 @@ class BusinessImage(models.Model):
         "files.FileMeta", blank=True, related_name="business_images"
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
     class Meta:
         ordering = ["created_at", "updated_at"]
 
 
-class Branch(models.Model):
+class Branch(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     address = models.ForeignKey(
@@ -208,9 +194,6 @@ class Branch(models.Model):
         null=True,
         related_name="branches",
     )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.name} - {self.business.name}"

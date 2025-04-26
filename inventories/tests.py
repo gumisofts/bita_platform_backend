@@ -23,9 +23,7 @@ class ItemViewSetTest(APITestCase):
         self.group = Group.objects.create(
             name="Test Group", description="Test Desc", business=self.business
         )
-        self.category = Category.objects.create(
-            name="Test Category", business=self.business
-        )
+        self.category = Category.objects.create(name="Test Category")
 
         self.item = Item.objects.create(
             name="Test Item",

@@ -31,15 +31,6 @@ class AccountsTestCase(APITestCase):
         self.user.save()
         self.token = str(RefreshToken.for_user(self.user).access_token)
         self.auth_header = {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
-        # self.business = Business.objects.create(
-        #     name="Test Business",
-        #     owner=self.user,
-        #     address="123 Test St",
-        #     city="Test City",
-        #     state="Test State",
-        #     country="Test Country",
-        #     zip_code="12345",
-        # )
 
     def test_address_crud(self):
         url = reverse("addresses-list")

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "inventories",
     "business",
     "notifications",
+    "orders",
     "crms",
     "financials",
     "markets",
