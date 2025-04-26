@@ -4,7 +4,6 @@ from pathlib import Path
 
 from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
-from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
 
 load_dotenv(override=True)
 load_dotenv(".env.production", override=True)
@@ -168,6 +167,24 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     "REDOC_DIST": "SIDECAR",
     "COMPONENT_SPLIT_REQUEST": True,
+    "SERVERS": [
+        {
+            "url": "https://apis.bita.gumisofts.com/v01",
+            "description": "V01 Production Server",
+        },
+        {
+            "url": "http://localhost:8000",
+            "description": "Local Development Server",
+        },
+        {
+            "url": "https://mpto2cz1lg.execute-api.eu-north-1.amazonaws.com/dev",
+            "description": "Active Development Server",
+        },
+        {
+            "url": "https://mpto2cz1lg.execute-api.eu-north-1.amazonaws.com/v01",
+            "description": "Alias of V01 Production Server",
+        },
+    ],
 }
 
 AUTHENTICATION_BACKENDS = [
@@ -194,44 +211,44 @@ AWS_QUERYSTRING_AUTH = True
 AWS_QUERYSTRING_EXPIRE = 3600
 
 
-ITEM_LIST_QUERY_PARAMETERS = [
-    OpenApiParameter(
-        name="category_id",
-        description="Filter by category ID",
-        required=False,
-        type=OpenApiTypes.INT,
-    ),
-    OpenApiParameter(
-        name="manufacturer_id",
-        description="Filter by manufacturer ID",
-        required=False,
-        type=OpenApiTypes.INT,
-    ),
-    OpenApiParameter(
-        name="visible",
-        description="Filter by visibility (true/false)",
-        required=False,
-        type=OpenApiTypes.BOOL,
-    ),
-    OpenApiParameter(
-        name="returnable",
-        description="Filter by returnable (true/false)",
-        required=False,
-        type=OpenApiTypes.BOOL,
-    ),
-    OpenApiParameter(
-        name="search",
-        description="Search term",
-        required=False,
-        type=OpenApiTypes.STR,
-    ),
-]
+# ITEM_LIST_QUERY_PARAMETERS = [
+#     OpenApiParameter(
+#         name="category_id",
+#         description="Filter by category ID",
+#         required=False,
+#         type=OpenApiTypes.INT,
+#     ),
+#     OpenApiParameter(
+#         name="manufacturer_id",
+#         description="Filter by manufacturer ID",
+#         required=False,
+#         type=OpenApiTypes.INT,
+#     ),
+#     OpenApiParameter(
+#         name="visible",
+#         description="Filter by visibility (true/false)",
+#         required=False,
+#         type=OpenApiTypes.BOOL,
+#     ),
+#     OpenApiParameter(
+#         name="returnable",
+#         description="Filter by returnable (true/false)",
+#         required=False,
+#         type=OpenApiTypes.BOOL,
+#     ),
+#     OpenApiParameter(
+#         name="search",
+#         description="Search term",
+#         required=False,
+#         type=OpenApiTypes.STR,
+#     ),
+# ]
 
-SUPPLY_RESERVATION_LIST_QUERY_PARAMETERS = [
-    OpenApiParameter(
-        name="status",
-        description="Filter by reservation status (active, cancelled, fulfilled)",
-        required=False,
-        type=OpenApiTypes.STR,
-    ),
-]
+# SUPPLY_RESERVATION_LIST_QUERY_PARAMETERS = [
+#     OpenApiParameter(
+#         name="status",
+#         description="Filter by reservation status (active, cancelled, fulfilled)",
+#         required=False,
+#         type=OpenApiTypes.STR,
+#     ),
+# ]
