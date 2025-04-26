@@ -186,8 +186,6 @@ class PasswordChangeSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         instance = getattr(self, "instance", None)
         errors = {}
-        print(Password.hash_password("Hello,World!"))
-        print(Password.hash_password("Hello,World!"))
         password = (
             Password.objects.filter(
                 password=Password.hash_password(attrs.get("new_password"))

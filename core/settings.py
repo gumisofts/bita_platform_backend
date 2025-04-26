@@ -17,7 +17,6 @@ DEBUG = env("DEBUG", False) == "True"
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
-# Application definition
 
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
@@ -78,9 +77,6 @@ WSGI_APPLICATION = "core.wsgi.app"
 ASGI_APPLICATION = "core.asgi.app"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -94,9 +90,6 @@ DATABASES = {
     },
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -114,9 +107,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "UTC"
@@ -126,15 +116,10 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
 STATIC_URL = env("STATIC_URL", "static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
 STATIC_ROOT = BASE_DIR / "static"
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -179,39 +164,36 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Description of documentation",
     "VERSION": "0.0.1",
     "SERVE_INCLUDE_SCHEMA": True,
-    # OTHER SETTINGS
-    "SWAGGER_UI_DIST": "SIDECAR",  # shorthand to use the sidecar instead
+    "SWAGGER_UI_DIST": "SIDECAR",
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     "REDOC_DIST": "SIDECAR",
-    # for binary data upload support
     "COMPONENT_SPLIT_REQUEST": True,
 }
 
 AUTHENTICATION_BACKENDS = [
-    "accounts.backends.EmailOrPhoneBackend",
     "accounts.backends.PhoneBackend",
     "accounts.backends.EmailBackend",
-    "django.contrib.auth.backends.ModelBackend",
+    "accounts.backends.ModelBackend",
 ]
 
 
-# AWS Credentials
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
 AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "eu-north-1")
 
 GOOGLE_WEB_CLIENT_ID = env("GOOGLE_WEB_CLIENT_ID")
-# S3 Storage Configuration
+
 AWS_S3_CUSTOM_DOMAIN = None
+
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
 }
-# Enable signed URLs
+
 AWS_QUERYSTRING_AUTH = True
 AWS_QUERYSTRING_EXPIRE = 3600
 
-# Drf-Spectacular Additional Settings
+
 ITEM_LIST_QUERY_PARAMETERS = [
     OpenApiParameter(
         name="category_id",

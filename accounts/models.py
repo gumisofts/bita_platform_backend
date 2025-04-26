@@ -45,7 +45,7 @@ class User(AbstractUser):
         return phone_number
 
     def __str__(self):
-        return self.email or self.username or str(self.id)
+        return f"User({str(self.id)})"
 
 
 class PhoneChangeRequest(models.Model):
