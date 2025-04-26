@@ -3,28 +3,32 @@ from uuid import uuid4
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
+from core.models import BaseModel
 from files.models import FileMeta
 
 
-class Item(models.Model):
+class Property(BaseModel):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    value = models.CharField(max_length=255)
+    item_variant = models.ForeignKey(
+        "ItemVariant", on_delete=models.CASCADE, related_name="properties"
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class Group(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField()
-    min_selling_quota = models.PositiveBigIntegerField(default=1)
-    categories = models.ManyToManyField(
-        "business.Category", blank=True, related_name="items"
+    business = models.ForeignKey(
+        "business.Business", on_delete=models.CASCADE, related_name="groups"
     )
-    inventory_unit = models.CharField(max_length=255)
-    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
-    notify_below = models.PositiveBigIntegerField()
-    is_returnable = models.BooleanField(default=False)
-    is_visible_online = models.BooleanField(default=True)
-    receive_online_orders = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "item"
+        db_table = "group"
         get_latest_by = "created_at"
         ordering = ["created_at", "updated_at"]
 
@@ -32,7 +36,47 @@ class Item(models.Model):
         return self.name
 
 
-class ItemImage(models.Model):
+class Item(BaseModel):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    group = models.ForeignKey(
+        Group, on_delete=models.CASCADE, related_name="items", null=True, blank=True
+    )
+    min_selling_quota = models.PositiveBigIntegerField(default=1)
+    categories = models.ManyToManyField(
+        "business.Category", blank=True, related_name="items"
+    )
+    inventory_unit = models.CharField(max_length=255)
+    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
+
+
+class ItemVariant(BaseModel):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    item = models.ForeignKey(Item, related_name="variants", on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    quantity = models.PositiveIntegerField()
+    selling_price = models.DecimalField(
+        max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
+    )
+    batch_number = models.CharField(max_length=255)
+    sku = models.CharField(max_length=255, unique=True)
+    expire_date = models.DateField(null=True, blank=True)
+    man_date = models.DateField(null=True, blank=True)
+    is_default = models.BooleanField(default=False)
+    is_returnable = models.BooleanField(default=False)
+    is_visible_online = models.BooleanField(default=True)
+    receive_online_orders = models.BooleanField(default=True)
+    notify_below = models.PositiveBigIntegerField()
+
+    def __str__(self):
+        return self.name
+
+
+class ItemImage(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     item = models.ForeignKey(Item, on_delete=models.CASCADE)
     file = models.ForeignKey(FileMeta, on_delete=models.CASCADE)
@@ -42,16 +86,11 @@ class ItemImage(models.Model):
     is_visible = models.BooleanField(default=True)
     is_thumbnail = models.BooleanField(default=False)
 
-    class Meta:
-        db_table = "item_image"
-        get_latest_by = "created_at"
-        ordering = ["created_at"]
-
     def __str__(self):
         return self.item.name
 
 
-class Supplier(models.Model):
+class Supplier(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField()
@@ -69,85 +108,61 @@ class Supplier(models.Model):
     )
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "supplier"
-        get_latest_by = "id"
-        ordering = ["created_at", "updated_at"]
-
     def __str__(self):
         return self.name
 
 
-class Supply(models.Model):
+class Supply(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     label = models.CharField(max_length=255)
-    supplied_date = models.DateTimeField(auto_now_add=True)
     branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
-    recipt = models.OneToOneField(
-        FileMeta,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "supply"
-        get_latest_by = "id"
-        ordering = ["created_at", "updated_at"]
         unique_together = ("label", "branch")
 
     def __str__(self):
-        return self.name
+        return self.label
 
 
-class SuppliedItem(models.Model):
+class SuppliedItem(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     quantity = models.PositiveIntegerField()
-    item = models.ManyToManyField(Item, related_name="supplied_items")
-    price = models.DecimalField(
+    item = models.ForeignKey(
+        Item, related_name="supplied_items", on_delete=models.CASCADE
+    )
+    purchase_price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
     )
     batch_number = models.CharField(max_length=255)
-    expiry_date = models.DateTimeField()
-    man_date = models.DateTimeField()
-    barcode = models.CharField(max_length=255, unique=True)
+    product_number = models.CharField(max_length=255, unique=True)
+    expire_date = models.DateField(null=True, blank=True)
+    man_date = models.DateField(null=True, blank=True)
+    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
-    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
-    timestamp = models.DateField(auto_now_add=True)
-    discount = models.PositiveIntegerField()
-    supply = models.ManyToManyField(Supply)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "supplied_item"
-        get_latest_by = "id"
-        ordering = ["created_at", "updated_at"]
+    supply = models.ForeignKey(
+        Supply, on_delete=models.CASCADE, related_name="supplied_items"
+    )
 
     def __str__(self):
         return self.item.name
 
 
-class Pricing(models.Model):
+class Pricing(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     price = models.PositiveBigIntegerField()
-    min_quantity = models.PositiveBigIntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    item_variant = models.ForeignKey(
+        ItemVariant, on_delete=models.CASCADE, related_name="pricings"
+    )
+    min_selling_quota = models.PositiveBigIntegerField()
 
-    class Meta:
-        db_table = "pricing"
-        get_latest_by = "created_at"
-        ordering = ["created_at", "updated_at"]
+
+class ReturnRecall(BaseModel):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    item_variant = models.ForeignKey(ItemVariant, on_delete=models.CASCADE)
+    remarks = models.TextField(blank=True)
+    quantity = models.PositiveIntegerField()

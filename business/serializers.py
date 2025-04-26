@@ -1,9 +1,9 @@
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.db.models import Q
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from business.models import *
-from django.db.models import Q
-from rest_framework.exceptions import ValidationError
 
 
 class AddressSerializer(serializers.ModelSerializer):

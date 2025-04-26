@@ -3,10 +3,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-from business.models import Business, Branch, Employee, Category, Role
 
-
-from django.contrib.auth import get_user_model
+from business.models import Branch, Business, Category, Employee, Role
 
 User = get_user_model()
 
