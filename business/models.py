@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.validators import RegexValidator
 from django.db import models
+
 from core.models import BaseModel
 
 User = get_user_model()
