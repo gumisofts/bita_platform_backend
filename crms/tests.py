@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounts.models import Business
+from business.models import Business
 
 from .models import Customer, GiftCard
 
