@@ -34,10 +34,13 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
     "accounts",
+    "platform_control",
     "files",
     "storages",
     "inventories",
+    "business",
     "notifications",
+    "orders",
     "crms",
     "financials",
     "markets",
@@ -87,7 +90,7 @@ DATABASES = {
         "HOST": env("PG_HOST", "localhost"),
         "PORT": env("PG_PORT", "5432"),
         "CONN_MAX_AGE": None,
-        "OPTIONS": {"sslmode": env("PG_SSL_MODE")},
+        "OPTIONS": {"sslmode": env("PG_SSL_MODE") if env("PG_SSL_MODE") else None},
     },
 }
 

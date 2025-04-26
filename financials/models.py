@@ -1,64 +1,27 @@
 import uuid
-from decimal import Decimal
 
 from django.db import models
 
-from accounts.models import Business
-from inventories.models import Item
+from core.models import BaseModel
 
 
-class Order(models.Model):
-    class StatusChoices(models.TextChoices):
-        PROCESSING = "PROCESSING", "Processing"
-        COMPLETED = "COMPLETED", "Completed"
-        CANCELLED = "CANCELLED", "Cancelled"
-        PARTIALLY_PAID = "PARTIALLY_PAID", "Partially Paid"
-
+class PaymentMethod(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    customer_id = models.UUIDField()
-    employee_id = models.UUIDField()
-    total_payable = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal("0.00")
-    )
-    status = models.CharField(
-        max_length=20, choices=StatusChoices.choices, default=StatusChoices.PROCESSING
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Order {self.id} - {self.status}"
+    image = models.ImageField(upload_to="payment_methods/", null=True, blank=True)
+    name = models.CharField(max_length=255)
+    short_name = models.CharField(max_length=255)
 
 
-class OrderItem(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    item = models.ForeignKey(
-        Item,
-        on_delete=models.CASCADE,
-    )
-    order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
-
-    def __str__(self):
-        return f"Item {self.item_id} in Order {self.order.id}"
-
-
-class Transaction(models.Model):
+class Transaction(BaseModel):
     class TransactionType(models.TextChoices):
         SALE = "SALE", "Sale"
         EXPENSE = "EXPENSE", "Expense"
         DEBT = "DEBT", "Debt"
         REFUND = "REFUND", "Refund"
 
-    class PaymentMethod(models.TextChoices):
-        CBE = "CBE", "Commercial Bank of Ethiopia"
-        AWASH = "AWASH", "Awash Bank"
-        TELEBIRR = "TELEBIRR", "Tele-Birr"
-        CASH = "CASH", "Cash"
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(
-        Order,
+        "orders.Order",
         related_name="transaction",
         on_delete=models.SET_NULL,
         null=True,
@@ -67,24 +30,22 @@ class Transaction(models.Model):
     type = models.CharField(max_length=20, choices=TransactionType.choices)
     total_paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
     total_left_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Transaction {self.id} - {self.type} ({self.amount})"
 
 
-class BusinessPaymentMethod(models.Model):
+class BusinessPaymentMethod(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    payment = models.ForeignKey(PaymentMethod, on_delete=models.SET_NULL, null=True)
     business = models.ForeignKey(
-        Business,
+        "business.Business",
         related_name="payment_methods",
         on_delete=models.CASCADE,
     )
-    payment_method = models.CharField(
-        max_length=20, choices=Transaction.PaymentMethod.choices
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
+    label = models.CharField(max_length=255)
+
+    identifier = models.CharField(max_length=255, unique=True)
 
     def __str__(self):
         return f"{self.business.name} - {self.payment_method}"

@@ -2,8 +2,8 @@
 
 import uuid
 
-import django.core.validators
 import django.db.models.deletion
+from django.conf import settings
 from django.db import migrations, models
 
 
@@ -12,13 +12,43 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("business", "0001_initial"),
+        ("auth", "0012_alter_user_first_name_max_length"),
         ("files", "0001_initial"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name="Group",
+            name="Address",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("lat", models.FloatField()),
+                ("lng", models.FloatField()),
+                ("plus_code", models.CharField(blank=True, null=True)),
+                ("sublocality", models.CharField(max_length=255, null=True)),
+                ("locality", models.CharField(max_length=255, null=True)),
+                ("admin_2", models.CharField(max_length=255, null=True)),
+                ("admin_1", models.CharField(max_length=255)),
+                ("country", models.CharField(max_length=255)),
+            ],
+            options={
+                "ordering": ["created_at", "updated_at"],
+                "get_latest_by": "created_at",
+                "abstract": False,
+            },
+        ),
+        migrations.CreateModel(
+            name="Business",
             fields=[
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
@@ -32,375 +62,42 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("name", models.CharField(max_length=255)),
-                ("description", models.TextField()),
                 (
-                    "business",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="groups",
-                        to="business.business",
-                    ),
-                ),
-            ],
-            options={
-                "db_table": "group",
-                "ordering": ["created_at", "updated_at"],
-                "get_latest_by": "created_at",
-            },
-        ),
-        migrations.CreateModel(
-            name="Item",
-            fields=[
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("name", models.CharField(max_length=255)),
-                ("description", models.TextField()),
-                ("min_selling_quota", models.PositiveBigIntegerField(default=1)),
-                ("inventory_unit", models.CharField(max_length=255)),
-                (
-                    "business",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        to="business.business",
-                    ),
-                ),
-                (
-                    "categories",
-                    models.ManyToManyField(
-                        blank=True, related_name="items", to="business.category"
-                    ),
-                ),
-                (
-                    "group",
-                    models.ForeignKey(
-                        blank=True,
-                        null=True,
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="items",
-                        to="inventories.group",
-                    ),
-                ),
-            ],
-            options={
-                "ordering": ["created_at", "updated_at"],
-                "get_latest_by": "created_at",
-                "abstract": False,
-            },
-        ),
-        migrations.CreateModel(
-            name="ItemImage",
-            fields=[
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                ("is_primary", models.BooleanField(default=False)),
-                ("is_visible", models.BooleanField(default=True)),
-                ("is_thumbnail", models.BooleanField(default=False)),
-                (
-                    "file",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE, to="files.filemeta"
-                    ),
-                ),
-                (
-                    "item",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        to="inventories.item",
-                    ),
-                ),
-            ],
-            options={
-                "ordering": ["created_at", "updated_at"],
-                "get_latest_by": "created_at",
-                "abstract": False,
-            },
-        ),
-        migrations.CreateModel(
-            name="ItemVariant",
-            fields=[
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("name", models.CharField(max_length=255)),
-                ("quantity", models.PositiveIntegerField()),
-                (
-                    "selling_price",
-                    models.DecimalField(
-                        decimal_places=2,
-                        max_digits=12,
-                        validators=[django.core.validators.MinValueValidator(1)],
-                    ),
-                ),
-                ("batch_number", models.CharField(max_length=255)),
-                ("sku", models.CharField(max_length=255, unique=True)),
-                ("expire_date", models.DateField(blank=True, null=True)),
-                ("man_date", models.DateField(blank=True, null=True)),
-                ("is_default", models.BooleanField(default=False)),
-                ("is_returnable", models.BooleanField(default=False)),
-                ("is_visible_online", models.BooleanField(default=True)),
-                ("receive_online_orders", models.BooleanField(default=True)),
-                ("notify_below", models.PositiveBigIntegerField()),
-                (
-                    "item",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="variants",
-                        to="inventories.item",
-                    ),
-                ),
-            ],
-            options={
-                "ordering": ["created_at", "updated_at"],
-                "get_latest_by": "created_at",
-                "abstract": False,
-            },
-        ),
-        migrations.CreateModel(
-            name="Pricing",
-            fields=[
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("price", models.PositiveBigIntegerField()),
-                ("min_selling_quota", models.PositiveBigIntegerField()),
-                (
-                    "item_variant",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="pricings",
-                        to="inventories.itemvariant",
-                    ),
-                ),
-            ],
-            options={
-                "ordering": ["created_at", "updated_at"],
-                "get_latest_by": "created_at",
-                "abstract": False,
-            },
-        ),
-        migrations.CreateModel(
-            name="Property",
-            fields=[
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("name", models.CharField(max_length=255)),
-                ("value", models.CharField(max_length=255)),
-                (
-                    "item_variant",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="properties",
-                        to="inventories.itemvariant",
-                    ),
-                ),
-            ],
-            options={
-                "ordering": ["created_at", "updated_at"],
-                "get_latest_by": "created_at",
-                "abstract": False,
-            },
-        ),
-        migrations.CreateModel(
-            name="ReturnRecall",
-            fields=[
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("remarks", models.TextField(blank=True)),
-                ("quantity", models.PositiveIntegerField()),
-                (
-                    "item_variant",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        to="inventories.itemvariant",
-                    ),
-                ),
-            ],
-            options={
-                "ordering": ["created_at", "updated_at"],
-                "get_latest_by": "created_at",
-                "abstract": False,
-            },
-        ),
-        migrations.CreateModel(
-            name="Supplier",
-            fields=[
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("name", models.CharField(max_length=255)),
-                ("email", models.EmailField(max_length=254)),
-                (
-                    "phone_number",
+                    "business_type",
                     models.CharField(
-                        blank=True,
-                        max_length=15,
-                        unique=True,
-                        validators=[
-                            django.core.validators.RegexValidator(
-                                message="Phone number must be entered in the format:                     '912345678 / 712345678'. Up to 9 digits allowed.",
-                                regex="^(9|7)\\d{8}$",
-                            )
+                        choices=[
+                            ("retail", "Retail"),
+                            ("whole_sale", "Wholesale"),
+                            ("manufacturing", "Manufacturing"),
+                            ("service", "Service"),
                         ],
+                        max_length=255,
                     ),
                 ),
                 (
-                    "business",
+                    "address",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        to="business.business",
-                    ),
-                ),
-            ],
-            options={
-                "ordering": ["created_at", "updated_at"],
-                "get_latest_by": "created_at",
-                "abstract": False,
-            },
-        ),
-        migrations.CreateModel(
-            name="Supply",
-            fields=[
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("label", models.CharField(max_length=255)),
-                (
-                    "branch",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        to="business.branch",
-                    ),
-                ),
-            ],
-            options={
-                "unique_together": {("label", "branch")},
-            },
-        ),
-        migrations.CreateModel(
-            name="SuppliedItem",
-            fields=[
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "id",
-                    models.UUIDField(
-                        default=uuid.uuid4,
-                        editable=False,
-                        primary_key=True,
-                        serialize=False,
-                    ),
-                ),
-                ("quantity", models.PositiveIntegerField()),
-                (
-                    "purchase_price",
-                    models.DecimalField(
-                        decimal_places=2,
-                        max_digits=12,
-                        validators=[django.core.validators.MinValueValidator(1)],
-                    ),
-                ),
-                ("batch_number", models.CharField(max_length=255)),
-                ("product_number", models.CharField(max_length=255, unique=True)),
-                ("expire_date", models.DateField(blank=True, null=True)),
-                ("man_date", models.DateField(blank=True, null=True)),
-                (
-                    "business",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        to="business.business",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="business.address",
                     ),
                 ),
                 (
-                    "item",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="supplied_items",
-                        to="inventories.item",
-                    ),
-                ),
-                (
-                    "supplier",
+                    "background_image",
                     models.ForeignKey(
                         blank=True,
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        to="inventories.supplier",
+                        to="files.filemeta",
                     ),
                 ),
                 (
-                    "supply",
+                    "owner",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="supplied_items",
-                        to="inventories.supply",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="businesses",
+                        to=settings.AUTH_USER_MODEL,
                     ),
                 ),
             ],
@@ -409,5 +106,314 @@ class Migration(migrations.Migration):
                 "get_latest_by": "created_at",
                 "abstract": False,
             },
+        ),
+        migrations.CreateModel(
+            name="Branch",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                (
+                    "address",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="branches",
+                        to="business.address",
+                    ),
+                ),
+                (
+                    "business",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="branches",
+                        to="business.business",
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ["created_at", "updated_at"],
+                "get_latest_by": "created_at",
+                "abstract": False,
+            },
+        ),
+        migrations.CreateModel(
+            name="BusinessImage",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "business",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="business_images",
+                        to="business.business",
+                    ),
+                ),
+                (
+                    "image",
+                    models.ManyToManyField(
+                        blank=True, related_name="business_images", to="files.filemeta"
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ["created_at", "updated_at"],
+            },
+        ),
+        migrations.CreateModel(
+            name="Category",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("is_active", models.BooleanField(default=True)),
+                (
+                    "image",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="files.filemeta",
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ["created_at", "updated_at"],
+                "get_latest_by": "created_at",
+                "abstract": False,
+            },
+        ),
+        migrations.AddField(
+            model_name="business",
+            name="categories",
+            field=models.ManyToManyField(
+                related_name="businesses", to="business.category"
+            ),
+        ),
+        migrations.CreateModel(
+            name="Employee",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "branch",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="employees",
+                        to="business.branch",
+                    ),
+                ),
+                (
+                    "business",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="business.business",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ["created_at", "updated_at"],
+                "get_latest_by": "created_at",
+                "abstract": False,
+            },
+        ),
+        migrations.CreateModel(
+            name="BusinessActivity",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "model",
+                    models.IntegerField(
+                        choices=[
+                            (1, "User"),
+                            (2, "Address"),
+                            (3, "Password"),
+                            (4, "Business"),
+                            (5, "BusinessActivity"),
+                            (6, "PhoneChangeRequest"),
+                            (7, "EmailChangeRequest"),
+                            (8, "Employee"),
+                            (9, "Branch"),
+                            (10, "Role"),
+                            (11, "RolePermission"),
+                            (12, "Category"),
+                        ]
+                    ),
+                ),
+                (
+                    "action",
+                    models.IntegerField(
+                        choices=[(1, "Create"), (2, "Update"), (3, "Delete")]
+                    ),
+                ),
+                ("timestamp", models.DateTimeField(auto_now_add=True)),
+                (
+                    "business",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="business.business",
+                    ),
+                ),
+                (
+                    "employee",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="business.employee",
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ["created_at", "updated_at"],
+                "get_latest_by": "created_at",
+                "abstract": False,
+            },
+        ),
+        migrations.CreateModel(
+            name="Industry",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("is_active", models.BooleanField(default=True)),
+                (
+                    "image",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="files.filemeta",
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ["created_at", "updated_at"],
+                "get_latest_by": "created_at",
+                "abstract": False,
+            },
+        ),
+        migrations.AddField(
+            model_name="category",
+            name="industry",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="business.industry",
+            ),
+        ),
+        migrations.CreateModel(
+            name="Role",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("role_name", models.CharField(max_length=255)),
+                (
+                    "business",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="roles",
+                        to="business.business",
+                    ),
+                ),
+                (
+                    "permissions",
+                    models.ManyToManyField(
+                        blank=True, related_name="roles", to="auth.permission"
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ["created_at", "updated_at"],
+                "get_latest_by": "created_at",
+                "abstract": False,
+            },
+        ),
+        migrations.AddField(
+            model_name="employee",
+            name="role",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="employees",
+                to="business.role",
+            ),
         ),
     ]

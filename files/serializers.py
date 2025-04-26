@@ -74,14 +74,6 @@ class SignedURLSerializer(serializers.Serializer):
     id = serializers.CharField(read_only=True)
     signed_url = serializers.CharField(read_only=True)
 
-    def validate(self, attrs):
-
-        attrs = super().validate(attrs)
-        if attrs.get("ext") not in [s[0] for s in self.extension_choices]:
-            raise ValidationError({"ext": "unsupported extension"})
-
-        return attrs
-
     def create(self, validated_data):
         s3_client = boto3.client(
             "s3",

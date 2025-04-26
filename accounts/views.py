@@ -82,11 +82,6 @@ class ResetRequestViewset(CreateModelMixin, GenericViewSet):
     serializer_class = ResetPasswordRequestSerializer
 
 
-class BusinessViewSet(viewsets.ModelViewSet):
-    queryset = Business.objects.all()
-    serializer_class = BusinessSerializer
-
-
 class PasswordChangeViewset(UpdateModelMixin, GenericViewSet):
     serializer_class = PasswordChangeSerializer
     permission_classes = [IsAuthenticated]
@@ -129,29 +124,6 @@ class JWTTokenVerifyView(TokenVerifyView):
         )
 
 
-class AddressViewSet(viewsets.ModelViewSet):
-    queryset = Address.objects.all()
-    serializer_class = AddressSerializer
-    permission_classes = [IsAuthenticated]
-
-
-class CategoryViewSet(ListModelMixin, GenericViewSet):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-
-
-class RoleViewset(RetrieveModelMixin, GenericViewSet):
-    queryset = Role.objects.all()
-    serializer_class = RoleSerializer
-    permission_classes = [IsAuthenticated]
-
-
-class BranchViewSet(viewsets.ModelViewSet):
-    queryset = Branch.objects.all()
-    serializer_class = BranchSerializer
-    permission_classes = [IsAuthenticated]
-
-
 class ConfirmVerificationCodeViewset(CreateModelMixin, GenericViewSet):
     serializer_class = ConfirmVerificationCodeSerializer
 
@@ -172,13 +144,3 @@ class SendVerificationCodeViewset(CreateModelMixin, GenericViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-
-
-class IndustryViewset(ListModelMixin, GenericViewSet):
-    serializer_class = IndustrySerializer
-    queryset = Industry.objects.filter(is_active=True)
-
-
-class BusinessImageViewset(ListModelMixin, GenericViewSet):
-    serializer_class = BusinessImageSerializer
-    queryset = BusinessImage.objects.filter()

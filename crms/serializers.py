@@ -1,5 +1,6 @@
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from rest_framework import serializers
+
 from .models import Customer, GiftCard, GiftCardTransfer
 
 User = get_user_model()
@@ -77,7 +78,7 @@ class GiftCardTransferSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("customer does not exist")
 
         try:
-            from_customer = Customer.objects.get(id=from_customer)
+            from_customer = Customer.objects.get(id=from_customer_id)
         except Customer.DoesNotExist:
             raise serializers.ValidationError("Customer does not exist")
 

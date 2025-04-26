@@ -1,26 +1,13 @@
 from rest_framework.routers import DefaultRouter
 
-from inventories.views import ItemViewSet
+from inventories.views import *
 
 router = DefaultRouter()
-router.register(
-    "items",
-    ItemViewSet,
-    basename="items",
-)
-# router.register("categories", views.CategoryViewSet, basename="categories")
-# router.register("supply", views.SupplyViewSet, basename="supplies")
-# router.register("store", views.StoreViewSet, basename="stores")
-# router.register("location", views.LocationViewSet, basename="locations")
-# router.register("stock-movement", views.StockMovementViewSet)
-# router.register(
-# "reservations", views.SupplyReservationViewSet, basename="reservations")
+router.register(r"items/variants", ItemVariantViewset, basename="item-variants")
+router.register(r"items", ItemViewset, basename="items")
+router.register(r"supplies", SupplyViewset, basename="supplies")
+router.register(r"groups", GroupViewset, basename="groups")
+router.register(r"pricings", PricingViewset, basename="pricings")
+router.register(r"supplied_items", SupplyItemViewset, basename="supplied-items")
 
-# # items_router = routers.NestedDefaultRouter(
-# router, "items", lookup="item")
-# items_router.register(
-# "images", views.ItemImageViewSet, basename="item-images")
-
-
-# # URLConf
 urlpatterns = [] + router.urls

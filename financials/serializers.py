@@ -1,38 +1,21 @@
 from rest_framework import serializers
 
-from .models import BusinessPaymentMethod, Order, OrderItem, Transaction
-
-
-class OrderSerializer(serializers.ModelSerializer):
-    # id = serializers.UUIDField(format="hex")
-
-    class Meta:
-        model = Order
-        fields = "__all__"
-
-
-class OrderItemSerializer(serializers.ModelSerializer):
-    # id = serializers.UUIDField(format="hex")
-
-    class Meta:
-        model = OrderItem
-        fields = "__all__"
+from financials.models import BusinessPaymentMethod, Transaction
 
 
 class TransactionSerializer(serializers.ModelSerializer):
-    # id = serializers.UUIDField(format="hex")
-
     class Meta:
         model = Transaction
         fields = "__all__"
 
 
-class PaymentMethodSerializer(serializers.Serializer):
-    key = serializers.CharField()
-    value = serializers.CharField()
+class PaymentMethodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinessPaymentMethod
+        exclude = []
 
 
 class BusinessPaymentMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessPaymentMethod
-        fields = "__all__"
+        exclude = []

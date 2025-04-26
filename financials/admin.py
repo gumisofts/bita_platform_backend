@@ -1,3 +1,6 @@
 from django.contrib import admin
 
-# Register your models here.
+from financials.models import *
+
+admin.site.register(PaymentMethod)
+admin.site.register(BusinessPaymentMethod)
