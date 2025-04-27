@@ -113,6 +113,7 @@ class Employee(BaseModel):
         Business,
         on_delete=models.CASCADE,
         null=True,
+        related_name="employees",
     )
     role = models.ForeignKey(
         Role,

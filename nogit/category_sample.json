@@ -1,0 +1,66 @@
+{
+    "categories": [
+        {
+            "name": "Medications",
+            "subcategories": [
+                "Prescription Drugs (Rx)",
+                "Over-the-Counter Drugs (OTC)",
+                "Generic Drugs",
+                "Brand-Name Drugs",
+                "Biologics",
+                "Controlled Substances"
+            ]
+        },
+        {
+            "name": "Medical Devices",
+            "subcategories": [
+                "Diagnostic Equipment",
+                "Surgical Instruments",
+                "Implantable Devices",
+                "Consumable Medical Supplies"
+            ]
+        },
+        {
+            "name": "Nutraceuticals and Supplements",
+            "subcategories": [
+                "Vitamins",
+                "Herbal Supplements",
+                "Probiotics",
+                "Protein Powders and Nutrition Products"
+            ]
+        },
+        {
+            "name": "Personal Care and Hygiene Products",
+            "subcategories": [
+                "Antiseptics",
+                "Medicated Skin Care Products",
+                "Oral Care Products"
+            ]
+        },
+        {
+            "name": "Laboratory Products",
+            "subcategories": [
+                "Chemicals and Reagents",
+                "Lab Testing Kits",
+                "Lab Consumables"
+            ]
+        },
+        {
+            "name": "Veterinary Pharmaceuticals",
+            "subcategories": [
+                "Animal Vaccines",
+                "Animal Antibiotics",
+                "Animal Supplements"
+            ]
+        },
+        {
+            "name": "Hospital and Clinical Supplies",
+            "subcategories": [
+                "IV Solutions",
+                "Anesthetics",
+                "Blood Products",
+                "Surgical Dressings"
+            ]
+        }
+    ]
+}
