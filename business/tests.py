@@ -41,6 +41,7 @@ class AccountsTestCase(APITestCase):
     def test_business_crud(self):
         url = reverse("businesses-list")
         data = {"name": "Test Biz", "owner": self.user.id, "description": "Some desc"}
+        self.client.force_authenticate(user=self.user)
         res = self.client.post(url, data)
         self.assertIn(
             res.status_code, [status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST]
