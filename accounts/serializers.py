@@ -668,3 +668,11 @@ class SendVerificationCodeSerializer(serializers.Serializer):
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
         return {"detail": "success"}
+
+
+class UserDeviceSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+
+    class Meta:
+        model = UserDevice
+        exclude = []

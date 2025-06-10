@@ -50,6 +50,8 @@ router.register(
     basename="auth-verification-send",
 )
 
+router.register(r"user_devices", UserDeviceViewset, basename="user-devices")
+
 
 urlpatterns = [
     path(

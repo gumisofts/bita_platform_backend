@@ -11,6 +11,8 @@ from django.db import models
 
 from .manager import CustomUserManager
 
+from core.models import *
+
 
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -125,3 +127,9 @@ class VerificationCode(models.Model):
         if force_insert:
             self.code = make_password(self.code)
         return super().save(force_insert=force_insert, *args, **kwargs)
+
+
+class UserDevice(BaseModel):
+    fcm_token = models.CharField(max_length=255)
+    label = models.CharField(max_length=255)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
