@@ -9,9 +9,9 @@ from django.contrib.auth.models import AbstractUser, Permission
 from django.core.validators import RegexValidator
 from django.db import models
 
-from .manager import CustomUserManager
-
 from core.models import *
+
+from .manager import CustomUserManager
 
 
 class User(AbstractUser):
