@@ -166,3 +166,4 @@ staticfiles/**
 
 *.env.*
 nogit/
+env/

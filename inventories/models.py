@@ -8,7 +8,6 @@ from files.models import FileMeta
 
 
 class Property(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     value = models.CharField(max_length=255)
     item_variant = models.ForeignKey(
@@ -20,7 +19,6 @@ class Property(BaseModel):
 
 
 class Group(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField()
     business = models.ForeignKey(
@@ -37,12 +35,11 @@ class Group(BaseModel):
 
 
 class Item(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField()
     group = models.ForeignKey(
         Group, on_delete=models.CASCADE, related_name="items", null=True, blank=True
-    )
+    )  # TODO change it to m2m
     min_selling_quota = models.PositiveBigIntegerField(default=1)
     categories = models.ManyToManyField(
         "business.Category", blank=True, related_name="items"
@@ -55,7 +52,6 @@ class Item(BaseModel):
 
 
 class ItemVariant(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     item = models.ForeignKey(Item, related_name="variants", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     quantity = models.PositiveIntegerField()
@@ -77,7 +73,6 @@ class ItemVariant(BaseModel):
 
 
 class ItemImage(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     item = models.ForeignKey(Item, on_delete=models.CASCADE)
     file = models.ForeignKey(FileMeta, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -91,7 +86,6 @@ class ItemImage(BaseModel):
 
 
 class Supplier(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField()
     phone_number = models.CharField(
@@ -113,7 +107,6 @@ class Supplier(BaseModel):
 
 
 class Supply(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     label = models.CharField(max_length=255)
     branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
 
@@ -125,7 +118,6 @@ class Supply(BaseModel):
 
 
 class SuppliedItem(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     quantity = models.PositiveIntegerField()
     item = models.ForeignKey(
         Item, related_name="supplied_items", on_delete=models.CASCADE
@@ -153,7 +145,6 @@ class SuppliedItem(BaseModel):
 
 
 class Pricing(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     price = models.PositiveBigIntegerField()
     item_variant = models.ForeignKey(
         ItemVariant, on_delete=models.CASCADE, related_name="pricings"
@@ -162,7 +153,6 @@ class Pricing(BaseModel):
 
 
 class ReturnRecall(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     item_variant = models.ForeignKey(ItemVariant, on_delete=models.CASCADE)
     remarks = models.TextField(blank=True)
     quantity = models.PositiveIntegerField()
