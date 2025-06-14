@@ -20,7 +20,14 @@ class PhoneBackend(ModelBackend):
     def user_can_authenticate(self, user):
         return super().user_can_authenticate(user) and user.is_phone_verified
 
-    def authenticate(self, request, phone_number, password, **kwargs):
+    def authenticate(
+        self, request, username=None, phone_number=None, password=None, **kwargs
+    ):
+        if username is not None:
+            phone_number = username
+        if phone_number is None:
+            return None
+
         user = User.objects.filter(
             phone_number=User.normalize_phone(phone_number)
         ).first()
