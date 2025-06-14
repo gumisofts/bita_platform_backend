@@ -84,6 +84,14 @@ class GroupViewset(ModelViewSet):
     def get_queryset(self):
         queryset = self.queryset
         item_id = self.request.query_params.get("item_id")
+        business_id = self.request.query_params.get("business_id")
+
+        name = self.request.query_params.get("name")
+
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+        if business_id:
+            queryset = queryset.filter(business=business_id)
         if item_id:
             queryset = queryset.filter(item=item_id)
         return queryset
@@ -97,6 +105,41 @@ class ItemVariantViewset(ModelViewSet):
     def get_queryset(self):
         queryset = self.queryset
         item_id = self.request.query_params.get("item_id")
+        business_id = self.request.query_params.get("business_id")
+        name = self.request.query_params.get("name")
+
+        price_from = self.request.query_params.get("price_from")
+        price_to = self.request.query_params.get("price_to")
+        batch_number = self.request.query_params.get("batch_number")
+        sku = self.request.query_params.get("sku")
+        expire_date_from = self.request.query_params.get("expire_date_from")
+        expire_date_to = self.request.query_params.get("expire_date_to")
+        man_date_from = self.request.query_params.get("man_date_from")
+        man_date_to = self.request.query_params.get("man_date_to")
+
+        if price_from:
+            queryset = queryset.filter(selling_price__gte=price_from)
+        if price_to:
+            queryset = queryset.filter(selling_price__lte=price_to)
+        if expire_date_from:
+            queryset = queryset.filter(expire_date__gte=expire_date_from)
+        if expire_date_to:
+            queryset = queryset.filter(expire_date__lte=expire_date_to)
+        if man_date_from:
+            queryset = queryset.filter(man_date__gte=man_date_from)
+        if man_date_to:
+            queryset = queryset.filter(man_date__lte=man_date_to)
+        if batch_number:
+            queryset = queryset.filter(batch_number__icontains=batch_number)
+        if sku:
+            queryset = queryset.filter(sku__icontains=sku)
+
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+
+        if business_id:
+            queryset = queryset.filter(item__business=business_id)
+
         if item_id:
             queryset = queryset.filter(item=item_id)
         return queryset
