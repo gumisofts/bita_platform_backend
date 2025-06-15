@@ -1,9 +1,13 @@
+import re
+
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+from accounts.models import User, regex_validator
 from business.models import *
+from business.signals import employee_invitation_status_changed
 
 
 class AddressSerializer(serializers.ModelSerializer):
@@ -100,3 +104,62 @@ class AddressSerializer(serializers.ModelSerializer):
             raise ValidationError(errors)
 
         return attrs
+
+
+class EmployeeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Employee
+        exclude = []
+
+    def create(self, validated_data):
+        user = validated_data.pop("user")
+        user = User.objects.create(**user)
+        validated_data["user"] = user
+        return super().create(validated_data)
+
+
+class EmployeeInvitationSerializer(serializers.ModelSerializer):
+    # email = serializers.EmailField(required=False)
+    # phone_number = serializers.CharField(required=False)
+    # role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all())
+    # branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all())
+    # business = serializers.PrimaryKeyRelatedField(queryset=Business.objects.all())
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        email = attrs.get("email")
+        phone_number = attrs.get("phone_number")
+        if not email and not phone_number:
+            raise ValidationError("Email or phone number is required")
+
+        if phone_number:
+            if not regex_validator.regex.match(phone_number):
+                raise ValidationError({"phone_number": "Invalid phone number"})
+
+        return attrs
+
+    class Meta:
+        model = EmployeeInvitation
+        exclude = []
+        read_only_fields = ["status"]
+
+
+class EmployeeInvitationStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=list(map(lambda x: x[0], EmployeeInvitation.STATUS_CHOICES))
+    )
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        status = attrs.get("status")
+        if status not in list(map(lambda x: x[0], EmployeeInvitation.STATUS_CHOICES)):
+            raise ValidationError({"status": "Invalid status"})
+        return attrs
+
+    def update(self, instance, validated_data):
+        instance.status = validated_data.get("status")
+        instance.save()
+        employee_invitation_status_changed.send(
+            sender=instance.__class__, instance=instance, status=instance.status
+        )
+        return instance

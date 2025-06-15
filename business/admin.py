@@ -57,6 +57,19 @@ class IndustryAdmin(admin.ModelAdmin):
     ordering = []
 
 
+class EmployeeInvitationAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "email",
+        "phone_number",
+        "role",
+        "branch",
+        "business",
+        "status",
+    ]
+    ordering = []
+
+
 admin.site.register(Employee, EmployeeAdmin)
 admin.site.register(Industry, IndustryAdmin)
 admin.site.register(Address, AddressAdmin)
@@ -64,3 +77,4 @@ admin.site.register(Business, BusinessAdmin)
 admin.site.register(Branch, BranchAdmin)
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(Role, RoleAdmin)
+admin.site.register(EmployeeInvitation, EmployeeInvitationAdmin)

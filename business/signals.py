@@ -2,11 +2,13 @@ from django.contrib.auth.models import Permission
 from django.db import transaction
 from django.db.models import Q
 from django.db.models.signals import post_save, pre_save
-from django.dispatch import receiver
+from django.dispatch import Signal, receiver
 
 from business.models import *
 
 from .roles import *
+
+employee_invitation_status_changed = Signal()
 
 
 @receiver(pre_save, sender=User)
@@ -104,3 +106,31 @@ def on_business_created(sender, instance, created, **kwargs):
     else:
         # Update verification Token Here
         pass
+
+
+@receiver(post_save, sender=EmployeeInvitation)
+def on_employee_invitation_created(sender, instance, created, **kwargs):
+    if created:
+        # Send Invitation Email Here
+        if instance.email:
+            # Send Invitation Email Here
+            pass
+        elif instance.phone_number:
+            # Send Invitation SMS Here
+            pass
+
+
+@receiver(employee_invitation_status_changed)
+def on_employee_invitation_status_changed(sender, instance, status, **kwargs):
+    # Send Invitation Email Here
+
+    if status == "accepted":
+        user = User.objects.filter(
+            Q(phone_number=instance.phone_number) | Q(email=instance.email)
+        ).first()
+        Employee.objects.create(
+            user=user,
+            business=instance.business,
+            role=instance.role,
+            branch=instance.branch,
+        )

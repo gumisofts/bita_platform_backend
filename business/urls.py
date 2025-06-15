@@ -10,5 +10,17 @@ router.register(r"roles", RoleViewset, basename="roles")
 router.register(r"addresses", AddressViewset, basename="addresses")
 router.register(r"branches", BranchViewset, basename="branches")
 router.register(r"industries", IndustryViewset, basename="industries")
+router.register(
+    r"employees/invitations/mine", InvitationViewset, basename="invitations-mine"
+)
+router.register(
+    r"employees/invitations/status",
+    EmployeeInvitationStatusViewset,
+    basename="employee-invitation-status",
+)
+router.register(
+    r"employees/invitations", EmployeeInvitationViewset, basename="employee-invitations"
+)
+router.register(r"employees", EmployeeViewset, basename="employees")
 
 urlpatterns = router.urls

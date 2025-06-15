@@ -4,6 +4,13 @@ from crms.models import *
 from financials.models import *
 from inventories.models import *
 from notifications.models import *
+from orders.models import *
+
+# Discreate Roles mode
+# Owner
+# Admin
+# Employee
+
 
 OwnerFullAccessModels = [
     Business,
@@ -20,6 +27,7 @@ OwnerFullAccessModels = [
     Order,
     BusinessPaymentMethod,
     ItemImage,
+    EmployeeInvitation,
 ]
 
 AdminFullAccessModels = [
@@ -30,6 +38,7 @@ AdminFullAccessModels = [
     Item,
     ItemImage,
     Order,
+    EmployeeInvitation,
 ]
 
 EmployeeFullAccessModels = [
@@ -48,3 +57,5 @@ EmployeeReadOnlyModels = [
     User,
     Role,
 ]
+
+#

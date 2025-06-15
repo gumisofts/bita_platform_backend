@@ -11,7 +11,6 @@ User = get_user_model()
 
 
 class Address(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     lat = models.FloatField()
     lng = models.FloatField()
     plus_code = models.CharField(null=True, blank=True)
@@ -68,10 +67,12 @@ class Business(BaseModel):
         null=True,
     )
     business_type = models.CharField(choices=business_type_choices, max_length=255)
-    address = models.ForeignKey(
+    address = models.OneToOneField(
         Address,
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
+        related_name="business",
     )
     categories = models.ManyToManyField(Category, related_name="businesses")
     background_image = models.ForeignKey(
@@ -83,7 +84,6 @@ class Business(BaseModel):
 
 
 class Role(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     role_name = models.CharField(max_length=255)
     # role_code = models.IntegerField()
     permissions = models.ManyToManyField(
@@ -103,7 +103,6 @@ class Role(BaseModel):
 
 
 class Employee(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -199,3 +198,22 @@ class Branch(BaseModel):
 
     def __str__(self):
         return f"{self.name} - {self.business.name}"
+
+
+class EmployeeInvitation(BaseModel):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
+        ("expired", "Expired"),
+        ("revoked", "Revoked"),
+    ]
+    email = models.EmailField(blank=True, null=True)
+    phone_number = models.CharField(max_length=255, blank=True, null=True)
+    role = models.ForeignKey(Role, on_delete=models.CASCADE)
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, null=True, blank=True)
+    business = models.ForeignKey(Business, on_delete=models.CASCADE)
+    status = models.CharField(max_length=255, choices=STATUS_CHOICES, default="pending")
+
+    def __str__(self):
+        return f"{self.email} - {self.business.name}"
