@@ -13,6 +13,12 @@ from core.models import *
 
 from .manager import CustomUserManager
 
+regex_validator = RegexValidator(
+    regex=r"^(9|7)\d{8}$",
+    message="Phone number must be entered in the format: \
+                    '912345678 / 712345678'. Up to 9 digits allowed.",
+)
+
 
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -20,13 +26,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True, blank=True, null=True)
     phone_number = models.CharField(
         max_length=15,
-        validators=[
-            RegexValidator(
-                regex=r"^(9|7)\d{8}$",
-                message="Phone number must be entered in the format: \
-                    '912345678 / 712345678'. Up to 9 digits allowed.",
-            )
-        ],
+        validators=[regex_validator],
         unique=True,
         blank=True,
         null=True,
