@@ -89,10 +89,24 @@ class CategoryViewset(ListModelMixin, GenericViewSet):
     serializer_class = CategorySerializer
 
 
-class RoleViewset(RetrieveModelMixin, GenericViewSet):
+class RoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
     permission_classes = [IsAuthenticated]
+
+
+class BusinessRoleViewset(ListModelMixin, GenericViewSet):
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        business_id = self.request.query_params.get("business_id")
+        if business_id:
+            queryset = queryset.filter(business=business_id)
+        return queryset
 
 
 class BranchViewset(ModelViewSet):
