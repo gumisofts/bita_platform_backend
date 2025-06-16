@@ -15,6 +15,24 @@ class AddressSerializer(serializers.ModelSerializer):
         model = Address
         fields = "__all__"
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        lat = attrs.get("lat")
+        lng = attrs.get("lng")
+
+        errors = {}
+
+        if lat is not None and (lat < -90 or lat > 90):
+            errors["lat"] = "latitude should be between -90 and 90"
+
+        if lng is not None and (lng < -180 or lng > 180):
+            errors["lng"] = "longitude should be between -180 and 180"
+
+        if errors:
+            raise ValidationError(errors)
+
+        return attrs
+
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -69,6 +87,14 @@ class BusinessSerializer(serializers.ModelSerializer):
         validated_data["address"] = address
         return super().create(validated_data)
 
+    def update(self, instance, validated_data):
+        address = validated_data.pop("address")
+        address, created = Address.objects.update_or_create(
+            id=instance.address.id, defaults=address
+        )
+        validated_data["address"] = address
+        return super().update(instance, validated_data)
+
 
 class IndustrySerializer(serializers.ModelSerializer):
     class Meta:
@@ -80,30 +106,6 @@ class BusinessImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessImage
         exclude = []
-
-
-class AddressSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Address
-        exclude = []
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        lat = attrs.get("lat")
-        lng = attrs.get("lng")
-
-        errors = {}
-
-        if lat < -90 or lat > 90:
-            errors["lat"] = "latitude should be between -90 and 90"
-
-        if lng < -180 or lng > 180:
-            errors["lng"] = "longitude should be between -180 and 180"
-
-        if errors:
-            raise ValidationError(errors)
-
-        return attrs
 
 
 class EmployeeSerializer(serializers.ModelSerializer):

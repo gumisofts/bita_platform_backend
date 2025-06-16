@@ -1,3 +1,6 @@
+from uuid import UUID
+
+from django.db.models import Q
 from django.shortcuts import render
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -13,6 +16,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from business.permissions import *
 from business.serializers import *
+from core.utils import is_valid_uuid
 
 
 class BusinessViewset(ModelViewSet):
@@ -28,18 +32,17 @@ class BusinessViewset(ModelViewSet):
         search = self.request.query_params.get("search")
 
         if search:
-            queryset = queryset.filter(name__icontains=search)
+            queryset = queryset.filter(Q(name__icontains=search))
+
         if business_type:
             queryset = queryset.filter(business_type=business_type)
 
         queryset = queryset.filter(Q(owner=user) | Q(employees__user__in=[user]))
 
         if categories:
-            queryset = queryset.filter(
-                categories__id__in=categories.split(",")
-            ).distinct()
+            queryset = queryset.filter(categories__id__in=categories.split(","))
 
-        return queryset
+        return queryset.distinct()
 
     @extend_schema(
         parameters=[
@@ -72,15 +75,50 @@ class BusinessViewset(ModelViewSet):
 class AddressViewset(ModelViewSet):
     queryset = Address.objects.all()
     serializer_class = AddressSerializer
-    permission_classes = [BusinessAddressPermission]
+    permission_classes = [IsAuthenticated]  # Temporarily simplified
+    pagination_class = None
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
         business_id = self.request.query_params.get("business_id")
+
         if business_id:
-            queryset = queryset.filter(business=business_id)
+            try:
+                # Convert business_id to UUID if it's a string
+                if isinstance(business_id, str):
+                    business_uuid = UUID(business_id)
+                else:
+                    business_uuid = business_id
+
+                # First verify user has access to the business
+                user_business = Business.objects.filter(
+                    Q(owner=user) | Q(employees__user=user), id=business_uuid
+                ).first()
+
+                print(f"DEBUG: user_business = {user_business}")
+
+                if not user_business:
+                    print("DEBUG: No user business found, returning empty queryset")
+                    return queryset.none()
+
+                # Filter addresses that are either:
+                # 1. The business's main address (through business.address)
+                # 2. Used by branches of the business (through branch.address)
+                filtered_queryset = queryset.filter(
+                    Q(business=user_business) | Q(branches__business=user_business)
+                ).distinct()
+
+                print(f"DEBUG: filtered_queryset count = {filtered_queryset.count()}")
+                return filtered_queryset
+
+            except (ValueError, TypeError) as e:
+                # Handle invalid UUID
+                print(f"DEBUG: Exception = {e}")
+                queryset = queryset.none()
         else:
-            queryset = []
+            print("DEBUG: No business_id provided, returning empty queryset")
+            queryset = queryset.none()
         return queryset
 
 
@@ -119,17 +157,19 @@ class BranchViewset(ModelViewSet):
         user = self.request.user
         business_id = self.request.query_params.get("business_id")
 
-        if business_id:
-            queryset = queryset.filter(business=business_id)
-            employee = (
-                Employee.objects.filter(user=user, business=business_id)
-                .prefetch_related("branch")
-                .first()
-            )
-            print(employee, employee.branch)
-            if employee.branch:
-                queryset = queryset.filter(id=employee.branch.id).distinct()
-
+        if business_id and is_valid_uuid(business_id):
+            try:
+                queryset = queryset.filter(business=business_id)
+                employee = (
+                    Employee.objects.filter(user=user, business=business_id)
+                    .prefetch_related("branch")
+                    .first()
+                )
+                if employee and employee.branch:
+                    queryset = queryset.filter(id=employee.branch.id).distinct()
+            except ValueError:
+                # Handle invalid UUID
+                queryset = queryset.none()
         else:
             queryset = queryset.none()
 

@@ -27,7 +27,6 @@ class Address(BaseModel):
 
 
 class Industry(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     image = models.ForeignKey(
         "files.FileMeta", null=True, blank=True, on_delete=models.SET_NULL
@@ -39,7 +38,6 @@ class Industry(BaseModel):
 
 
 class Category(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     industry = models.ForeignKey(Industry, on_delete=models.CASCADE, null=True)
     is_active = models.BooleanField(default=True)
@@ -52,7 +50,6 @@ class Category(BaseModel):
 
 
 class Business(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     business_type_choices = [
         ("retail", "Retail"),
         ("whole_sale", "Wholesale"),
@@ -151,7 +148,6 @@ class BusinessActivity(BaseModel):
         (2, "Update"),
         (3, "Delete"),
     ]
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     model = models.IntegerField(choices=MODEL_CHOICES)
     employee = models.ForeignKey(
         Employee,
@@ -181,7 +177,6 @@ class BusinessImage(BaseModel):
 
 
 class Branch(BaseModel):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     address = models.ForeignKey(
         Address,

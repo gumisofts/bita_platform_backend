@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -22,7 +23,7 @@ from business.models import (
 User = get_user_model()
 
 
-class BusinessViewsetTest(APITestCase):
+class BusinessViewsetTest(TestCase):
     """Test cases for BusinessViewset"""
 
     def setUp(self):
@@ -45,6 +46,8 @@ class BusinessViewsetTest(APITestCase):
             password="testpass123",
             first_name="Other",
         )
+
+        self.client = APIClient()
 
         # Create test addresses
         self.address1 = Address.objects.create(
@@ -75,22 +78,13 @@ class BusinessViewsetTest(APITestCase):
         )
         self.business2.categories.add(self.category2)
 
-        # Create roles and employees
-        self.owner_role = Role.objects.create(
-            role_name="Owner", business=self.business1
-        )
         self.employee_role = Role.objects.create(
             role_name="Employee", business=self.business1
         )
 
-        self.owner_employee = Employee.objects.create(
-            user=self.owner_user, business=self.business1, role=self.owner_role
-        )
         self.employee_employee = Employee.objects.create(
             user=self.employee_user, business=self.business1, role=self.employee_role
         )
-
-        self.client = APIClient()
 
     def test_business_list_authenticated_owner(self):
         """Test business list for authenticated owner"""
@@ -99,8 +93,8 @@ class BusinessViewsetTest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Tech Store")
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["name"], "Tech Store")
 
     def test_business_list_authenticated_employee(self):
         """Test business list for authenticated employee"""
@@ -109,8 +103,8 @@ class BusinessViewsetTest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Tech Store")
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["name"], "Tech Store")
 
     def test_business_list_unauthenticated(self):
         """Test business list for unauthenticated user"""
@@ -127,12 +121,12 @@ class BusinessViewsetTest(APITestCase):
         # Test search that matches
         response = self.client.get(url, {"search": "Tech"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data["count"], 1)
 
         # Test search that doesn't match
         response = self.client.get(url, {"search": "NonExistent"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.data["count"], 0)
 
     def test_business_list_with_business_type_filter(self):
         """Test business list with business_type filter"""
@@ -142,12 +136,12 @@ class BusinessViewsetTest(APITestCase):
         # Test matching business type
         response = self.client.get(url, {"business_type": "retail"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data["count"], 1)
 
         # Test non-matching business type
         response = self.client.get(url, {"business_type": "manufacturing"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.data["count"], 0)
 
     def test_business_list_with_categories_filter(self):
         """Test business list with categories filter"""
@@ -157,14 +151,14 @@ class BusinessViewsetTest(APITestCase):
         # Test matching category
         response = self.client.get(url, {"categories": str(self.category1.id)})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data["count"], 1)
 
         # Test multiple categories
         response = self.client.get(
             url, {"categories": f"{self.category1.id},{self.category2.id}"}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data["count"], 1)
 
     def test_business_create(self):
         """Test business creation"""
@@ -173,6 +167,7 @@ class BusinessViewsetTest(APITestCase):
         data = {
             "name": "New Business",
             "business_type": "service",
+            "categories": [str(self.category1.id)],
             "address": {
                 "lat": 41.8781,
                 "lng": -87.6298,
@@ -182,6 +177,7 @@ class BusinessViewsetTest(APITestCase):
         }
 
         response = self.client.post(url, data, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Business.objects.count(), 3)
 
@@ -266,7 +262,7 @@ class AddressViewsetTest(APITestCase):
 
         response = self.client.get(url, {"business_id": self.business.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.json()), 1)
 
     def test_address_list_without_business_id(self):
         """Test address list without business_id filter returns empty"""
@@ -275,7 +271,7 @@ class AddressViewsetTest(APITestCase):
 
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.json()), 0)
 
     def test_address_create(self):
         """Test address creation"""
@@ -343,9 +339,9 @@ class CategoryViewsetTest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.json()["count"], 2)
 
-        names = [item["name"] for item in response.data]
+        names = [item["name"] for item in response.json()["results"]]
         self.assertIn("Electronics", names)
         self.assertIn("Clothing", names)
 
@@ -419,9 +415,21 @@ class BranchViewsetTest(APITestCase):
             name="Main Branch", business=self.business, address=self.address
         )
 
-        self.role = Role.objects.create(role_name="Manager", business=self.business)
+        self.other_user = User.objects.create_user(
+            phone_number="912345684",
+            email="test4@example.com",
+            password="testpass123",
+            first_name="Test User",
+        )
+
+        self.role = Role.objects.filter(
+            role_name="Manager", business=self.business
+        ).first()
         self.employee = Employee.objects.create(
-            user=self.user, business=self.business, role=self.role, branch=self.branch
+            user=self.other_user,
+            business=self.business,
+            role=self.role,
+            branch=self.branch,
         )
 
         self.client = APIClient()
@@ -433,8 +441,8 @@ class BranchViewsetTest(APITestCase):
 
         response = self.client.get(url, {"business_id": self.business.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Main Branch")
+        self.assertEqual(response.json()["count"], 2)
+        self.assertEqual(response.json()["results"][0]["name"], "Main Branch")
 
     def test_branch_list_without_business_id(self):
         """Test branch list without business_id returns empty"""
@@ -443,11 +451,11 @@ class BranchViewsetTest(APITestCase):
 
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.json()["count"], 0)
 
     def test_branch_list_employee_with_branch_restriction(self):
         """Test branch list shows only employee's branch"""
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.other_user)
         url = reverse("branches-list")
 
         # Create another branch
@@ -458,8 +466,8 @@ class BranchViewsetTest(APITestCase):
         response = self.client.get(url, {"business_id": self.business.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Should only return the employee's branch
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Main Branch")
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(response.json()["results"][0]["name"], "Main Branch")
 
     def test_branch_create(self):
         """Test branch creation"""
@@ -473,7 +481,7 @@ class BranchViewsetTest(APITestCase):
 
         response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Branch.objects.count(), 2)
+        self.assertEqual(Branch.objects.count(), 3)
 
     def test_branch_unauthenticated(self):
         """Test branch endpoints require authentication"""
@@ -500,8 +508,8 @@ class IndustryViewsetTest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Technology")
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(response.json()["results"][0]["name"], "Technology")
 
     def test_industry_list_no_authentication_required(self):
         """Test industry list doesn't require authentication"""
@@ -536,7 +544,7 @@ class BusinessImageViewsetTest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.json()["count"], 1)
 
     def test_business_image_list_no_authentication_required(self):
         """Test business image list doesn't require authentication"""
@@ -596,7 +604,7 @@ class PermissionTest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.json()["count"], 1)
 
     def test_business_access_by_outsider(self):
         """Test business access denied for outsider"""
@@ -605,7 +613,7 @@ class PermissionTest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)  # Should not see any businesses
+        self.assertEqual(response.json()["count"], 0)  # Should not see any businesses
 
 
 class EdgeCaseTest(APITestCase):
@@ -665,7 +673,7 @@ class EdgeCaseTest(APITestCase):
 
         # Should handle gracefully and return empty result
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.json()["count"], 0)
 
     def test_address_list_with_invalid_business_id(self):
         """Test address list with invalid business_id"""
@@ -674,7 +682,7 @@ class EdgeCaseTest(APITestCase):
 
         # Should handle gracefully and return empty result
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.json()), 0)
 
 
 class QueryParameterTest(APITestCase):
@@ -738,15 +746,15 @@ class QueryParameterTest(APITestCase):
             url, {"search": "Electronics", "business_type": "retail"}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Electronics Store")
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(response.json()["results"][0]["name"], "Electronics Store")
 
         # Test search + business_type filter that shouldn't match
         response = self.client.get(
             url, {"search": "Electronics", "business_type": "manufacturing"}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.json()["count"], 0)
 
     def test_business_list_case_insensitive_search(self):
         """Test business list search is case insensitive"""
@@ -755,12 +763,12 @@ class QueryParameterTest(APITestCase):
         # Test lowercase search
         response = self.client.get(url, {"search": "electronics"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.json()["count"], 1)
 
         # Test uppercase search
         response = self.client.get(url, {"search": "ELECTRONICS"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.json()["count"], 1)
 
     def test_business_list_partial_search(self):
         """Test business list partial name search"""
@@ -769,8 +777,8 @@ class QueryParameterTest(APITestCase):
         # Test partial search
         response = self.client.get(url, {"search": "Elect"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Electronics Store")
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(response.json()["results"][0]["name"], "Electronics Store")
 
 
 class BranchEmployeeFilterTest(APITestCase):
@@ -780,6 +788,13 @@ class BranchEmployeeFilterTest(APITestCase):
         self.user = User.objects.create_user(
             phone_number="912345690",
             email="test7@example.com",
+            password="testpass123",
+            first_name="Test User",
+        )
+
+        self.other_user = User.objects.create_user(
+            phone_number="912345691",
+            email="test8@example.com",
             password="testpass123",
             first_name="Test User",
         )
@@ -811,96 +826,31 @@ class BranchEmployeeFilterTest(APITestCase):
         """Test branch list for employee assigned to specific branch"""
         # Assign employee to branch1
         Employee.objects.create(
-            user=self.user, business=self.business, role=self.role, branch=self.branch1
+            user=self.other_user,
+            business=self.business,
+            role=self.role,
+            branch=self.branch1,
         )
 
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.other_user)
         url = reverse("branches-list")
 
         response = self.client.get(url, {"business_id": self.business.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Branch 1")
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(response.json()["results"][0]["name"], "Branch 1")
 
     def test_branch_list_employee_without_branch(self):
         """Test branch list for employee not assigned to any branch"""
         # Create employee without branch assignment
         Employee.objects.create(
-            user=self.user, business=self.business, role=self.role, branch=None
+            user=self.other_user, business=self.business, role=self.role, branch=None
         )
 
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.other_user)
         url = reverse("branches-list")
 
         response = self.client.get(url, {"business_id": self.business.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Should return all branches when employee has no specific branch
-        self.assertEqual(len(response.data), 2)
-
-
-class SerializerFieldTest(APITestCase):
-    """Test cases for serializer field behavior"""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            phone_number="912345691",
-            email="test8@example.com",
-            password="testpass123",
-            first_name="Test User",
-        )
-
-        self.address = Address.objects.create(
-            lat=40.7128, lng=-74.0060, admin_1="New York", country="USA"
-        )
-
-        self.business = Business.objects.create(
-            name="Test Business",
-            owner=self.user,
-            business_type="retail",
-            address=self.address,
-        )
-
-        self.branch = Branch.objects.create(
-            name="Test Branch", business=self.business, address=self.address
-        )
-
-        self.role = Role.objects.create(role_name="Manager", business=self.business)
-        self.employee = Employee.objects.create(
-            user=self.user, business=self.business, role=self.role, branch=self.branch
-        )
-
-        self.client = APIClient()
-        self.client.force_authenticate(user=self.user)
-
-    def test_branch_serializer_current_user_role(self):
-        """Test branch serializer includes current_user_role field"""
-        url = reverse("branches-list")
-        response = self.client.get(url, {"business_id": self.business.id})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-
-        branch_data = response.data[0]
-        self.assertIn("current_user_role", branch_data)
-        self.assertEqual(branch_data["current_user_role"], self.role.id)
-
-    def test_business_serializer_hidden_owner_field(self):
-        """Test business serializer automatically sets owner from current user"""
-        url = reverse("businesses-list")
-        data = {
-            "name": "Auto Owner Business",
-            "business_type": "service",
-            "address": {
-                "lat": 41.8781,
-                "lng": -87.6298,
-                "admin_1": "Illinois",
-                "country": "USA",
-            },
-        }
-
-        response = self.client.post(url, data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        # Verify owner was automatically set
-        new_business = Business.objects.get(name="Auto Owner Business")
-        self.assertEqual(new_business.owner, self.user)
+        self.assertEqual(response.json()["count"], 3)

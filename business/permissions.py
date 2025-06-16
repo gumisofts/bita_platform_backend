@@ -23,12 +23,12 @@ class IsOwnerOrEmployee(BasePermission):
         )
 
 
-def has_bussiness_permission(request, model, bussiness: Business):
+def has_business_permission(request, model, business: Business):
     if not request.user.is_authenticated:
         return False
     user: User = request.user
 
-    employee = Employee.objects.filter(user=user, bussiness=bussiness).first()
+    employee = Employee.objects.filter(user=user, business=business).first()
 
     if not employee:
         return False
@@ -41,12 +41,12 @@ def has_bussiness_permission(request, model, bussiness: Business):
     )
 
 
-def has_bussiness_object_permission(request, model, bussiness):
+def has_business_object_permission(request, model, business):
     if not request.user.is_authenticated:
         return False
     user: User = request.user
 
-    employee = Employee.objects.filter(user=user, business=bussiness).first()
+    employee = Employee.objects.filter(user=user, business=business).first()
 
     if not employee:
         return False
@@ -89,7 +89,7 @@ class hasBusinessPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
 
         if view.action in ["partial_update", "update", "destroy", "retrieve"]:
-            return has_bussiness_object_permission(request, Business, obj)
+            return has_business_object_permission(request, Business, obj)
         return False
 
 
@@ -101,7 +101,7 @@ class hasBranchPermission(BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
-        return has_bussiness_object_permission(request, Branch, obj.business)
+        return has_business_object_permission(request, Branch, obj.business)
 
 
 class BusinessAddressPermission(BasePermission):
@@ -112,7 +112,19 @@ class BusinessAddressPermission(BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
-        return has_bussiness_object_permission(request, Address, obj.business)
+        # Address can be related to business in two ways:
+        # 1. As the main address of a business (obj.business)
+        # 2. As an address used by branches (obj.branches.first().business)
+        business = None
+        if hasattr(obj, "business") and obj.business:
+            business = obj.business
+        elif obj.branches.exists():
+            business = obj.branches.first().business
+
+        if not business:
+            return False
+
+        return has_business_object_permission(request, Address, business)
 
 
 class EmployeeInvitationPermission(BasePermission):
@@ -123,6 +135,4 @@ class EmployeeInvitationPermission(BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
-        return has_bussiness_object_permission(
-            request, EmployeeInvitation, obj.business
-        )
+        return has_business_object_permission(request, EmployeeInvitation, obj.business)

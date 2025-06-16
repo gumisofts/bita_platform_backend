@@ -10,6 +10,7 @@ router.register(r"roles", RoleViewset, basename="roles")
 router.register(r"addresses", AddressViewset, basename="addresses")
 router.register(r"branches", BranchViewset, basename="branches")
 router.register(r"industries", IndustryViewset, basename="industries")
+router.register(r"businessimage", BusinessImageViewset, basename="businessimage")
 router.register(
     r"employees/invitations/mine", InvitationViewset, basename="invitations-mine"
 )
