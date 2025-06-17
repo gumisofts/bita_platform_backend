@@ -70,3 +70,145 @@ class ItemVariantSerializer(serializers.ModelSerializer):
         model = ItemVariant
         exclude = []
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class InventoryMovementItemSerializer(serializers.ModelSerializer):
+    supplied_item_details = serializers.SerializerMethodField(read_only=True)
+
+    def get_supplied_item_details(self, obj):
+        return {
+            "item_name": obj.supplied_item.item.name,
+            "batch_number": obj.supplied_item.batch_number,
+            "product_number": obj.supplied_item.product_number,
+            "available_quantity": obj.supplied_item.quantity,
+        }
+
+    class Meta:
+        model = InventoryMovementItem
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class InventoryMovementSerializer(serializers.ModelSerializer):
+    movement_items = InventoryMovementItemSerializer(many=True, read_only=True)
+    from_branch_name = serializers.CharField(source="from_branch.name", read_only=True)
+    to_branch_name = serializers.CharField(source="to_branch.name", read_only=True)
+    requested_by_name = serializers.CharField(
+        source="requested_by.get_full_name", read_only=True
+    )
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = InventoryMovement
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "movement_number",
+            "approved_by",
+            "shipped_by",
+            "received_by",
+            "approved_at",
+            "shipped_at",
+            "received_at",
+        ]
+
+    def validate(self, attrs):
+        from_branch = attrs.get("from_branch")
+        to_branch = attrs.get("to_branch")
+
+        if from_branch == to_branch:
+            raise serializers.ValidationError(
+                "From branch and to branch cannot be the same"
+            )
+
+        # Ensure both branches belong to the same business
+        if from_branch.business != to_branch.business:
+            raise serializers.ValidationError(
+                "Both branches must belong to the same business"
+            )
+
+        # Set business from branches
+        attrs["business"] = from_branch.business
+
+        return attrs
+
+
+class InventoryMovementCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating inventory movements with items"""
+
+    items = serializers.ListField(child=serializers.DictField(), write_only=True)
+
+    class Meta:
+        model = InventoryMovement
+        fields = ["from_branch", "to_branch", "notes", "items"]
+
+    def validate_items(self, items):
+        if not items:
+            raise serializers.ValidationError("At least one item must be specified")
+
+        for item in items:
+            if "supplied_item_id" not in item or "quantity" not in item:
+                raise serializers.ValidationError(
+                    "Each item must have 'supplied_item_id' and 'quantity'"
+                )
+
+            if item["quantity"] <= 0:
+                raise serializers.ValidationError("Quantity must be greater than 0")
+
+        return items
+
+    def validate(self, attrs):
+        from_branch = attrs.get("from_branch")
+        to_branch = attrs.get("to_branch")
+
+        if from_branch == to_branch:
+            raise serializers.ValidationError(
+                "From branch and to branch cannot be the same"
+            )
+
+        # Ensure both branches belong to the same business
+        if from_branch.business != to_branch.business:
+            raise serializers.ValidationError(
+                "Both branches must belong to the same business"
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+        user = self.context["request"].user
+
+        # Set business and requested_by
+        validated_data["business"] = validated_data["from_branch"].business
+        validated_data["requested_by"] = user
+
+        movement = InventoryMovement.objects.create(**validated_data)
+
+        # Create movement items
+        for item_data in items_data:
+            try:
+                supplied_item = SuppliedItem.objects.get(
+                    id=item_data["supplied_item_id"],
+                    supply__branch=movement.from_branch,
+                )
+
+                # Check if requested quantity is available
+                if item_data["quantity"] > supplied_item.quantity:
+                    raise serializers.ValidationError(
+                        f"Requested quantity ({item_data['quantity']}) exceeds available quantity ({supplied_item.quantity}) for {supplied_item.item.name}"
+                    )
+
+                InventoryMovementItem.objects.create(
+                    movement=movement,
+                    supplied_item=supplied_item,
+                    quantity_requested=item_data["quantity"],
+                    notes=item_data.get("notes", ""),
+                )
+            except SuppliedItem.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Supplied item with ID {item_data['supplied_item_id']} not found in source branch"
+                )
+
+        return movement

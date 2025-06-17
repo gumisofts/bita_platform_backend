@@ -9,5 +9,9 @@ router.register(r"supplies", SupplyViewset, basename="supplies")
 router.register(r"groups", GroupViewset, basename="groups")
 router.register(r"pricings", PricingViewset, basename="pricings")
 router.register(r"supplied_items", SupplyItemViewset, basename="supplied-items")
+router.register(r"movements", InventoryMovementViewSet, basename="inventory-movements")
+router.register(
+    r"movement-items", InventoryMovementItemViewSet, basename="movement-items"
+)
 
 urlpatterns = [] + router.urls

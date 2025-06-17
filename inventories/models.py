@@ -156,3 +156,93 @@ class ReturnRecall(BaseModel):
     item_variant = models.ForeignKey(ItemVariant, on_delete=models.CASCADE)
     remarks = models.TextField(blank=True)
     quantity = models.PositiveIntegerField()
+
+
+class InventoryMovement(BaseModel):
+    """Model to track inventory movements between branches"""
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("shipped", "Shipped"),
+        ("received", "Received"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    movement_number = models.CharField(max_length=50, unique=True)
+    from_branch = models.ForeignKey(
+        "business.Branch", on_delete=models.CASCADE, related_name="outgoing_movements"
+    )
+    to_branch = models.ForeignKey(
+        "business.Branch", on_delete=models.CASCADE, related_name="incoming_movements"
+    )
+    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    requested_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="requested_movements",
+    )
+    approved_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_movements",
+    )
+    shipped_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="shipped_movements",
+    )
+    received_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="received_movements",
+    )
+    notes = models.TextField(blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.movement_number}: {self.from_branch} → {self.to_branch}"
+
+    def save(self, *args, **kwargs):
+        if not self.movement_number:
+            # Generate movement number (format: MOV-YYYYMMDD-XXXX)
+            import random
+
+            from django.utils import timezone
+
+            date_str = timezone.now().strftime("%Y%m%d")
+            random_num = str(random.randint(1000, 9999))
+            self.movement_number = f"MOV-{date_str}-{random_num}"
+        super().save(*args, **kwargs)
+
+
+class InventoryMovementItem(BaseModel):
+    """Items included in an inventory movement"""
+
+    movement = models.ForeignKey(
+        InventoryMovement, on_delete=models.CASCADE, related_name="movement_items"
+    )
+    supplied_item = models.ForeignKey(SuppliedItem, on_delete=models.CASCADE)
+    quantity_requested = models.PositiveIntegerField()
+    quantity_shipped = models.PositiveIntegerField(default=0)
+    quantity_received = models.PositiveIntegerField(default=0)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ("movement", "supplied_item")
+
+    def __str__(self):
+        return f"{self.supplied_item.item.name} - {self.quantity_requested} units"

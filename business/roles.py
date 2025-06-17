@@ -28,6 +28,8 @@ OwnerFullAccessModels = [
     BusinessPaymentMethod,
     ItemImage,
     EmployeeInvitation,
+    InventoryMovement,
+    InventoryMovementItem,
 ]
 
 AdminFullAccessModels = [
@@ -39,6 +41,8 @@ AdminFullAccessModels = [
     ItemImage,
     Order,
     EmployeeInvitation,
+    InventoryMovement,
+    InventoryMovementItem,
 ]
 
 EmployeeFullAccessModels = [
@@ -48,6 +52,8 @@ EmployeeFullAccessModels = [
     Transaction,
     Order,
     ItemImage,
+    InventoryMovement,
+    InventoryMovementItem,
 ]
 
 AdminReadOnlyModels = [Business, Role, Branch]

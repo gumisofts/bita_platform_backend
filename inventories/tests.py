@@ -8,7 +8,16 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from business.models import Branch, Business, Category
-from inventories.models import Group, Item, ItemVariant, Pricing, SuppliedItem, Supply
+from inventories.models import (
+    Group,
+    InventoryMovement,
+    InventoryMovementItem,
+    Item,
+    ItemVariant,
+    Pricing,
+    SuppliedItem,
+    Supply,
+)
 
 User = get_user_model()
 
@@ -289,3 +298,211 @@ class ItemVariantViewSetTest(APITestCase):
         response = self.client.get(url, {"item_id": self.item.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
+
+
+class InventoryMovementTest(APITestCase):
+    """Test cases for Inventory Movement functionality"""
+
+    def setUp(self):
+        # Create test user
+        self.user = User.objects.create_user(
+            email="testuser@example.com",
+            password="password123",
+            first_name="Test",
+            last_name="User",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        # Create business and branches
+        self.business = Business.objects.create(name="Test Business", owner=self.user)
+
+        self.branch_a = Branch.objects.create(name="Branch A", business=self.business)
+
+        self.branch_b = Branch.objects.create(name="Branch B", business=self.business)
+
+        # Create supplies and items
+        self.supply_a = Supply.objects.create(label="Supply A", branch=self.branch_a)
+
+        self.item = Item.objects.create(
+            name="Test Item",
+            description="Test Description",
+            inventory_unit="pcs",
+            business=self.business,
+        )
+
+        self.supplied_item = SuppliedItem.objects.create(
+            quantity=100,
+            item=self.item,
+            purchase_price=50,
+            batch_number="BATCH001",
+            product_number="PROD001",
+            business=self.business,
+            supply=self.supply_a,
+        )
+
+    def test_create_inventory_movement(self):
+        """Test creating a new inventory movement"""
+        url = reverse("inventory-movements-list")
+        data = {
+            "from_branch": str(self.branch_a.id),
+            "to_branch": str(self.branch_b.id),
+            "notes": "Test movement",
+            "items": [
+                {
+                    "supplied_item_id": str(self.supplied_item.id),
+                    "quantity": 10,
+                    "notes": "Test item movement",
+                }
+            ],
+        }
+
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify movement was created
+        movement = InventoryMovement.objects.get(id=response.data["id"])
+        self.assertEqual(movement.from_branch, self.branch_a)
+        self.assertEqual(movement.to_branch, self.branch_b)
+        self.assertEqual(movement.status, "pending")
+        self.assertEqual(movement.requested_by, self.user)
+
+        # Verify movement item was created
+        self.assertEqual(movement.movement_items.count(), 1)
+        movement_item = movement.movement_items.first()
+        self.assertEqual(movement_item.quantity_requested, 10)
+
+    def test_approve_movement(self):
+        """Test approving a pending movement"""
+        # Create a movement
+        movement = InventoryMovement.objects.create(
+            from_branch=self.branch_a,
+            to_branch=self.branch_b,
+            business=self.business,
+            requested_by=self.user,
+            status="pending",
+        )
+
+        url = reverse("inventory-movements-approve", kwargs={"pk": movement.id})
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        movement.refresh_from_db()
+        self.assertEqual(movement.status, "approved")
+        self.assertEqual(movement.approved_by, self.user)
+        self.assertIsNotNone(movement.approved_at)
+
+    def test_ship_movement(self):
+        """Test shipping an approved movement"""
+        # Create an approved movement with items
+        movement = InventoryMovement.objects.create(
+            from_branch=self.branch_a,
+            to_branch=self.branch_b,
+            business=self.business,
+            requested_by=self.user,
+            status="approved",
+        )
+
+        movement_item = InventoryMovementItem.objects.create(
+            movement=movement, supplied_item=self.supplied_item, quantity_requested=10
+        )
+
+        original_quantity = self.supplied_item.quantity
+
+        url = reverse("inventory-movements-ship", kwargs={"pk": movement.id})
+        data = {
+            "items": [{"movement_item_id": movement_item.id, "quantity_shipped": 10}]
+        }
+
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify movement status updated
+        movement.refresh_from_db()
+        self.assertEqual(movement.status, "shipped")
+        self.assertEqual(movement.shipped_by, self.user)
+
+        # Verify inventory reduced
+        self.supplied_item.refresh_from_db()
+        self.assertEqual(self.supplied_item.quantity, original_quantity - 10)
+
+        # Verify movement item updated
+        movement_item.refresh_from_db()
+        self.assertEqual(movement_item.quantity_shipped, 10)
+
+    def test_receive_movement(self):
+        """Test receiving a shipped movement"""
+        # Create a shipped movement
+        movement = InventoryMovement.objects.create(
+            from_branch=self.branch_a,
+            to_branch=self.branch_b,
+            business=self.business,
+            requested_by=self.user,
+            status="shipped",
+        )
+
+        movement_item = InventoryMovementItem.objects.create(
+            movement=movement,
+            supplied_item=self.supplied_item,
+            quantity_requested=10,
+            quantity_shipped=10,
+        )
+
+        url = reverse("inventory-movements-receive", kwargs={"pk": movement.id})
+        data = {
+            "items": [{"movement_item_id": movement_item.id, "quantity_received": 10}]
+        }
+
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify movement status updated
+        movement.refresh_from_db()
+        self.assertEqual(movement.status, "received")
+        self.assertEqual(movement.received_by, self.user)
+
+        # Verify destination supply created
+        destination_supply = Supply.objects.filter(
+            branch=self.branch_b, label=self.supply_a.label
+        ).first()
+        self.assertIsNotNone(destination_supply)
+
+        # Verify new supplied item created in destination
+        destination_supplied_items = SuppliedItem.objects.filter(
+            supply=destination_supply, item=self.item
+        )
+        self.assertEqual(destination_supplied_items.count(), 1)
+
+        destination_item = destination_supplied_items.first()
+        self.assertEqual(destination_item.quantity, 10)
+
+    def test_cancel_movement(self):
+        """Test cancelling a movement"""
+        movement = InventoryMovement.objects.create(
+            from_branch=self.branch_a,
+            to_branch=self.branch_b,
+            business=self.business,
+            requested_by=self.user,
+            status="pending",
+        )
+
+        url = reverse("inventory-movements-cancel", kwargs={"pk": movement.id})
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        movement.refresh_from_db()
+        self.assertEqual(movement.status, "cancelled")
+
+    def test_invalid_branch_movement(self):
+        """Test that movement between same branch is not allowed"""
+        url = reverse("inventory-movements-list")
+        data = {
+            "from_branch": str(self.branch_a.id),
+            "to_branch": str(self.branch_a.id),  # Same branch
+            "notes": "Invalid movement",
+            "items": [{"supplied_item_id": str(self.supplied_item.id), "quantity": 10}],
+        }
+
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
