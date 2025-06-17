@@ -142,7 +142,7 @@ class InventoryMovementCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InventoryMovement
-        fields = ["from_branch", "to_branch", "notes", "items"]
+        fields = ["id", "from_branch", "to_branch", "notes", "items"]
 
     def validate_items(self, items):
         if not items:
