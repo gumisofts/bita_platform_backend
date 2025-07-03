@@ -70,15 +70,14 @@ class PhoneChangeRequest(BaseModel):
     expires_at = models.DateTimeField()
 
 
-class EmailChangeRequest(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+class EmailChangeRequest(BaseModel):
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
     )
     new_email = models.EmailField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    code = models.CharField(max_length=255)
     expires_at = models.DateTimeField()
 
 

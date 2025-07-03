@@ -758,9 +758,12 @@ class EmailChangeRequestSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
-        user = validated_data.get("user")
-        user.email = validated_data.get("new_email")
-        user.save()
+        EmailChangeRequest.objects.create(
+            user=validated_data.get("user"),
+            new_email=validated_data.get("new_email"),
+            code=make_password(str(123456)),  # TODO change this on production
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
         return {"detail": "success"}
 
 
