@@ -8,15 +8,15 @@ from .models import *
 class PropertyInline(admin.TabularInline):
     model = Property
     extra = 0
-    fields = ('name', 'value')
-    fk_name = 'item_variant'
+    fields = ("name", "value")
+    fk_name = "item_variant"
 
 
 class ItemInline(admin.TabularInline):
     model = Item
     extra = 0
-    fields = ('name', 'inventory_unit', 'min_selling_quota')
-    readonly_fields = ('created_at',)
+    fields = ("name", "inventory_unit", "min_selling_quota")
+    readonly_fields = ("created_at",)
 
 
 @admin.register(Group)
@@ -27,65 +27,70 @@ class GroupAdmin(admin.ModelAdmin):
     readonly_fields = ["id", "created_at", "updated_at"]
     raw_id_fields = ["business"]
     inlines = [ItemInline]
-    
+
     fieldsets = (
-        (None, {
-            'fields': ('id', 'name', 'business')
-        }),
-        (_('Details'), {
-            'fields': ('description',)
-        }),
-        (_('Timestamps'), {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
+        (None, {"fields": ("id", "name", "business")}),
+        (_("Details"), {"fields": ("description",)}),
+        (
+            _("Timestamps"),
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
     )
-    
+
     def business_name(self, obj):
         return obj.business.name if obj.business else "-"
+
     business_name.short_description = "Business"
-    
+
     def item_count(self, obj):
         count = obj.items.count()
         return f"{count} items"
+
     item_count.short_description = "Items"
 
 
 @admin.register(Item)
 class ItemAdmin(admin.ModelAdmin):
-    list_display = ["id", "name", "business_name", "group_name", "inventory_unit", "min_selling_quota", "category_list", "created_at"]
+    list_display = [
+        "id",
+        "name",
+        "business_name",
+        "group_name",
+        "inventory_unit",
+        "min_selling_quota",
+        "category_list",
+        "created_at",
+    ]
     list_filter = ["business", "group", "inventory_unit", "categories", "created_at"]
     search_fields = ["name", "description", "business__name", "group__name"]
     readonly_fields = ["id", "created_at", "updated_at"]
     raw_id_fields = ["business", "group"]
     filter_horizontal = ["categories"]
     # inlines = [PropertyInline]  # Property is related to ItemVariant, not Item
-    
+
     fieldsets = (
-        (None, {
-            'fields': ('id', 'name', 'business', 'group')
-        }),
-        (_('Details'), {
-            'fields': ('description', 'inventory_unit', 'min_selling_quota')
-        }),
-        (_('Categories'), {
-            'fields': ('categories',),
-            'classes': ('collapse',)
-        }),
-        (_('Timestamps'), {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
+        (None, {"fields": ("id", "name", "business", "group")}),
+        (
+            _("Details"),
+            {"fields": ("description", "inventory_unit", "min_selling_quota")},
+        ),
+        (_("Categories"), {"fields": ("categories",), "classes": ("collapse",)}),
+        (
+            _("Timestamps"),
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
     )
-    
+
     def business_name(self, obj):
         return obj.business.name if obj.business else "-"
+
     business_name.short_description = "Business"
-    
+
     def group_name(self, obj):
         return obj.group.name if obj.group else "-"
+
     group_name.short_description = "Group"
-    
+
     def category_list(self, obj):
         categories = obj.categories.all()[:3]  # Show first 3 categories
         if not categories:
@@ -95,6 +100,7 @@ class ItemAdmin(admin.ModelAdmin):
         if obj.categories.count() > 3:
             result += f" (+{obj.categories.count() - 3} more)"
         return result
+
     category_list.short_description = "Categories"
 
 
@@ -105,19 +111,18 @@ class PropertyAdmin(admin.ModelAdmin):
     search_fields = ["name", "value", "item_variant__name"]
     readonly_fields = ["id", "created_at", "updated_at"]
     raw_id_fields = ["item_variant"]
-    
+
     fieldsets = (
-        (None, {
-            'fields': ('id', 'item_variant', 'name', 'value')
-        }),
-        (_('Timestamps'), {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
+        (None, {"fields": ("id", "item_variant", "name", "value")}),
+        (
+            _("Timestamps"),
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
     )
-    
+
     def item_variant_name(self, obj):
         return obj.item_variant.name if obj.item_variant else "-"
+
     item_variant_name.short_description = "Item Variant"
 
 
@@ -161,40 +166,58 @@ class InventoryMovementItemAdmin(admin.ModelAdmin):
 # Additional admin configurations for any other inventory models
 try:
     from .models import SuppliedItem
-    
+
     @admin.register(SuppliedItem)
     class SuppliedItemAdmin(admin.ModelAdmin):
-        list_display = ["id", "item_name", "supplier_info", "purchase_price", "quantity", "created_at"]
+        list_display = [
+            "id",
+            "item_name",
+            "supplier_info",
+            "purchase_price",
+            "quantity",
+            "created_at",
+        ]
         list_filter = ["created_at", "item__business"]
         search_fields = ["item__name", "supplier__name", "supplier__email"]
         readonly_fields = ["id", "created_at", "updated_at"]
         raw_id_fields = ["item", "supplier", "supply"]
-        
+
         fieldsets = (
-            (None, {
-                'fields': ('id', 'item', 'purchase_price', 'quantity')
-            }),
-            (_('Product Details'), {
-                'fields': ('batch_number', 'product_number', 'expire_date', 'man_date')
-            }),
-            (_('Business & Supplier'), {
-                'fields': ('business', 'supplier', 'supply'),
-                'classes': ('collapse',)
-            }),
-            (_('Timestamps'), {
-                'fields': ('created_at', 'updated_at'),
-                'classes': ('collapse',)
-            }),
+            (None, {"fields": ("id", "item", "purchase_price", "quantity")}),
+            (
+                _("Product Details"),
+                {
+                    "fields": (
+                        "batch_number",
+                        "product_number",
+                        "expire_date",
+                        "man_date",
+                    )
+                },
+            ),
+            (
+                _("Business & Supplier"),
+                {
+                    "fields": ("business", "supplier", "supply"),
+                    "classes": ("collapse",),
+                },
+            ),
+            (
+                _("Timestamps"),
+                {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+            ),
         )
-        
+
         def item_name(self, obj):
             return obj.item.name if obj.item else "-"
+
         item_name.short_description = "Item"
-        
+
         def supplier_info(self, obj):
             if obj.supplier:
                 return f"{obj.supplier.name} ({obj.supplier.email})"
             return "-"
+
         supplier_info.short_description = "Supplier"
 
 except ImportError:
@@ -204,40 +227,58 @@ except ImportError:
 
 try:
     from .models import ItemVariant
-    
+
     @admin.register(ItemVariant)
     class ItemVariantAdmin(admin.ModelAdmin):
-        list_display = ["id", "name", "item_name", "quantity", "selling_price", "property_count", "created_at"]
+        list_display = [
+            "id",
+            "name",
+            "item_name",
+            "quantity",
+            "selling_price",
+            "property_count",
+            "created_at",
+        ]
         list_filter = ["item", "created_at"]
         search_fields = ["name", "item__name", "sku", "batch_number"]
         readonly_fields = ["id", "created_at", "updated_at"]
         raw_id_fields = ["item"]
         inlines = [PropertyInline]
-        
+
         fieldsets = (
-            (None, {
-                'fields': ('id', 'name', 'item', 'quantity', 'selling_price')
-            }),
-            (_('Product Details'), {
-                'fields': ('batch_number', 'sku', 'expire_date', 'man_date')
-            }),
-            (_('Settings'), {
-                'fields': ('is_default', 'is_returnable', 'is_visible_online', 'receive_online_orders', 'notify_below'),
-                'classes': ('collapse',)
-            }),
-            (_('Timestamps'), {
-                'fields': ('created_at', 'updated_at'),
-                'classes': ('collapse',)
-            }),
+            (None, {"fields": ("id", "name", "item", "quantity", "selling_price")}),
+            (
+                _("Product Details"),
+                {"fields": ("batch_number", "sku", "expire_date", "man_date")},
+            ),
+            (
+                _("Settings"),
+                {
+                    "fields": (
+                        "is_default",
+                        "is_returnable",
+                        "is_visible_online",
+                        "receive_online_orders",
+                        "notify_below",
+                    ),
+                    "classes": ("collapse",),
+                },
+            ),
+            (
+                _("Timestamps"),
+                {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+            ),
         )
-        
+
         def item_name(self, obj):
             return obj.item.name if obj.item else "-"
+
         item_name.short_description = "Item"
-        
+
         def property_count(self, obj):
             count = obj.properties.count()
             return f"{count} properties"
+
         property_count.short_description = "Properties"
 
 except ImportError:
@@ -246,20 +287,28 @@ except ImportError:
 
 
 try:
-    from .models import Supplier, Supply, ItemImage
-    
+    from .models import ItemImage, Supplier, Supply
+
     @admin.register(Supplier)
     class SupplierAdmin(admin.ModelAdmin):
-        list_display = ["id", "name", "email", "phone_number", "business_name", "created_at"]
+        list_display = [
+            "id",
+            "name",
+            "email",
+            "phone_number",
+            "business_name",
+            "created_at",
+        ]
         list_filter = ["business", "created_at"]
         search_fields = ["name", "email", "phone_number", "business__name"]
         readonly_fields = ["id", "created_at", "updated_at"]
         raw_id_fields = ["business"]
-        
+
         def business_name(self, obj):
             return obj.business.name if obj.business else "-"
+
         business_name.short_description = "Business"
-    
+
     @admin.register(Supply)
     class SupplyAdmin(admin.ModelAdmin):
         list_display = ["id", "label", "branch_name", "created_at"]
@@ -267,21 +316,30 @@ try:
         search_fields = ["label", "branch__name"]
         readonly_fields = ["id", "created_at", "updated_at"]
         raw_id_fields = ["branch"]
-        
+
         def branch_name(self, obj):
             return obj.branch.name if obj.branch else "-"
+
         branch_name.short_description = "Branch"
-    
+
     @admin.register(ItemImage)
     class ItemImageAdmin(admin.ModelAdmin):
-        list_display = ["id", "item_name", "is_primary", "is_visible", "is_thumbnail", "created_at"]
+        list_display = [
+            "id",
+            "item_name",
+            "is_primary",
+            "is_visible",
+            "is_thumbnail",
+            "created_at",
+        ]
         list_filter = ["is_primary", "is_visible", "is_thumbnail", "created_at"]
         search_fields = ["item__name"]
         readonly_fields = ["id", "created_at", "updated_at"]
         raw_id_fields = ["item", "file"]
-        
+
         def item_name(self, obj):
             return obj.item.name if obj.item else "-"
+
         item_name.short_description = "Item"
 
 except ImportError:

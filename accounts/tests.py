@@ -66,7 +66,11 @@ class AccountsTestCase(APITestCase):
 
     def test_confirm_reset_password(self):
         url = reverse("auth-confirm-reset-password-request")
-        data = {"code": "dummy", "new_password": "NewPass123!", "email": self.user.email}
+        data = {
+            "code": "dummy",
+            "new_password": "NewPass123!",
+            "email": self.user.email,
+        }
         res = self.client.post(url, data)
         self.assertIn(
             res.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_200_OK]

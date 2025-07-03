@@ -4,8 +4,6 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-
-from rest_framework.decorators import action
 from drf_spectacular.utils import (
     OpenApiExample,
     OpenApiParameter,
@@ -14,6 +12,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import generics, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.mixins import (
     CreateModelMixin,
     DestroyModelMixin,
@@ -21,9 +20,9 @@ from rest_framework.mixins import (
     RetrieveModelMixin,
     UpdateModelMixin,
 )
-from rest_framework.settings import api_settings
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import (
@@ -151,11 +150,10 @@ class AuthViewset(GenericViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
 
-
     @action(
         detail=False,
         methods=["post"],
-        url_path='password/reset/request',
+        url_path="password/reset/request",
         permission_classes=[],
     )
     def reset_request(self, request):
@@ -164,63 +162,71 @@ class AuthViewset(GenericViewSet):
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
+
     @action(
         detail=False,
         methods=["post"],
-        url_path='phone/change/request',
+        url_path="phone/change/request",
         permission_classes=[IsAuthenticated],
     )
     def phone_change_request(self, request):
-        serializer = PhoneChangeRequestSerializer(data=request.data,context={"request":request})
+        serializer = PhoneChangeRequestSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
+
     @action(
         detail=False,
         methods=["post"],
-        url_path='phone/change/confirm',
+        url_path="phone/change/confirm",
         permission_classes=[],
     )
     def phone_change_confirm(self, request):
-        serializer = PhoneChangeConfirmSerializer(data=request.data,context={"request":request})
+        serializer = PhoneChangeConfirmSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
+
     @action(
         detail=False,
         methods=["post"],
-        url_path='email/change/request',
+        url_path="email/change/request",
         permission_classes=[IsAuthenticated],
     )
     def email_change_request(self, request):
-        serializer = EmailChangeRequestSerializer(data=request.data,context={"request":request})
+        serializer = EmailChangeRequestSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
+
     @action(
         detail=False,
         methods=["post"],
-        url_path='email/change/confirm',
+        url_path="email/change/confirm",
         permission_classes=[],
     )
     def email_change_confirm(self, request):
-        serializer = EmailChangeConfirmSerializer(data=request.data,context={"request":request})
+        serializer = EmailChangeConfirmSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
+
     @action(
         detail=False,
         methods=["post"],
-        url_path='password/reset/confirm',
+        url_path="password/reset/confirm",
         permission_classes=[],
     )
     def confirm_reset_password_request(self, request):
@@ -229,11 +235,11 @@ class AuthViewset(GenericViewSet):
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
+
     @action(
         detail=False,
         methods=["post"],
-        url_path='password/change',
+        url_path="password/change",
         permission_classes=[IsAuthenticated],
     )
     def password_change(self, request):
@@ -242,11 +248,11 @@ class AuthViewset(GenericViewSet):
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
+
     @action(
         detail=False,
         methods=["post"],
-        url_path='verifications/send',
+        url_path="verifications/send",
         permission_classes=[AllowAny],
     )
     def send_verification_code(self, request):
@@ -255,11 +261,11 @@ class AuthViewset(GenericViewSet):
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
+
     @action(
         detail=False,
         methods=["post"],
-        url_path='verifications/confirm',
+        url_path="verifications/confirm",
         permission_classes=[AllowAny],
     )
     def confirm_verification_code(self, request):
@@ -268,8 +274,6 @@ class AuthViewset(GenericViewSet):
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
-    
-   
 
 
 class JWTTokenVerifyView(TokenVerifyView):

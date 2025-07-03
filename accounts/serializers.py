@@ -686,22 +686,23 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         new_phone = attrs.get("new_phone")
         if not re.match(r"^(9|7)\d{8}$", new_phone):
-            raise serializers.ValidationError({"new_phone":["Invalid phone number"]})
-    
+            raise serializers.ValidationError({"new_phone": ["Invalid phone number"]})
+
         if User.objects.filter(phone_number=new_phone).exists():
-            raise serializers.ValidationError({"new_phone":["Phone number already exists"]})
-        
+            raise serializers.ValidationError(
+                {"new_phone": ["Phone number already exists"]}
+            )
+
         attrs["new_phone"] = new_phone
-        
+
         user = self.context.get("request").user
         attrs["user"] = user
-        
-        
+
         return attrs
 
     def create(self, validated_data):
         # code = generate_secure_six_digits()
-        code=str(123456) # TODO change this on production
+        code = str(123456)  # TODO change this on production
         PhoneChangeRequest.objects.create(
             user=validated_data.get("user"),
             new_phone=validated_data.get("new_phone"),
@@ -710,7 +711,8 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
         )
 
         return {"detail": "success"}
-    
+
+
 class PhoneChangeConfirmSerializer(serializers.Serializer):
     code = serializers.CharField(write_only=True)
     new_phone = serializers.CharField(write_only=True)
@@ -720,15 +722,17 @@ class PhoneChangeConfirmSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         code = attrs.get("code")
         new_phone = attrs.get("new_phone")
-        phone_change_request = PhoneChangeRequest.objects.filter(new_phone=new_phone).first()
+        phone_change_request = PhoneChangeRequest.objects.filter(
+            new_phone=new_phone
+        ).first()
         if not phone_change_request:
-            raise serializers.ValidationError({"code":["No request found"]})
-        if not check_password(code,phone_change_request.code):
-            raise serializers.ValidationError({"code":["Invalid code"]})
+            raise serializers.ValidationError({"code": ["No request found"]})
+        if not check_password(code, phone_change_request.code):
+            raise serializers.ValidationError({"code": ["Invalid code"]})
         attrs["phone_change_request"] = phone_change_request
         attrs["user"] = phone_change_request.user
         return attrs
-    
+
     def create(self, validated_data):
         user = validated_data.get("user")
         user.phone_number = validated_data.get("new_phone")
@@ -736,7 +740,8 @@ class PhoneChangeConfirmSerializer(serializers.Serializer):
         phone_change_request = validated_data.get("phone_change_request")
         phone_change_request.delete()
         return {"detail": "success"}
-    
+
+
 class EmailChangeRequestSerializer(serializers.Serializer):
     new_email = serializers.CharField(write_only=True)
     detail = serializers.CharField(read_only=True)
@@ -745,19 +750,20 @@ class EmailChangeRequestSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         new_email = attrs.get("new_email")
         if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", new_email):
-            raise serializers.ValidationError({"new_email":["Invalid email"]})  
+            raise serializers.ValidationError({"new_email": ["Invalid email"]})
         if User.objects.filter(email=new_email).exists():
-            raise serializers.ValidationError({"new_email":["Email already exists"]})
+            raise serializers.ValidationError({"new_email": ["Email already exists"]})
         attrs["new_email"] = new_email
         attrs["user"] = self.context.get("request").user
         return attrs
-    
+
     def create(self, validated_data):
         user = validated_data.get("user")
         user.email = validated_data.get("new_email")
         user.save()
         return {"detail": "success"}
-    
+
+
 class EmailChangeConfirmSerializer(serializers.Serializer):
     code = serializers.CharField(write_only=True)
     new_email = serializers.CharField(write_only=True)
@@ -767,15 +773,17 @@ class EmailChangeConfirmSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         code = attrs.get("code")
         new_email = attrs.get("new_email")
-        email_change_request = EmailChangeRequest.objects.filter(new_email=new_email).first()
+        email_change_request = EmailChangeRequest.objects.filter(
+            new_email=new_email
+        ).first()
         if not email_change_request:
-            raise serializers.ValidationError({"code":["No request found"]})
-        if not check_password(code,email_change_request.code):
-            raise serializers.ValidationError({"code":["Invalid code"]})
+            raise serializers.ValidationError({"code": ["No request found"]})
+        if not check_password(code, email_change_request.code):
+            raise serializers.ValidationError({"code": ["Invalid code"]})
         attrs["email_change_request"] = email_change_request
         attrs["user"] = email_change_request.user
         return attrs
-    
+
     def create(self, validated_data):
         user = validated_data.get("user")
         user.email = validated_data.get("new_email")
