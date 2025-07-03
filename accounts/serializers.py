@@ -719,7 +719,9 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
 
 class PhoneChangeConfirmSerializer(serializers.Serializer):
     code = serializers.CharField(write_only=True)
-    change_request = serializers.PrimaryKeyRelatedField(queryset=PhoneChangeRequest.objects.all(),write_only=True)
+    change_request = serializers.PrimaryKeyRelatedField(
+        queryset=PhoneChangeRequest.objects.all(), write_only=True
+    )
     password = serializers.CharField(write_only=True)
     detail = serializers.CharField(read_only=True)
 
@@ -775,7 +777,9 @@ class EmailChangeRequestSerializer(serializers.Serializer):
 class EmailChangeConfirmSerializer(serializers.Serializer):
     code = serializers.CharField(write_only=True)
     detail = serializers.CharField(read_only=True)
-    change_request = serializers.PrimaryKeyRelatedField(queryset=EmailChangeRequest.objects.all(),write_only=True)
+    change_request = serializers.PrimaryKeyRelatedField(
+        queryset=EmailChangeRequest.objects.all(), write_only=True
+    )
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
