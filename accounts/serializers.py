@@ -513,7 +513,7 @@ class ConfirmResetPasswordRequestViewsetSerializer(serializers.Serializer):
         try:
             password_validation.validate_password(new_password, user)
         except ValidationError as e:
-            raise ValidationError({"password": e})
+            raise ValidationError({"new_password": e})
 
         attrs["user"] = user
 
@@ -526,7 +526,7 @@ class ConfirmResetPasswordRequestViewsetSerializer(serializers.Serializer):
 
         if not obj:
             raise ValidationError(
-                {"detail": "no reset request found for the given user"}, 400
+                {"code": "no reset request found for the given user"}, 400
             )
 
         if not check_password(code, obj.code):
@@ -545,6 +545,7 @@ class ConfirmResetPasswordRequestViewsetSerializer(serializers.Serializer):
         new_password = validated_data.pop("new_password")
 
         user.set_password(new_password)
+        user.save()
 
         obj = validated_data.pop("reset_request")
         obj.is_used = True
