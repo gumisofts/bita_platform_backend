@@ -97,43 +97,43 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
         requests.request("POST", email_url, headers=headers, data=payload)
 
 
-class EmailChangeRequestSerializer(serializers.Serializer):
-    new_email = serializers.EmailField()
+# class EmailChangeRequestSerializer(serializers.Serializer):
+#     new_email = serializers.EmailField()
 
-    def save(self):
-        request = self.context.get("request")
-        user = request.user
-        expires_at = timezone.now() + timedelta(hours=1)
-        EmailChangeRequest.objects.create(
-            user=user,
-            new_email=self.validated_data["new_email"],
-            expires_at=expires_at,
-        )
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        confirm_url = f"""
-                {request.scheme}://{request.get_host()}/accounts/email-change-confirm/{uid}/{token}/
-                """
-        email_message = (
-            "Click the link below to confirm\
-                  your email change:\n\n"
-            + confirm_url
-        )
-        email_subject = "Email Change Confirmation"
-        payload = json.dumps(
-            {
-                "subject": email_subject,
-                "message": email_message,
-                "recipients": user.email,
-            }
-        )
-        notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
-        email_url = os.environ.get("EMAIL_URL")
-        headers = {
-            "Authorization": f"Api-Key {notification_api_key}",
-            "Content-Type": "application/json",
-        }
-        requests.request("POST", email_url, headers=headers, data=payload)
+#     def save(self):
+#         request = self.context.get("request")
+#         user = request.user
+#         expires_at = timezone.now() + timedelta(hours=1)
+#         EmailChangeRequest.objects.create(
+#             user=user,
+#             new_email=self.validated_data["new_email"],
+#             expires_at=expires_at,
+#         )
+#         uid = urlsafe_base64_encode(force_bytes(user.pk))
+#         token = default_token_generator.make_token(user)
+#         confirm_url = f"""
+#                 {request.scheme}://{request.get_host()}/accounts/email-change-confirm/{uid}/{token}/
+#                 """
+#         email_message = (
+#             "Click the link below to confirm\
+#                   your email change:\n\n"
+#             + confirm_url
+#         )
+#         email_subject = "Email Change Confirmation"
+#         payload = json.dumps(
+#             {
+#                 "subject": email_subject,
+#                 "message": email_message,
+#                 "recipients": user.email,
+#             }
+#         )
+#         notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
+#         email_url = os.environ.get("EMAIL_URL")
+#         headers = {
+#             "Authorization": f"Api-Key {notification_api_key}",
+#             "Content-Type": "application/json",
+#         }
+#         requests.request("POST", email_url, headers=headers, data=payload)
 
 
 class PasswordResetSerializer(serializers.Serializer):
@@ -676,3 +676,110 @@ class UserDeviceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserDevice
         exclude = []
+
+
+class PhoneChangeRequestSerializer(serializers.Serializer):
+    new_phone = serializers.CharField(write_only=True)
+    detail = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        new_phone = attrs.get("new_phone")
+        if not re.match(r"^(9|7)\d{8}$", new_phone):
+            raise serializers.ValidationError({"new_phone":["Invalid phone number"]})
+    
+        if User.objects.filter(phone_number=new_phone).exists():
+            raise serializers.ValidationError({"new_phone":["Phone number already exists"]})
+        
+        attrs["new_phone"] = new_phone
+        
+        user = self.context.get("request").user
+        attrs["user"] = user
+        
+        
+        return attrs
+
+    def create(self, validated_data):
+        # code = generate_secure_six_digits()
+        code=str(123456) # TODO change this on production
+        PhoneChangeRequest.objects.create(
+            user=validated_data.get("user"),
+            new_phone=validated_data.get("new_phone"),
+            code=make_password(code),
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        return {"detail": "success"}
+    
+class PhoneChangeConfirmSerializer(serializers.Serializer):
+    code = serializers.CharField(write_only=True)
+    new_phone = serializers.CharField(write_only=True)
+    detail = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        code = attrs.get("code")
+        new_phone = attrs.get("new_phone")
+        phone_change_request = PhoneChangeRequest.objects.filter(new_phone=new_phone).first()
+        if not phone_change_request:
+            raise serializers.ValidationError({"code":["No request found"]})
+        if not check_password(code,phone_change_request.code):
+            raise serializers.ValidationError({"code":["Invalid code"]})
+        attrs["phone_change_request"] = phone_change_request
+        attrs["user"] = phone_change_request.user
+        return attrs
+    
+    def create(self, validated_data):
+        user = validated_data.get("user")
+        user.phone_number = validated_data.get("new_phone")
+        user.save()
+        phone_change_request = validated_data.get("phone_change_request")
+        phone_change_request.delete()
+        return {"detail": "success"}
+    
+class EmailChangeRequestSerializer(serializers.Serializer):
+    new_email = serializers.CharField(write_only=True)
+    detail = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        new_email = attrs.get("new_email")
+        if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", new_email):
+            raise serializers.ValidationError({"new_email":["Invalid email"]})  
+        if User.objects.filter(email=new_email).exists():
+            raise serializers.ValidationError({"new_email":["Email already exists"]})
+        attrs["new_email"] = new_email
+        attrs["user"] = self.context.get("request").user
+        return attrs
+    
+    def create(self, validated_data):
+        user = validated_data.get("user")
+        user.email = validated_data.get("new_email")
+        user.save()
+        return {"detail": "success"}
+    
+class EmailChangeConfirmSerializer(serializers.Serializer):
+    code = serializers.CharField(write_only=True)
+    new_email = serializers.CharField(write_only=True)
+    detail = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        code = attrs.get("code")
+        new_email = attrs.get("new_email")
+        email_change_request = EmailChangeRequest.objects.filter(new_email=new_email).first()
+        if not email_change_request:
+            raise serializers.ValidationError({"code":["No request found"]})
+        if not check_password(code,email_change_request.code):
+            raise serializers.ValidationError({"code":["Invalid code"]})
+        attrs["email_change_request"] = email_change_request
+        attrs["user"] = email_change_request.user
+        return attrs
+    
+    def create(self, validated_data):
+        user = validated_data.get("user")
+        user.email = validated_data.get("new_email")
+        user.save()
+        email_change_request = validated_data.get("email_change_request")
+        email_change_request.delete()
+        return {"detail": "success"}

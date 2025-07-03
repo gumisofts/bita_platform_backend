@@ -50,8 +50,7 @@ class User(AbstractUser):
         return f"User({str(self.id)})"
 
 
-class PhoneChangeRequest(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+class PhoneChangeRequest(BaseModel):
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -67,7 +66,7 @@ class PhoneChangeRequest(models.Model):
             )
         ],
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    code = models.CharField(max_length=255)
     expires_at = models.DateTimeField()
 
 

@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
+    "core",
     "accounts",
     "platform_control",
     "files",
