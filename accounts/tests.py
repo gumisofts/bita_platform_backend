@@ -47,11 +47,11 @@ class AccountsTestCase(APITestCase):
         res = self.client.post(url, data)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    # def test_password_change(self):
-    #     url = reverse("auth-password-change")
-    #     data = {"old_password": "StrongPass123!", "new_password": "NewStrongPass123!"}
-    #     res = self.client.post(url, data, **self.auth_header)
-    #     self.assertEqual(res.status_code, status.HTTP_200_OK)
+    def test_password_change(self):
+        url = reverse("auth-password-change")
+        data = {"old_password": "StrongPass123!", "new_password": "NewStrongPass123!"}
+        res = self.client.patch(url, data, **self.auth_header)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_token_verify(self):
         url = reverse("token-verify")

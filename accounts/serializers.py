@@ -178,13 +178,14 @@ class PasswordResetSerializer(serializers.Serializer):
 
 
 class PasswordChangeSerializer(serializers.Serializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True)
     status = serializers.CharField(read_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        instance = getattr(self, "instance", None)
+        instance = attrs.get("user")
         errors = {}
         password = (
             Password.objects.filter(
@@ -193,6 +194,7 @@ class PasswordChangeSerializer(serializers.Serializer):
             .order_by("created_at")
             .first()
         )
+
         if not instance.check_password(attrs.get("old_password")):
             errors["old_password"] = ["Old password is not correct."]
 
@@ -206,12 +208,13 @@ class PasswordChangeSerializer(serializers.Serializer):
 
         return attrs
 
-    def update(self, instance, validated_data):
-        old_password = instance.password
-        instance.set_password(validated_data.get("new_password"))
-        instance.save()
+    def create(self, validated_data):
+        user = validated_data.get("user")
+        # old_password = user.password
+        user.set_password(validated_data.get("new_password"))
+        user.save()
 
-        Password.objects.create(password=old_password)
+        # Password.objects.create(password=old_password)
 
         return {"status": "password changed successfully"}
 

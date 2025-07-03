@@ -238,12 +238,14 @@ class AuthViewset(GenericViewSet):
 
     @action(
         detail=False,
-        methods=["post"],
+        methods=["patch"],
         url_path="password/change",
         permission_classes=[IsAuthenticated],
     )
     def password_change(self, request):
-        serializer = PasswordChangeSerializer(data=request.data)
+        serializer = PasswordChangeSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
