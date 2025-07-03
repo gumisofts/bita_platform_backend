@@ -47,35 +47,13 @@ class UserViewSet(
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-    def get_serializer(self, *args, **kwargs):
-        if self.action == "me":
-            return UserSerializer(*args, **kwargs)
-        elif self.action == "register":
-            return RegisterSerializer(*args, **kwargs)
-        elif self.action == "login":
-            return LoginSerializer(*args, **kwargs)
-        elif self.action == "login_with_google":
-            return LoginWithGoogleIdTokenSerializer(*args, **kwargs)
-        elif self.action == "refresh_login":
-            return RefreshLoginSerializer(*args, **kwargs)
-        elif self.action == "reset_request":
-            return ResetPasswordRequestSerializer(*args, **kwargs)
-        elif self.action == "password_change":
-            return PasswordChangeSerializer(*args, **kwargs)
-        elif self.action == "reset_password_request":
-            return ResetPasswordRequestSerializer(*args, **kwargs)
-        elif self.action == "confirm_reset_password_request":
-            return ConfirmResetPasswordRequestViewsetSerializer(*args, **kwargs)
-        elif self.action == "confirm_verification_code":
-            return ConfirmVerificationCodeSerializer(*args, **kwargs)
-
     @action(
         detail=False,
         methods=["delete"],
         permission_classes=[IsAuthenticated],
     )
     def delete(self, request, *args, **kwargs):
-        instance = self.request.user
+        instance = request.user
         instance.is_active = False
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -83,7 +61,7 @@ class UserViewSet(
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def me(self, request):
         user = request.user
-        serializer = self.get_serializer(user)
+        serializer = UserSerializer(user, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
