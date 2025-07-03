@@ -684,6 +684,7 @@ class UserDeviceSerializer(serializers.ModelSerializer):
 class PhoneChangeRequestSerializer(serializers.Serializer):
     new_phone = serializers.CharField(write_only=True)
     detail = serializers.CharField(read_only=True)
+    change_request_id = serializers.UUIDField(read_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -706,39 +707,39 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
     def create(self, validated_data):
         # code = generate_secure_six_digits()
         code = str(123456)  # TODO change this on production
-        PhoneChangeRequest.objects.create(
+        phone_change_request = PhoneChangeRequest.objects.create(
             user=validated_data.get("user"),
             new_phone=validated_data.get("new_phone"),
             code=make_password(code),
             expires_at=timezone.now() + timedelta(hours=1),
         )
 
-        return {"detail": "success"}
+        return {"detail": "success", "change_request_id": phone_change_request.id}
 
 
 class PhoneChangeConfirmSerializer(serializers.Serializer):
     code = serializers.CharField(write_only=True)
-    new_phone = serializers.CharField(write_only=True)
+    change_request = serializers.PrimaryKeyRelatedField(queryset=PhoneChangeRequest.objects.all(),write_only=True)
+    password = serializers.CharField(write_only=True)
     detail = serializers.CharField(read_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
         code = attrs.get("code")
-        new_phone = attrs.get("new_phone")
-        phone_change_request = PhoneChangeRequest.objects.filter(
-            new_phone=new_phone
-        ).first()
+        phone_change_request = attrs.get("change_request")
         if not phone_change_request:
             raise serializers.ValidationError({"code": ["No request found"]})
         if not check_password(code, phone_change_request.code):
             raise serializers.ValidationError({"code": ["Invalid code"]})
         attrs["phone_change_request"] = phone_change_request
         attrs["user"] = phone_change_request.user
+        if not phone_change_request.user.check_password(attrs.get("password")):
+            raise serializers.ValidationError({"password": ["Invalid password"]})
         return attrs
 
     def create(self, validated_data):
         user = validated_data.get("user")
-        user.phone_number = validated_data.get("new_phone")
+        user.phone_number = validated_data.get("change_request").new_phone
         user.save()
         phone_change_request = validated_data.get("phone_change_request")
         phone_change_request.delete()
@@ -748,6 +749,7 @@ class PhoneChangeConfirmSerializer(serializers.Serializer):
 class EmailChangeRequestSerializer(serializers.Serializer):
     new_email = serializers.CharField(write_only=True)
     detail = serializers.CharField(read_only=True)
+    change_request_id = serializers.UUIDField(read_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -761,33 +763,33 @@ class EmailChangeRequestSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
-        EmailChangeRequest.objects.create(
+        email_change_request = EmailChangeRequest.objects.create(
             user=validated_data.get("user"),
             new_email=validated_data.get("new_email"),
             code=make_password(str(123456)),  # TODO change this on production
             expires_at=timezone.now() + timedelta(hours=1),
         )
-        return {"detail": "success"}
+        return {"detail": "success", "change_request_id": email_change_request.id}
 
 
 class EmailChangeConfirmSerializer(serializers.Serializer):
     code = serializers.CharField(write_only=True)
-    new_email = serializers.CharField(write_only=True)
     detail = serializers.CharField(read_only=True)
+    change_request = serializers.PrimaryKeyRelatedField(queryset=EmailChangeRequest.objects.all(),write_only=True)
+    password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
         code = attrs.get("code")
-        new_email = attrs.get("new_email")
-        email_change_request = EmailChangeRequest.objects.filter(
-            new_email=new_email
-        ).first()
+        email_change_request = attrs.get("change_request")
         if not email_change_request:
             raise serializers.ValidationError({"code": ["No request found"]})
         if not check_password(code, email_change_request.code):
             raise serializers.ValidationError({"code": ["Invalid code"]})
         attrs["email_change_request"] = email_change_request
         attrs["user"] = email_change_request.user
+        if not email_change_request.user.check_password(attrs.get("password")):
+            raise serializers.ValidationError({"password": ["Invalid password"]})
         return attrs
 
     def create(self, validated_data):
