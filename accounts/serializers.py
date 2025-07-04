@@ -799,8 +799,8 @@ class EmailChangeConfirmSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         user = validated_data.get("user")
-        user.email = validated_data.get("new_email")
-        user.save()
         email_change_request = validated_data.get("email_change_request")
+        user.email = email_change_request.new_email
+        user.save()
         email_change_request.delete()
         return {"detail": "success"}
