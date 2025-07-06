@@ -135,9 +135,6 @@ class CategoryViewset(ListModelMixin, GenericViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
-    
-    
-
 
 class BusinessRoleViewset(ListModelMixin, GenericViewSet):
     queryset = Role.objects.all()
