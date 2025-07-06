@@ -23,9 +23,15 @@ from core.utils import is_valid_uuid
 
 
 class BusinessViewset(ModelViewSet):
-    queryset = Business.objects.all()
+    queryset = Business.objects.filter(is_active=True)
     serializer_class = BusinessSerializer
     permission_classes = [hasBusinessPermission]
+
+    def destroy(self, request, *args, **kwargs):
+        business = self.get_object()
+        business.is_active = False
+        business.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -129,11 +135,8 @@ class CategoryViewset(ListModelMixin, GenericViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
-
-class RoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
-    queryset = Role.objects.all()
-    serializer_class = RoleSerializer
-    permission_classes = [IsAuthenticated]
+    
+    
 
 
 class BusinessRoleViewset(ListModelMixin, GenericViewSet):
@@ -143,7 +146,6 @@ class BusinessRoleViewset(ListModelMixin, GenericViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        user = self.request.user
         business_id = self.request.query_params.get("business_id")
         if business_id:
             queryset = queryset.filter(business=business_id)
@@ -296,7 +298,7 @@ class EmployeeInvitationViewset(ModelViewSet):
             invitation = EmployeeInvitation.objects.get(id=pk, status="pending")
         except EmployeeInvitation.DoesNotExist:
             return Response(
-                {"error": "Invitation not found or already processed"},
+                {"detail": "Invitation not found or already processed"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -308,13 +310,18 @@ class EmployeeInvitationViewset(ModelViewSet):
             or invitation.phone_number == user.phone_number
         ):
             return Response(
-                {"error": "You can only update your own invitations"},
+                {"detail": "You can only update your own invitations"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         serializer = self.get_serializer(invitation, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            employee_invitation_status_changed.send(
+                sender=EmployeeInvitation,
+                instance=invitation,
+                status=serializer.validated_data.get("status"),
+            )
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

@@ -6,7 +6,7 @@ from business.views import *
 
 router.register(r"businesses", BusinessViewset, basename="businesses")
 router.register(r"categories", CategoryViewset, basename="categories")
-router.register(r"roles", RoleViewset, basename="roles")
+router.register(r"roles", BusinessRoleViewset, basename="roles")
 router.register(r"addresses", AddressViewset, basename="addresses")
 router.register(r"branches", BranchViewset, basename="branches")
 router.register(r"industries", IndustryViewset, basename="industries")
