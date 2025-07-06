@@ -12,14 +12,6 @@ router.register(r"branches", BranchViewset, basename="branches")
 router.register(r"industries", IndustryViewset, basename="industries")
 router.register(r"businessimage", BusinessImageViewset, basename="businessimage")
 router.register(
-    r"employees/invitations/mine", InvitationViewset, basename="invitations-mine"
-)
-router.register(
-    r"employees/invitations/status",
-    EmployeeInvitationStatusViewset,
-    basename="employee-invitation-status",
-)
-router.register(
     r"employees/invitations", EmployeeInvitationViewset, basename="employee-invitations"
 )
 router.register(r"employees", EmployeeViewset, basename="employees")

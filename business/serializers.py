@@ -80,6 +80,7 @@ class BusinessSerializer(serializers.ModelSerializer):
     class Meta:
         model = Business
         fields = "__all__"
+        read_only_fields = ["is_verified", "is_active"]
 
     def create(self, validated_data):
         address = validated_data.pop("address")

@@ -75,6 +75,8 @@ class Business(BaseModel):
     background_image = models.ForeignKey(
         "files.FileMeta", on_delete=models.SET_NULL, null=True, blank=True
     )
+    is_verified = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
