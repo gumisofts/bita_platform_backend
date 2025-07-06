@@ -110,6 +110,16 @@ class CustomUserAdmin(BaseUserAdmin):
         return format_html(f"Email: {email_status} | Phone: {phone_status}")
 
     verification_status.short_description = "Verification Status"
+    
+    def verify_phone_selected_users(self, request, queryset):
+        for user in queryset:
+            user.is_phone_verified = True
+            user.save()
+        self.message_user(request, "Selected users have been verified")
+
+    verify_phone_selected_users.short_description = "Verify Phone"
+    
+    actions = [verify_phone_selected_users]
 
 
 @admin.register(UserDevice)
