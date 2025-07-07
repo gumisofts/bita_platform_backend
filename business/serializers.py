@@ -89,11 +89,8 @@ class BusinessSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        address = validated_data.pop("address")
-        address, created = Address.objects.update_or_create(
-            id=instance.address.id, defaults=address
-        )
-        validated_data["address"] = address
+        if "address" in validated_data:
+            address = validated_data.pop("address")
         return super().update(instance, validated_data)
 
 
