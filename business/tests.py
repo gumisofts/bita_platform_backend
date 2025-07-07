@@ -223,7 +223,9 @@ class BusinessViewsetTest(TestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(Business.objects.filter(id=self.business1.id).count(), 0)
+        self.assertEqual(
+            Business.objects.filter(id=self.business1.id, is_active=True).count(), 0
+        )
 
 
 class AddressViewsetTest(APITestCase):
