@@ -28,7 +28,6 @@ class BusinessViewset(ModelViewSet):
     serializer_class = BusinessSerializer
     permission_classes = [IsAuthenticated, DjangoObjectPermissions]
 
-    
     def destroy(self, request, *args, **kwargs):
         business = self.get_object()
         business.is_active = False
