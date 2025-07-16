@@ -26,7 +26,7 @@ from core.utils import is_valid_uuid
 class BusinessViewset(ModelViewSet):
     queryset = Business.objects.filter(is_active=True)
     serializer_class = BusinessSerializer
-    permission_classes = [IsAuthenticated, DjangoObjectPermissions]
+    permission_classes = [IsAuthenticated, GuardianObjectPermissions]
 
     def destroy(self, request, *args, **kwargs):
         business = self.get_object()
@@ -458,8 +458,6 @@ class BusinessPermissionViewset(GenericViewSet, ListModelMixin):
         user = self.request.user
         business_id = self.request.query_params.get("business_id")
         branch_id = self.request.query_params.get("branch_id")
-
-        print(f"DEBUG: user = {user.email} {user.phone_number}")
 
         if not business_id or not is_valid_uuid(business_id):
             business_permissions = []

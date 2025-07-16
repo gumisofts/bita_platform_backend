@@ -24,7 +24,11 @@ from business.models import (
     Industry,
     Role,
 )
-from business.permissions import has_business_object_permission, has_business_permission
+from business.permissions import (
+    PermissionManager,
+    has_business_object_permission,
+    has_business_permission,
+)
 from business.signals import employee_invitation_status_changed
 from inventories.models import Property
 
@@ -225,9 +229,9 @@ class BusinessViewsetTest(TestCase):
 
     def test_business_update(self):
         """Test business update"""
-
         self.client.force_authenticate(user=self.owner_user)
         url = reverse("businesses-detail", args=[self.business1.id])
+
         data = {
             "name": "Updated Tech Store",
             "business_type": "retail",
@@ -240,7 +244,6 @@ class BusinessViewsetTest(TestCase):
         }
 
         response = self.client.patch(url, data, format="json")
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.business1.refresh_from_db()
@@ -251,7 +254,6 @@ class BusinessViewsetTest(TestCase):
         self.client.force_authenticate(user=self.owner_user)
         url = reverse("businesses-detail", args=[self.business1.id])
         response = self.client.delete(url)
-
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(
             Business.objects.filter(id=self.business1.id, is_active=True).count(), 0
