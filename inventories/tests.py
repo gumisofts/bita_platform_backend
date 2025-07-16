@@ -28,7 +28,7 @@ class ItemViewSetTest(APITestCase):
             email="test@example.com", password="password123"
         )
         self.client.force_authenticate(user=self.user)
-        self.business = Business.objects.create(name="Test Business")
+        self.business = Business.objects.create(name="Test Business", owner=self.user)
         self.group = Group.objects.create(
             name="Test Group", description="Test Desc", business=self.business
         )
@@ -84,7 +84,7 @@ class SupplyViewSetTest(APITestCase):
             email="supplyuser@example.com", password="password123"
         )
         self.client.force_authenticate(user=self.user)
-        self.business = Business.objects.create(name="Supply Business")
+        self.business = Business.objects.create(name="Supply Business", owner=self.user)
         self.branch = Branch.objects.create(name="Main Branch", business=self.business)
         self.supply = Supply.objects.create(label="Supply Label", branch=self.branch)
 
@@ -117,7 +117,9 @@ class SuppliedItemViewSetTest(APITestCase):
             email="supplieditemuser@example.com", password="password123"
         )
         self.client.force_authenticate(user=self.user)
-        self.business = Business.objects.create(name="Supply Item Business")
+        self.business = Business.objects.create(
+            name="Supply Item Business", owner=self.user
+        )
         self.branch = Branch.objects.create(name="Branch", business=self.business)
         self.supply = Supply.objects.create(label="Supply Label", branch=self.branch)
         self.item = Item.objects.create(
@@ -168,7 +170,9 @@ class PricingViewSetTest(APITestCase):
             email="pricinguser@example.com", password="password123"
         )
         self.client.force_authenticate(user=self.user)
-        self.business = Business.objects.create(name="Pricing Business")
+        self.business = Business.objects.create(
+            name="Pricing Business", owner=self.user
+        )
         self.item = Item.objects.create(
             name="Item for Pricing",
             description="desc",
@@ -224,7 +228,7 @@ class GroupViewSetTest(APITestCase):
             email="groupuser@example.com", password="password123"
         )
         self.client.force_authenticate(user=self.user)
-        self.business = Business.objects.create(name="Group Business")
+        self.business = Business.objects.create(name="Group Business", owner=self.user)
 
         self.group = Group.objects.create(
             name="Test Group", description="Group Desc", business=self.business
@@ -254,7 +258,9 @@ class ItemVariantViewSetTest(APITestCase):
             email="variantuser@example.com", password="password123"
         )
         self.client.force_authenticate(user=self.user)
-        self.business = Business.objects.create(name="Variant Business")
+        self.business = Business.objects.create(
+            name="Variant Business", owner=self.user
+        )
         self.item = Item.objects.create(
             name="Variant Item",
             description="desc",

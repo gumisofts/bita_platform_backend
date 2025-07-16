@@ -1,8 +1,46 @@
 from django.db.models import Q
+from django.http import Http404
+from guardian.shortcuts import assign_perm
+from rest_framework import exceptions
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from accounts.models import User
-from business.models import Address, Branch, Business, Employee, EmployeeInvitation
+from business.models import (
+    AdditionalBusinessPermissionNames,
+    Address,
+    Branch,
+    Business,
+    Employee,
+    EmployeeInvitation,
+)
+
+
+class BusinessModelObjectPermission(BasePermission):
+
+    def to_generic_action(self, action):
+        if action == "list":
+            return "view"
+        if action == "create":
+            return "add"
+        if action == "update":
+            return "change"
+        if action == "destroy":
+            return "delete"
+        return "change"
+
+    def has_permission(self, request, view):
+        return has_business_permission(
+            request, view.queryset.model, request.query_params.get("business_id")
+        )
+
+    def has_object_permission(self, request, view):
+
+        return has_business_object_permission(
+            request,
+            view.queryset.model,
+            request.query_params.get("business_id"),
+            self.to_generic_action(view.action),
+        )
 
 
 class IsOwner(BasePermission):
@@ -24,26 +62,21 @@ class IsOwnerOrEmployee(BasePermission):
 
 
 def has_business_permission(request, model, business: Business):
-    if not request.user.is_authenticated:
-        return False
-    user: User = request.user
+    # Assumes that user is authenticated
 
+    user: User = request.user
     employee = Employee.objects.filter(user=user, business=business).first()
 
     if not employee:
         return False
 
-    return (
-        request.method in SAFE_METHODS
-        and employee.role.permissions.filter(
-            content_type__model=model._meta.model_name
-        ).exists()
-    )
+    return employee.role.permissions.filter(
+        content_type__model=model._meta.model_name
+    ).exists()
 
 
-def has_business_object_permission(request, model, business):
-    if not request.user.is_authenticated:
-        return False
+def has_business_object_permission(request, model, business, generic_action="change"):
+
     user: User = request.user
 
     employee = Employee.objects.filter(user=user, business=business).first()
@@ -57,11 +90,21 @@ def has_business_object_permission(request, model, business):
         ).exists()
 
     return employee.role.permissions.filter(
-        Q(codename="add_" + model._meta.model_name)
-        | Q(codename="view_" + model._meta.model_name)
-        | Q(codename="delete_" + model._meta.model_name)
-        | Q(codename="change_" + model._meta.model_name)
+        Q(codename=f"{generic_action}_" + model._meta.model_name)
+        # | Q(codename="view_" + model._meta.model_name)
+        # | Q(codename="delete_" + model._meta.model_name)
+        # | Q(codename="change_" + model._meta.model_name)
     ).exists()
+
+
+class hasBusinessAddressPermission(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        return has_business_object_permission(request, Address, obj.business)
 
 
 class hasUserPermission(BasePermission):
@@ -136,3 +179,203 @@ class EmployeeInvitationPermission(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         return has_business_object_permission(request, EmployeeInvitation, obj.business)
+
+
+class PermissionManager:
+
+    def assign_employee_permissions(self, employee):
+        if employee.role.role_name == "Owner":
+            self.assign_owner_permissions(employee.business)
+        elif employee.role.role_name == "Manager":
+            self.assign_manager_permissions(employee.business)
+        elif employee.role.role_name == "Employee":
+            self.assign_employee_permissions(employee.business)
+
+    ## Roles
+    # Owner
+    # Business Admin
+    # Branch Manager
+    # Branch Employee
+
+    def assign_business_admin_permissions(self, user, business):
+        perms = [
+            perm.value[0] + "_business" for perm in AdditionalBusinessPermissionNames
+        ] + ["view_business", "change_business"]
+        for perm in perms:
+            assign_perm(perm, user, business)
+
+    def assign_owner_permissions(self, user, business):
+        perms = [
+            perm.value[0] + "_business" for perm in AdditionalBusinessPermissionNames
+        ] + ["change_business", "delete_business", "view_business"]
+        for perm in perms:
+            assign_perm(perm, user, business)
+
+    def assign_manager_permissions(self, user, business, branch):
+        branch_manager_perms = [
+            AdditionalBusinessPermissionNames.CAN_VIEW_GROUP,
+            AdditionalBusinessPermissionNames.CAN_ADD_GROUP,
+            AdditionalBusinessPermissionNames.CAN_ADD_CUSTOMER,
+            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM,
+            AdditionalBusinessPermissionNames.CAN_ADD_ITEM,
+            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLIER,
+        ]
+        perms = [perm.value[0] + "_branch" for perm in branch_manager_perms]
+
+        for perm in perms:
+            assign_perm(perm, user, branch)
+
+        branch_perms = [
+            "view_branch",
+            "add_branch",
+            "change_branch",
+        ]
+        business_perms = [
+            "view_business",
+        ]
+
+        for perm in branch_perms:
+            assign_perm(perm, user, branch)
+
+        for perm in business_perms:
+            assign_perm(perm, user, business)
+
+    def assign_employee_permissions(self, user, business, branch):
+        employee_branch_perms = [
+            AdditionalBusinessPermissionNames.CAN_VIEW_GROUP,
+            AdditionalBusinessPermissionNames.CAN_ADD_GROUP,
+            AdditionalBusinessPermissionNames.CAN_ADD_CUSTOMER,
+            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM,
+            AdditionalBusinessPermissionNames.CAN_ADD_ITEM,
+            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLIER,
+            AdditionalBusinessPermissionNames.CAN_ADD_SUPPLIER,
+            AdditionalBusinessPermissionNames.CAN_ADD_ITEM_VARIANT,
+            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT,
+            AdditionalBusinessPermissionNames.CAN_ADD_INVENTORY_MOVEMENT,
+            AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY_MOVEMENT,
+        ]
+        perms = [perm.value[0] + "_branch" for perm in employee_branch_perms]
+
+        for perm in perms:
+            assign_perm(perm, user, branch)
+
+        branch_perms = ["view_branch"]
+        business_perms = ["view_business"]
+
+        for perm in branch_perms:
+            assign_perm(perm, user, branch)
+
+        for perm in business_perms:
+            assign_perm(perm, user, business)
+
+
+class BusinessLevelPermission(BasePermission):
+    """
+    The request is authenticated using Django's object-level permissions.
+    It requires an object-permissions-enabled backend, such as Django Guardian.
+
+    It ensures that the user is authenticated, and has the appropriate
+    `add`/`change`/`delete` permissions on the object using .has_perms.
+
+    This permission can only be applied against view classes that
+    provide a `.queryset` attribute.
+    """
+
+    perms_map = {
+        "GET": [],
+        "OPTIONS": [],
+        "HEAD": [],
+        "POST": ["%(app_label)s.can_add_%(model_name)s_business"],
+        "PUT": ["%(app_label)s.can_change_%(model_name)s_business"],
+        "PATCH": ["%(app_label)s.can_change_%(model_name)s_business"],
+        "DELETE": ["%(app_label)s.can_delete_%(model_name)s_business"],
+    }
+
+    def get_required_object_permissions(self, method, model_cls):
+        kwargs = {
+            "app_label": model_cls._meta.app_label,
+            "model_name": model_cls._meta.model_name,
+        }
+
+        if method not in self.perms_map:
+            raise exceptions.MethodNotAllowed(method)
+
+        return [perm % kwargs for perm in self.perms_map[method]]
+
+    def get_binding_object(self, request):
+        """
+        This method is used to get the binding object for the permission check.
+        It can be overridden in subclasses to provide custom logic.
+        """
+        return request.business if hasattr(request, "business") else None
+
+    def has_object_permission(self, request, view, obj):
+        # authentication checks have already executed via has_permission
+        queryset = self._queryset(view)
+        model_cls = queryset.model
+        user = request.user
+        business = self.get_binding_object(request)
+
+        perms = self.get_required_object_permissions(request.method, model_cls)
+
+        if not user.has_perms(perms, business):
+            # If the user does not have permissions we need to determine if
+            # they have read permissions to see 403, or not, and simply see
+            # a 404 response.
+
+            if request.method in SAFE_METHODS:
+                # Read permissions already checked and failed, no need
+                # to make another lookup.
+                raise Http404
+
+            read_perms = self.get_required_object_permissions("GET", model_cls)
+            if not user.has_perms(read_perms, obj):
+                raise Http404
+
+            # Has read permissions.
+            return False
+
+        return True
+
+    def _queryset(self, view):
+        assert (
+            hasattr(view, "get_queryset") or getattr(view, "queryset", None) is not None
+        ), (
+            "Cannot apply {} on a view that does not set "
+            "`.queryset` or have a `.get_queryset()` method."
+        ).format(
+            self.__class__.__name__
+        )
+
+        if hasattr(view, "get_queryset"):
+            queryset = view.get_queryset()
+            assert queryset is not None, "{}.get_queryset() returned None".format(
+                view.__class__.__name__
+            )
+            return queryset
+        return view.queryset
+
+
+class BranchLevelPermission(BusinessLevelPermission):
+    """
+    Permission class for branch-level permissions.
+    It extends BusinessLevelPermission to ensure that the user has
+    the appropriate permissions for branch-related actions.
+    """
+
+    perms_map = {
+        "GET": [],
+        "OPTIONS": [],
+        "HEAD": [],
+        "POST": ["%(app_label)s.can_add_%(model_name)s_branch"],
+        "PUT": ["%(app_label)s.can_change_%(model_name)s_branch"],
+        "PATCH": ["%(app_label)s.can_change_%(model_name)s_branch"],
+        "DELETE": ["%(app_label)s.can_delete_%(model_name)s_branch"],
+    }
+
+    def get_binding_object(self, request):
+        """
+        This method is used to get the binding object for the permission check.
+        It can be overridden in subclasses to provide custom logic.
+        """
+        return request.branch if hasattr(request, "branch") else None

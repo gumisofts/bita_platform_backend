@@ -18,6 +18,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
 
 from accounts.models import *
+from accounts.signals import user_verified
 from accounts.utils import *
 
 User = get_user_model()
@@ -95,45 +96,6 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
             "Content-Type": "application/json",
         }
         requests.request("POST", email_url, headers=headers, data=payload)
-
-
-# class EmailChangeRequestSerializer(serializers.Serializer):
-#     new_email = serializers.EmailField()
-
-#     def save(self):
-#         request = self.context.get("request")
-#         user = request.user
-#         expires_at = timezone.now() + timedelta(hours=1)
-#         EmailChangeRequest.objects.create(
-#             user=user,
-#             new_email=self.validated_data["new_email"],
-#             expires_at=expires_at,
-#         )
-#         uid = urlsafe_base64_encode(force_bytes(user.pk))
-#         token = default_token_generator.make_token(user)
-#         confirm_url = f"""
-#                 {request.scheme}://{request.get_host()}/accounts/email-change-confirm/{uid}/{token}/
-#                 """
-#         email_message = (
-#             "Click the link below to confirm\
-#                   your email change:\n\n"
-#             + confirm_url
-#         )
-#         email_subject = "Email Change Confirmation"
-#         payload = json.dumps(
-#             {
-#                 "subject": email_subject,
-#                 "message": email_message,
-#                 "recipients": user.email,
-#             }
-#         )
-#         notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
-#         email_url = os.environ.get("EMAIL_URL")
-#         headers = {
-#             "Authorization": f"Api-Key {notification_api_key}",
-#             "Content-Type": "application/json",
-#         }
-#         requests.request("POST", email_url, headers=headers, data=payload)
 
 
 class PasswordResetSerializer(serializers.Serializer):
@@ -598,7 +560,6 @@ class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):
             raise ValidationError({"code": ["invalid verification code"]}, 400)
 
         attrs["instance"] = instance
-
         return attrs
 
     def create(self, validated_data):
@@ -620,6 +581,13 @@ class ConfirmVerificationCodeSerializer(serializers.ModelSerializer):
         refresh = RefreshToken.for_user(instance.user)
         access_token = str(refresh.access_token)
         refresh_token = str(refresh)
+
+        kwargs = {
+            "mode": "phone_number" if "phone_number" in validated_data else "email",
+            "user": instance.user,
+        }
+
+        user_verified.send(self, **kwargs)
 
         return {
             "user": instance.user,

@@ -2,12 +2,23 @@ import re
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from guardian.shortcuts import assign_perm, get_perms
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from accounts.models import User, regex_validator
 from business.models import *
 from business.signals import employee_invitation_status_changed
+
+
+class BaseSerializerMixin(serializers.Serializer):
+    permissions = serializers.SerializerMethodField()
+
+    def get_permissions(self, obj):
+        user = self.context.get("request").user
+        if user.is_authenticated:
+            return list(get_perms(user, obj))
+        return []
 
 
 class AddressSerializer(serializers.ModelSerializer):
@@ -52,7 +63,7 @@ class RoleSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class BranchSerializer(serializers.ModelSerializer):
+class BranchSerializer(serializers.ModelSerializer, BaseSerializerMixin):
     current_user_role = serializers.SerializerMethodField()
 
     def get_current_user_role(self, obj):
@@ -73,7 +84,7 @@ class BranchSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class BusinessSerializer(serializers.ModelSerializer):
+class BusinessSerializer(serializers.ModelSerializer, BaseSerializerMixin):
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
     address = AddressSerializer()
 
@@ -106,7 +117,7 @@ class BusinessImageSerializer(serializers.ModelSerializer):
         exclude = []
 
 
-class EmployeeSerializer(serializers.ModelSerializer):
+class EmployeeSerializer(serializers.ModelSerializer, BaseSerializerMixin):
     class Meta:
         model = Employee
         exclude = []
@@ -118,7 +129,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-class EmployeeInvitationSerializer(serializers.ModelSerializer):
+class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMixin):
     # email = serializers.EmailField(required=False)
     # phone_number = serializers.CharField(required=False)
     # role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all())

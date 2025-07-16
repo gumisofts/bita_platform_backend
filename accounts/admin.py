@@ -17,7 +17,7 @@ class UserDeviceInline(admin.TabularInline):
 class VerificationCodeInline(admin.TabularInline):
     model = VerificationCode
     extra = 0
-    readonly_fields = ("created_at", "expires_at", "is_used")
+    readonly_fields = ("created_at",)
     can_delete = False
 
 
@@ -31,6 +31,7 @@ class CustomUserAdmin(BaseUserAdmin):
         "verification_status",
         "is_staff",
         "is_active",
+        "is_superuser",
         "date_joined",
     )
     list_filter = (

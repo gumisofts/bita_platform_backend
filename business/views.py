@@ -4,6 +4,7 @@ from django.db.models import Q
 from django.shortcuts import render
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.mixins import (
@@ -13,7 +14,7 @@ from rest_framework.mixins import (
     RetrieveModelMixin,
     UpdateModelMixin,
 )
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import DjangoObjectPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
@@ -25,8 +26,9 @@ from core.utils import is_valid_uuid
 class BusinessViewset(ModelViewSet):
     queryset = Business.objects.filter(is_active=True)
     serializer_class = BusinessSerializer
-    permission_classes = [hasBusinessPermission]
+    permission_classes = [IsAuthenticated, DjangoObjectPermissions]
 
+    
     def destroy(self, request, *args, **kwargs):
         business = self.get_object()
         business.is_active = False
@@ -40,18 +42,17 @@ class BusinessViewset(ModelViewSet):
         business_type = self.request.query_params.get("business_type")
         search = self.request.query_params.get("search")
 
+        queryset = get_objects_for_user(user, "view_business", queryset)
+
         if search:
             queryset = queryset.filter(Q(name__icontains=search))
 
         if business_type:
             queryset = queryset.filter(business_type=business_type)
 
-        queryset = queryset.filter(Q(owner=user) | Q(employees__user__in=[user]))
-
         if categories:
             queryset = queryset.filter(categories__id__in=categories.split(","))
-
-        return queryset.distinct()
+        return queryset.distinct().order_by("created_at")
 
     @extend_schema(
         parameters=[
@@ -84,7 +85,10 @@ class BusinessViewset(ModelViewSet):
 class AddressViewset(ModelViewSet):
     queryset = Address.objects.all()
     serializer_class = AddressSerializer
-    permission_classes = [IsAuthenticated]  # TODO Temporarily simplified
+    permission_classes = [
+        IsAuthenticated,
+        BusinessLevelPermission,
+    ]
     pagination_class = None
 
     def get_queryset(self):
@@ -92,43 +96,20 @@ class AddressViewset(ModelViewSet):
         user = self.request.user
         business_id = self.request.query_params.get("business_id")
 
-        if business_id:
-            try:
-                # Convert business_id to UUID if it's a string
-                if isinstance(business_id, str):
-                    business_uuid = UUID(business_id)
-                else:
-                    business_uuid = business_id
+        if not business_id or not is_valid_uuid(business_id):
 
-                # First verify user has access to the business
-                user_business = Business.objects.filter(
-                    Q(owner=user) | Q(employees__user=user), id=business_uuid
-                ).first()
+            raise ValidationError({"detail": "Empty or invalid business_id"})
 
-                print(f"DEBUG: user_business = {user_business}")
+        businesses = get_objects_for_user(
+            user,
+            "can_view_address_business",
+            Business.objects.filter(id=business_id),
+            accept_global_perms=False,
+        )
 
-                if not user_business:
-                    print("DEBUG: No user business found, returning empty queryset")
-                    return queryset.none()
-
-                # Filter addresses that are either:
-                # 1. The business's main address (through business.address)
-                # 2. Used by branches of the business (through branch.address)
-                filtered_queryset = queryset.filter(
-                    Q(business=user_business) | Q(branches__business=user_business)
-                ).distinct()
-
-                print(f"DEBUG: filtered_queryset count = {filtered_queryset.count()}")
-                return filtered_queryset
-
-            except (ValueError, TypeError) as e:
-                # Handle invalid UUID
-                print(f"DEBUG: Exception = {e}")
-                queryset = queryset.none()
-        else:
-            print("DEBUG: No business_id provided, returning empty queryset")
-            queryset = queryset.none()
-        return queryset
+        return queryset.filter(
+            Q(business__in=businesses) | Q(branches__business__in=businesses)
+        ).distinct()
 
 
 class CategoryViewset(ListModelMixin, GenericViewSet):
@@ -139,7 +120,10 @@ class CategoryViewset(ListModelMixin, GenericViewSet):
 class BusinessRoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [
+        IsAuthenticated,
+        BusinessLevelPermission | BranchLevelPermission,
+    ]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -152,33 +136,33 @@ class BusinessRoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
 class BranchViewset(ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
-    permission_classes = [hasBranchPermission]
+    permission_classes = [
+        IsAuthenticated,
+        BusinessLevelPermission | BranchLevelPermission,
+    ]
 
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
         business_id = self.request.query_params.get("business_id")
 
-        if business_id and is_valid_uuid(business_id):
-            try:
-                queryset = queryset.filter(business=business_id)
-                employee = (
-                    Employee.objects.filter(user=user, business=business_id)
-                    .prefetch_related("branch")
-                    .first()
-                )
-                if employee and employee.branch:
-                    queryset = queryset.filter(id=employee.branch.id).distinct()
-            except ValueError:
-                # Handle invalid UUID
-                queryset = queryset.none()
-        else:
-            queryset = queryset.none()
+        queryset = get_objects_for_user(user, "view_branch", queryset)
 
-        return queryset
+        if not business_id or not is_valid_uuid(business_id):
+            raise ValidationError({"detail": "Empty or invalid business_id"})
 
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+        queryset = queryset.filter(business=business_id)
+
+        business = get_objects_for_user(
+            user,
+            "can_view_branch_business",
+            Business.objects.filter(id=business_id),
+            accept_global_perms=False,
+        ).first()
+        if business:
+            queryset = queryset | business.branches.all()
+
+        return queryset.order_by("created_at")
 
 
 class IndustryViewset(ListModelMixin, GenericViewSet):
@@ -195,7 +179,10 @@ class BusinessImageViewset(ListModelMixin, GenericViewSet):
 class EmployeeViewset(ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
-    permission_classes = [IsAuthenticated]  # TODO: Handle permissions
+    permission_classes = [
+        IsAuthenticated,
+        BusinessLevelPermission | BranchLevelPermission,
+    ]  # TODO: Handle permissions
     lookup_field = "id"
 
     def get_queryset(self):
@@ -462,3 +449,44 @@ class EmployeeInvitationViewset(ModelViewSet):
             return Response(
                 {"error": "Invitation not found"}, status=status.HTTP_404_NOT_FOUND
             )
+
+
+class BusinessPermissionViewset(GenericViewSet, ListModelMixin):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+
+        user = self.request.user
+        business_id = self.request.query_params.get("business_id")
+        branch_id = self.request.query_params.get("branch_id")
+
+        print(f"DEBUG: user = {user.email} {user.phone_number}")
+
+        if not business_id or not is_valid_uuid(business_id):
+            business_permissions = []
+        else:
+            try:
+                business = Business.objects.get(id=business_id)
+            except Business.DoesNotExist:
+                return Response(
+                    {"error": "Business not found"}, status=status.HTTP_404_NOT_FOUND
+                )
+            business_permissions = get_perms(user, business)
+
+        if not branch_id or not is_valid_uuid(branch_id):
+            branch_permissions = []
+        else:
+            try:
+                branch = Branch.objects.get(id=branch_id)
+            except Branch.DoesNotExist:
+                return Response(
+                    {"error": "Branch not found"}, status=status.HTTP_404_NOT_FOUND
+                )
+            branch_permissions = get_perms(user, branch)
+
+        return Response(
+            {
+                "branch_permissions": branch_permissions,
+                "business_permissions": business_permissions,
+            }
+        )

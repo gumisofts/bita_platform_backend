@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
+    "guardian",
     "core",
     "accounts",
     "platform_control",
@@ -49,6 +50,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "business.middleware.BusinessContextMiddleWare",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -192,6 +194,7 @@ AUTHENTICATION_BACKENDS = [
     "accounts.backends.PhoneBackend",
     "accounts.backends.EmailBackend",
     "accounts.backends.ModelBackend",
+    "guardian.backends.ObjectPermissionBackend",
 ]
 
 
@@ -210,3 +213,9 @@ AWS_S3_OBJECT_PARAMETERS = {
 
 AWS_QUERYSTRING_AUTH = True
 AWS_QUERYSTRING_EXPIRE = 3600
+
+
+# Guardian settings
+GUARDIAN_RAISE_403 = True
+ANONYMOUS_USER_NAME = None
+# GUARDIAN_USER_OBJ_PERMS_MODEL = True

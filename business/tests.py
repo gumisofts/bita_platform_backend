@@ -6,19 +6,27 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
+from guardian.shortcuts import assign_perm, get_perms
 from rest_framework import status
-from rest_framework.test import APIClient, APITestCase
+from rest_framework.permissions import DjangoObjectPermissions, IsAuthenticated
+from rest_framework.test import APIClient, APIRequestFactory, APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from business.models import (
+    ROLES,
     Address,
     Branch,
     Business,
     BusinessImage,
     Category,
     Employee,
+    EmployeeInvitation,
     Industry,
     Role,
 )
+from business.permissions import has_business_object_permission, has_business_permission
+from business.signals import employee_invitation_status_changed
+from inventories.models import Property
 
 User = get_user_model()
 
@@ -48,7 +56,6 @@ class BusinessViewsetTest(TestCase):
         )
 
         self.client = APIClient()
-
         # Create test addresses
         self.address1 = Address.objects.create(
             lat=40.7128, lng=-74.0060, admin_1="New York", country="USA"
@@ -78,13 +85,34 @@ class BusinessViewsetTest(TestCase):
         )
         self.business2.categories.add(self.category2)
 
-        self.employee_role = Role.objects.create(
-            role_name="Employee", business=self.business1
+        self.employee_role = Role.objects.get(
+            role_name=ROLES.EMPLOYEE.value, business=self.business1
         )
 
-        self.employee_employee = Employee.objects.create(
-            user=self.employee_user, business=self.business1, role=self.employee_role
+        branch = Branch.objects.create(
+            name="The other branch",
+            business=self.business1,
+            address=self.address1,
         )
+
+        employee_invitation = EmployeeInvitation.objects.create(
+            email=self.employee_user.email,
+            phone_number=self.employee_user.phone_number,
+            role=self.employee_role,
+            branch=branch,
+            business=self.business1,
+            status="accepted",
+        )
+
+        employee_invitation_status_changed.send(
+            sender=EmployeeInvitation,
+            instance=employee_invitation,
+            status="accepted",
+        )
+
+        # self.employee_employee = Employee.objects.create(
+        #     user=self.employee_user, business=self.business1, role=self.employee_role
+        # )
 
     def test_business_list_authenticated_owner(self):
         """Test business list for authenticated owner"""
@@ -110,7 +138,6 @@ class BusinessViewsetTest(TestCase):
         """Test business list for unauthenticated user"""
         url = reverse("businesses-list")
         response = self.client.get(url)
-
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_business_list_with_search_filter(self):
@@ -175,6 +202,7 @@ class BusinessViewsetTest(TestCase):
                 "country": "USA",
             },
         }
+        assign_perm("business.add_business", self.owner_user)
 
         response = self.client.post(url, data, format="json")
 
@@ -197,6 +225,7 @@ class BusinessViewsetTest(TestCase):
 
     def test_business_update(self):
         """Test business update"""
+
         self.client.force_authenticate(user=self.owner_user)
         url = reverse("businesses-detail", args=[self.business1.id])
         data = {
@@ -211,6 +240,7 @@ class BusinessViewsetTest(TestCase):
         }
 
         response = self.client.patch(url, data, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.business1.refresh_from_db()
@@ -272,8 +302,7 @@ class AddressViewsetTest(APITestCase):
         url = reverse("addresses-list")
 
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 0)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_address_create(self):
         """Test address creation"""
@@ -424,15 +453,30 @@ class BranchViewsetTest(APITestCase):
             first_name="Test User",
         )
 
-        self.role = Role.objects.filter(
-            role_name="Manager", business=self.business
-        ).first()
-        self.employee = Employee.objects.create(
-            user=self.other_user,
-            business=self.business,
+        self.role = Role.objects.get(
+            role_name=ROLES.EMPLOYEE.value, business=self.business
+        )
+
+        employee_invitation = EmployeeInvitation.objects.create(
+            email=self.other_user.email,
+            phone_number=self.other_user.phone_number,
             role=self.role,
             branch=self.branch,
+            business=self.business,
+            status="accepted",
         )
+
+        employee_invitation_status_changed.send(
+            sender=EmployeeInvitation,
+            instance=employee_invitation,
+            status="accepted",
+        )
+        # self.employee = Employee.objects.create(
+        #     user=self.other_user,
+        #     business=self.business,
+        #     role=self.role,
+        #     branch=self.branch,
+        # )
 
         self.client = APIClient()
 
@@ -452,8 +496,7 @@ class BranchViewsetTest(APITestCase):
         url = reverse("branches-list")
 
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()["count"], 0)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_branch_list_employee_with_branch_restriction(self):
         """Test branch list shows only employee's branch"""
@@ -583,10 +626,33 @@ class PermissionTest(APITestCase):
             owner=self.owner,
             business_type="retail",
         )
+        self.employee_role = Role.objects.get(
+            role_name=ROLES.EMPLOYEE.value, business=self.business
+        )
 
-        self.role = Role.objects.create(role_name="Employee", business=self.business)
-        self.employee_record = Employee.objects.create(
-            user=self.employee, business=self.business, role=self.role
+        # self.employee_record = Employee.objects.create(
+        #     user=self.employee, business=self.business, role=self.employee_role
+        # )
+
+        branch = Branch.objects.create(
+            name="The other Branch",
+            business=self.business,
+            address=self.business.address,
+        )
+
+        inv = EmployeeInvitation.objects.create(
+            email=self.employee.email,
+            phone_number=self.employee.phone_number,
+            role=self.employee_role,
+            branch=branch,
+            business=self.business,
+            status="accepted",
+        )
+
+        employee_invitation_status_changed.send(
+            sender=Employee,
+            instance=inv,
+            status="accepted",
         )
 
         self.client = APIClient()
@@ -628,6 +694,9 @@ class EdgeCaseTest(APITestCase):
             password="testpass123",
             first_name="Test User",
         )
+        assign_perm(
+            "business.add_business", self.user
+        )  # Assign permission to create business
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
@@ -674,8 +743,7 @@ class EdgeCaseTest(APITestCase):
         response = self.client.get(url, {"business_id": "invalid-uuid"})
 
         # Should handle gracefully and return empty result
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()["count"], 0)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_address_list_with_invalid_business_id(self):
         """Test address list with invalid business_id"""
@@ -683,8 +751,7 @@ class EdgeCaseTest(APITestCase):
         response = self.client.get(url, {"business_id": "invalid-uuid"})
 
         # Should handle gracefully and return empty result
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 0)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class QueryParameterTest(APITestCase):
@@ -820,18 +887,32 @@ class BranchEmployeeFilterTest(APITestCase):
             name="Branch 2", business=self.business, address=self.address
         )
 
-        self.role = Role.objects.create(role_name="Employee", business=self.business)
+        self.role = Role.objects.get(
+            role_name=ROLES.EMPLOYEE.value, business=self.business
+        )
+        self.admin_role = Role.objects.get(
+            role_name=ROLES.BUSINESS_ADMIN.value, business=self.business
+        )
 
         self.client = APIClient()
 
     def test_branch_list_employee_with_specific_branch(self):
         """Test branch list for employee assigned to specific branch"""
         # Assign employee to branch1
-        Employee.objects.create(
-            user=self.other_user,
-            business=self.business,
+
+        inv = EmployeeInvitation.objects.create(
+            email=self.other_user.email,
+            phone_number=self.other_user.phone_number,
             role=self.role,
             branch=self.branch1,
+            business=self.business,
+            status="accepted",
+        )
+
+        employee_invitation_status_changed.send(
+            sender=Employee,
+            instance=inv,
+            status="accepted",
         )
 
         self.client.force_authenticate(user=self.other_user)
@@ -845,8 +926,20 @@ class BranchEmployeeFilterTest(APITestCase):
     def test_branch_list_employee_without_branch(self):
         """Test branch list for employee not assigned to any branch"""
         # Create employee without branch assignment
-        Employee.objects.create(
-            user=self.other_user, business=self.business, role=self.role, branch=None
+
+        inv = EmployeeInvitation.objects.create(
+            email=self.other_user.email,
+            phone_number=self.other_user.phone_number,
+            role=self.admin_role,
+            branch=None,
+            business=self.business,
+            status="accepted",
+        )
+
+        employee_invitation_status_changed.send(
+            sender=EmployeeInvitation,
+            instance=inv,
+            status="accepted",
         )
 
         self.client.force_authenticate(user=self.other_user)
@@ -856,3 +949,125 @@ class BranchEmployeeFilterTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Should return all branches when employee has no specific branch
         self.assertEqual(response.json()["count"], 3)
+
+
+class PermissionMixinTest(APITestCase):
+    """Test cases for permission handling"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            phone_number="912345685",
+            email="owner2@example.com",
+            password="testpass123",
+            first_name="Owner",
+        )
+
+        self.employee_user = User.objects.create_user(
+            phone_number="912345686",
+            email="employee@example.com",
+            password="testpass123",
+            first_name="Employee",
+        )
+
+        self.manager_user = User.objects.create_user(
+            phone_number="912345687",
+            email="manager@example.com",
+            password="testpass123",
+            first_name="Manager",
+        )
+
+        self.outsider_user = User.objects.create_user(
+            phone_number="912345688",
+            email="outsider@example.com",
+            password="testpass123",
+            first_name="Outsider",
+        )
+
+        # Create address and business
+        self.address = Address.objects.create(
+            lat=40.7128, lng=-74.0060, admin_1="New York", country="USA"
+        )
+
+        self.business = Business.objects.create(
+            name="Test Business",
+            owner=self.user,
+            business_type="retail",
+            address=self.address,
+        )
+
+        self.branch1 = Branch.objects.create(
+            name="The Other Branch", business=self.business, address=self.address
+        )
+
+        # Get the default roles created by signals
+        self.owner_role = Role.objects.get(
+            role_name=ROLES.OWNER.value, business=self.business
+        )
+        self.manager_role = Role.objects.get(
+            role_name=ROLES.BRANCH_MANAGER.value, business=self.business
+        )
+        self.employee_role = Role.objects.get(
+            role_name=ROLES.EMPLOYEE.value, business=self.business
+        )
+
+        manager_invitation = EmployeeInvitation.objects.create(
+            email=self.manager_user.email,
+            phone_number=self.manager_user.phone_number,
+            role=self.manager_role,
+            business=self.business,
+            branch=self.branch1,
+            status="accepted",
+        )
+
+        employee_invitation = EmployeeInvitation.objects.create(
+            email=self.employee_user.email,
+            phone_number=self.employee_user.phone_number,
+            role=self.employee_role,
+            branch=self.branch1,
+            business=self.business,
+            status="accepted",
+        )
+
+        employee_invitation_status_changed.send(
+            sender=Employee,
+            instance=manager_invitation,
+            status="accepted",
+        )
+        employee_invitation_status_changed.send(
+            sender=Employee,
+            instance=employee_invitation,
+            status="accepted",
+        )
+        self.manager_employee = Employee.objects.get(
+            user=self.manager_user,
+            business=self.business,
+            role=self.manager_role,
+            branch=self.branch1,
+        )
+
+        self.employee_employee = Employee.objects.get(
+            user=self.employee_user,
+            business=self.business,
+            role=self.employee_role,
+            branch=self.branch1,
+        )
+
+        self.client = APIClient()
+
+    def test_owner_model_permission_check(self):
+        """Test that owner role has full permissions for Business model"""
+        factory = APIRequestFactory()
+        request = factory.post("/businesses/")
+        user = self.user
+        self.assertTrue(user.has_perm("view_business", self.business))
+        self.assertTrue(user.has_perm("can_add_branch_business", self.business))
+        self.assertTrue(user.has_perm("can_add_employee_business", self.business))
+        self.assertTrue(user.has_perm("can_add_address_business", self.business))
+
+    def test_employee_model_permission_check(self):
+        """Test that employee role has full permissions for Business model"""
+        factory = APIRequestFactory()
+        request = factory.get("/businesses/")
+        request.user = self.employee_user
+        self.assertTrue(self.employee_user.has_perm("view_business", self.business))
+        self.assertTrue(self.employee_user.has_perm("view_branch", self.branch1))
