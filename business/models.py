@@ -217,7 +217,7 @@ class ROLES(enum.Enum):
 
 class Role(BaseModel):
     role_name = models.CharField(
-        max_length=255, choices=[(tag, tag.value) for tag in ROLES]
+        max_length=255, choices=[(tag.value.capitalize(), tag.value) for tag in ROLES]
     )
     permissions = models.ManyToManyField(
         Permission,

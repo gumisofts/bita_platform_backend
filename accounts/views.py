@@ -79,6 +79,7 @@ class AuthViewset(GenericViewSet):
         detail=False,
         methods=["post"],
         permission_classes=[],
+        serializer_class=RegisterSerializer,
     )
     def register(self, request):
         user = request.data
@@ -94,9 +95,10 @@ class AuthViewset(GenericViewSet):
         detail=False,
         methods=["post"],
         permission_classes=[],
+        serializer_class=LoginSerializer,
     )
     def login(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
@@ -107,9 +109,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         permission_classes=[],
         url_path="google/login",
+        serializer_class=LoginWithGoogleIdTokenSerializer,
     )
     def login_with_google(self, request):
-        serializer = LoginWithGoogleIdTokenSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
@@ -133,9 +136,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         url_path="password/reset/request",
         permission_classes=[],
+        serializer_class=ResetPasswordRequestSerializer,
     )
     def reset_request(self, request):
-        serializer = ResetPasswordRequestSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
@@ -146,9 +150,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         url_path="phone/change/request",
         permission_classes=[IsAuthenticated],
+        serializer_class=PhoneChangeRequestSerializer,
     )
     def phone_change_request(self, request):
-        serializer = PhoneChangeRequestSerializer(
+        serializer = self.get_serializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
@@ -161,9 +166,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         url_path="phone/change/confirm",
         permission_classes=[],
+        serializer_class=PhoneChangeConfirmSerializer,
     )
     def phone_change_confirm(self, request):
-        serializer = PhoneChangeConfirmSerializer(
+        serializer = self.get_serializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
@@ -176,9 +182,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         url_path="email/change/request",
         permission_classes=[IsAuthenticated],
+        serializer_class=EmailChangeRequestSerializer,
     )
     def email_change_request(self, request):
-        serializer = EmailChangeRequestSerializer(
+        serializer = self.get_serializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
@@ -191,9 +198,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         url_path="email/change/confirm",
         permission_classes=[],
+        serializer_class=EmailChangeConfirmSerializer,
     )
     def email_change_confirm(self, request):
-        serializer = EmailChangeConfirmSerializer(
+        serializer = self.get_serializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
@@ -206,9 +214,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         url_path="password/reset/confirm",
         permission_classes=[],
+        serializer_class=ConfirmResetPasswordRequestViewsetSerializer,
     )
     def confirm_reset_password_request(self, request):
-        serializer = ConfirmResetPasswordRequestViewsetSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
@@ -219,9 +228,10 @@ class AuthViewset(GenericViewSet):
         methods=["patch"],
         url_path="password/change",
         permission_classes=[IsAuthenticated],
+        serializer_class=PasswordChangeSerializer,
     )
     def password_change(self, request):
-        serializer = PasswordChangeSerializer(
+        serializer = self.get_serializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
@@ -234,9 +244,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         url_path="verifications/send",
         permission_classes=[AllowAny],
+        serializer_class=SendVerificationCodeSerializer,
     )
     def send_verification_code(self, request):
-        serializer = SendVerificationCodeSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
@@ -247,9 +258,10 @@ class AuthViewset(GenericViewSet):
         methods=["post"],
         url_path="verifications/confirm",
         permission_classes=[AllowAny],
+        serializer_class=ConfirmVerificationCodeSerializer,
     )
     def confirm_verification_code(self, request):
-        serializer = ConfirmVerificationCodeSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         headers = self.get_success_headers(serializer.data)
