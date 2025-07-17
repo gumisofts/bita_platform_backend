@@ -64,20 +64,26 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class BranchSerializer(serializers.ModelSerializer, BaseSerializerMixin):
-    current_user_role = serializers.SerializerMethodField()
+    business = serializers.PrimaryKeyRelatedField(
+        queryset=Business.objects.all(),
+        required=True,
+        allow_null=False,
+    )
 
-    def get_current_user_role(self, obj):
+    # current_user_role = serializers.SerializerMethodField()
 
-        employee = Employee.objects.filter(
-            Q(branch=obj) | Q(branch=None),
-            user=self.context.get("request").user,
-            business=obj.business,
-        ).first()
+    # def get_current_user_role(self, obj):
 
-        if not employee:
-            return None
+    #     employee = Employee.objects.filter(
+    #         Q(branch=obj) | Q(branch=None),
+    #         user=self.context.get("request").user,
+    #         business=obj.business,
+    #     ).first()
 
-        return employee.role.id if employee.role else None
+    #     if not employee:
+    #         return None
+
+    #     return employee.role.id if employee.role else None
 
     class Meta:
         model = Branch
@@ -130,11 +136,6 @@ class EmployeeSerializer(serializers.ModelSerializer, BaseSerializerMixin):
 
 
 class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMixin):
-    # email = serializers.EmailField(required=False)
-    # phone_number = serializers.CharField(required=False)
-    # role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all())
-    # branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all())
-    # business = serializers.PrimaryKeyRelatedField(queryset=Business.objects.all())
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

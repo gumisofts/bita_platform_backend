@@ -1,5 +1,6 @@
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -8,6 +9,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+from business.permissions import (
+    BranchLevelPermission,
+    BusinessLevelPermission,
+    GuardianObjectPermissions,
+)
+
 from .models import *
 from .serializers import *
 
@@ -15,9 +22,13 @@ from .serializers import *
 class ItemViewset(ModelViewSet):
     queryset = Item.objects.all()
     serializer_class = ItemSerializer
+    permission_classes = [
+        IsAuthenticated,
+        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
+    ]
 
     def get_queryset(self):
-        queryset = Item.objects.all()
+        queryset = super().get_queryset()
         category_id = self.request.query_params.get("category_id")
         if category_id:
             queryset = queryset.filter(category_id=category_id)
@@ -36,8 +47,17 @@ class ItemViewset(ModelViewSet):
             queryset = queryset.filter(make_online_available=False)
         search_term = self.request.query_params.get("search")
         if search_term:
-            pass
-            # TODO(Abeni)
+            queryset = queryset.filter(
+                Q(name__icontains=search_term)
+                | Q(sku__icontains=search_term)
+                | Q(category__name__icontains=search_term)
+                | Q(group__name__icontains=search_term)
+                | Q(itemvariant__name__icontains=search_term)
+                | Q(itemvariant__sku__icontains=search_term)
+                | Q(itemvariant__batch_number__icontains=search_term)
+                | Q(itemvariant__expire_date__icontains=search_term)
+                | Q(itemvariant__man_date__icontains=search_term)
+            )
 
         return queryset
 

@@ -163,6 +163,18 @@ class BranchViewset(ModelViewSet):
 
         return queryset.order_by("created_at")
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="business_id",
+                type=OpenApiTypes.UUID,
+                description="Filter by business ID",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
 
 class IndustryViewset(ListModelMixin, GenericViewSet):
     serializer_class = IndustrySerializer
@@ -189,21 +201,22 @@ class EmployeeViewset(ModelViewSet):
         user = self.request.user
         business_id = self.request.query_params.get("business_id")
 
-        if business_id and is_valid_uuid(business_id):
-            try:
-                # Check if user has access to the business
-                user_business = Business.objects.filter(
-                    Q(owner=user) | Q(employees__user=user), id=business_id
-                ).first()
+        if not business_id or not is_valid_uuid(business_id):
+            raise ValidationError({"detail": "Empty or invalid business_id"})
 
-                if user_business:
-                    queryset = queryset.filter(business=business_id)
-                else:
-                    queryset = queryset.none()
-            except ValueError:
-                queryset = queryset.none()
-        else:
-            queryset = queryset.none()
+        queryset = get_objects_for_user(user, "view_employee", queryset)
+
+        queryset = queryset.filter(business=business_id)
+
+        business = get_objects_for_user(
+            user,
+            "can_view_employee_business",
+            Business.objects.filter(id=business_id),
+            accept_global_perms=False,
+        ).first()
+
+        if business:
+            queryset = queryset | business.employees.all()
 
         return queryset
 
@@ -245,15 +258,12 @@ class EmployeeInvitationViewset(ModelViewSet):
             permission_classes = [EmployeeInvitationPermission]
         return [permission() for permission in permission_classes]
 
-    def get_serializer_class(self):
-        """
-        Return the class to use for the serializer.
-        """
-        if self.action == "update_status":
-            return EmployeeInvitationStatusSerializer
-        return EmployeeInvitationSerializer
-
-    @action(detail=False, methods=["get"], url_path="mine")
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="mine",
+        serializer_class=EmployeeInvitationSerializer,
+    )
     def mine(self, request):
         """
         List pending invitations for the current user.
@@ -271,7 +281,12 @@ class EmployeeInvitationViewset(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=["patch"], url_path="status")
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path="status",
+        serializer_class=EmployeeInvitationStatusSerializer,
+    )
     def update_status(self, request, pk=None):
         """
         Update the status of an employee invitation.
@@ -300,11 +315,6 @@ class EmployeeInvitationViewset(ModelViewSet):
         serializer = self.get_serializer(invitation, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            employee_invitation_status_changed.send(
-                sender=EmployeeInvitation,
-                instance=invitation,
-                status=serializer.validated_data.get("status"),
-            )
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -453,6 +463,20 @@ class EmployeeInvitationViewset(ModelViewSet):
 class BusinessPermissionViewset(GenericViewSet, ListModelMixin):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="business_id",
+                type=OpenApiTypes.UUID,
+                description="Filter by business ID",
+            ),
+            OpenApiParameter(
+                name="branch_id",
+                type=OpenApiTypes.UUID,
+                description="Filter by branch ID",
+            ),
+        ]
+    )
     def list(self, request):
 
         user = self.request.user

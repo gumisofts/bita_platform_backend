@@ -13,24 +13,6 @@ from .roles import *
 employee_invitation_status_changed = Signal()
 
 
-@receiver(pre_save, sender=User)
-def on_user_created(sender, instance, **kwargs):
-
-    if kwargs.get("send_verification"):
-        pass
-    # Send verification Token Here
-
-
-@receiver(post_save, sender=Employee)
-def on_employee_created(sender, instance, created, **kwargs):
-    if created:
-        # Send verification Token Here
-        pass
-    else:
-        # Update verification Token Here
-        pass
-
-
 @receiver(post_save, sender=Business)
 def on_business_created(sender, instance, created, **kwargs):
     if created:
@@ -73,21 +55,10 @@ def on_business_created(sender, instance, created, **kwargs):
         PermissionManager().assign_owner_permissions(instance.owner, instance)
 
 
-@receiver(post_save, sender=EmployeeInvitation)
-def on_employee_invitation_created(sender, instance, created, **kwargs):
-    if created:
-        # Send Invitation Email Here
-        if instance.email:
-            # Send Invitation Email Here
-            pass
-        elif instance.phone_number:
-            # Send Invitation SMS Here
-            pass
-
-
 @receiver(employee_invitation_status_changed)
 def on_employee_invitation_status_changed(sender, instance, status, **kwargs):
     # Send Invitation Email Here
+    print(instance, status)
 
     if status == "accepted":
         user = User.objects.filter(

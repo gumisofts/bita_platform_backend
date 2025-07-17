@@ -307,7 +307,32 @@ class BusinessLevelPermission(BasePermission):
         This method is used to get the binding object for the permission check.
         It can be overridden in subclasses to provide custom logic.
         """
+        if request.method != "GET":
+            if request.business:
+                return request.business
+
+            business = request.data.get("business")
+            if not business:
+                business = request.data.get("business_id")
+            if business:
+                request.business = Business.objects.filter(id=business).first()
+                return request.business
+
         return request.business if hasattr(request, "business") else None
+
+    def has_permission(self, request, view):
+        user = request.user
+        model_cls = view.queryset.model
+        if request.method == "POST":
+            business = request.data.get("business")
+            if not business:
+                business = request.data.get("business_id")
+            if business:
+                request.business = Business.objects.filter(id=business).first()
+                perms = self.get_required_object_permissions(request.method, model_cls)
+                return user.has_perms(perms, request.business)
+
+        return super().has_permission(request, view)
 
     def has_object_permission(self, request, view, obj):
         # authentication checks have already executed via has_permission
