@@ -111,7 +111,7 @@ class AddressViewset(ModelViewSet):
         ).distinct()
 
 
-class CategoryViewset(ListModelMixin, GenericViewSet):
+class CategoryViewset(ListModelMixin, RetrieveModelMixin, GenericViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
