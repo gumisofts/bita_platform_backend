@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "crms",
     "financials",
     "markets",
+    "chat",
 ]
 
 MIDDLEWARE = [
