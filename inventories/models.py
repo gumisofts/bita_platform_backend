@@ -109,6 +109,20 @@ class Supplier(BaseModel):
 class Supply(BaseModel):
     label = models.CharField(max_length=255)
     branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.CASCADE,
+        related_name="supplies",
+        null=True,
+        blank=True,
+    )
+    payment_method = models.ForeignKey(
+        "financials.PaymentMethod",
+        on_delete=models.CASCADE,
+        related_name="supplies",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         unique_together = ("label", "branch")
@@ -120,7 +134,14 @@ class Supply(BaseModel):
 class SuppliedItem(BaseModel):
     quantity = models.PositiveIntegerField()
     item = models.ForeignKey(
-        Item, related_name="supplied_items", on_delete=models.CASCADE
+        Item,
+        related_name="supplied_items",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    variant = models.ForeignKey(
+        ItemVariant, related_name="supplied_items", on_delete=models.CASCADE
     )
     purchase_price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
@@ -130,12 +151,6 @@ class SuppliedItem(BaseModel):
     expire_date = models.DateField(null=True, blank=True)
     man_date = models.DateField(null=True, blank=True)
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
-    supplier = models.ForeignKey(
-        Supplier,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
     supply = models.ForeignKey(
         Supply, on_delete=models.CASCADE, related_name="supplied_items"
     )

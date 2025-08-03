@@ -172,7 +172,6 @@ try:
         list_display = [
             "id",
             "item_name",
-            "supplier_info",
             "purchase_price",
             "quantity",
             "created_at",
@@ -180,7 +179,7 @@ try:
         list_filter = ["created_at", "item__business"]
         search_fields = ["item__name", "supplier__name", "supplier__email"]
         readonly_fields = ["id", "created_at", "updated_at"]
-        raw_id_fields = ["item", "supplier", "supply"]
+        raw_id_fields = ["item", "supply"]
 
         fieldsets = (
             (None, {"fields": ("id", "item", "purchase_price", "quantity")}),
@@ -212,13 +211,6 @@ try:
             return obj.item.name if obj.item else "-"
 
         item_name.short_description = "Item"
-
-        def supplier_info(self, obj):
-            if obj.supplier:
-                return f"{obj.supplier.name} ({obj.supplier.email})"
-            return "-"
-
-        supplier_info.short_description = "Supplier"
 
 except ImportError:
     # SuppliedItem model doesn't exist
