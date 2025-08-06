@@ -167,3 +167,4 @@ staticfiles/**
 *.env.*
 nogit/
 env/
+nogit/

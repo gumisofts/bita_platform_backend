@@ -34,20 +34,20 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'  
+          python-version: '3.12'
 
       - name: Install Dependencies
         run: pip install -r requirements.txt
         shell: bash
       - name: Create Directory
         run: |
-            mkdir schema 
+            mkdir schema
             mkdir schema/build
 
       - name: Generate Schema File
         run: python manage.py spectacular --color --file schema/index.yaml
 
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:

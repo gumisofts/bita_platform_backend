@@ -2,23 +2,25 @@ from django.contrib.postgres.search import TrigramSimilarity
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
+
+from business.models import AdditionalBusinessPermissionNames, Business
 from business.permissions import (
     BranchLevelPermission,
     BusinessLevelPermission,
     GuardianObjectPermissions,
 )
 
+from .filters import GroupFilter, ItemFilter, ItemVariantFilter
 from .models import *
 from .serializers import *
-from .filters import ItemFilter, ItemVariantFilter, GroupFilter
-from business.models import AdditionalBusinessPermissionNames, Business
+
 
 class ItemViewset(ModelViewSet):
     queryset = Item.objects.all()
@@ -31,10 +33,16 @@ class ItemViewset(ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        
-        if self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0]+"_business",self.request.business):
+
+        if self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0] + "_business",
+            self.request.business,
+        ):
             queryset = queryset.filter(business=self.request.business)
-        elif self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0]+"_branch",self.request.branch):
+        elif self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0] + "_branch",
+            self.request.branch,
+        ):
             queryset = queryset.filter(branch=self.request.branch)
         else:
             queryset = queryset.none()
@@ -43,7 +51,10 @@ class ItemViewset(ModelViewSet):
 
 class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
     serializer_class = SupplySerializer
-    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
+    permission_classes = [
+        IsAuthenticated,
+        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
+    ]
     queryset = Supply.objects.all()
 
     def get_queryset(self):
@@ -56,7 +67,10 @@ class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
 
 class SupplyItemViewset(CreateModelMixin, GenericViewSet):
     serializer_class = SuppliedItemSerializer
-    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
+    permission_classes = [
+        IsAuthenticated,
+        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
+    ]
     queryset = SuppliedItem.objects.all()
 
     def get_queryset(self):
@@ -70,7 +84,10 @@ class SupplyItemViewset(CreateModelMixin, GenericViewSet):
 class PricingViewset(ModelViewSet):
     queryset = Pricing.objects.all()
     serializer_class = PricingSerializer
-    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
+    permission_classes = [
+        IsAuthenticated,
+        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
+    ]
 
     def get_queryset(self):
         queryset = self.queryset
@@ -83,14 +100,23 @@ class PricingViewset(ModelViewSet):
 class GroupViewset(ModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
-    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
+    permission_classes = [
+        IsAuthenticated,
+        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
+    ]
     filterset_class = GroupFilter
 
     def get_queryset(self):
         queryset = self.queryset
-        if self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_GROUP.value[0]+"_business",self.request.business):
+        if self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_GROUP.value[0] + "_business",
+            self.request.business,
+        ):
             queryset = queryset.filter(business=self.request.business)
-        elif self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_GROUP.value[0]+"_branch",self.request.branch):
+        elif self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_GROUP.value[0] + "_branch",
+            self.request.branch,
+        ):
             queryset = queryset.filter(branch=self.request.branch)
         else:
             queryset = queryset.none()
@@ -100,19 +126,30 @@ class GroupViewset(ModelViewSet):
 class ItemVariantViewset(ModelViewSet):
     queryset = ItemVariant.objects.all()
     serializer_class = ItemVariantSerializer
-    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
+    permission_classes = [
+        IsAuthenticated,
+        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
+    ]
     filterset_class = ItemVariantFilter
+
     def get_queryset(self):
         queryset = self.queryset
-   
-        if self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]+"_business",self.request.business):
+
+        if self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]
+            + "_business",
+            self.request.business,
+        ):
             queryset = queryset.filter(item__business=self.request.business)
-        elif self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]+"_branch",self.request.branch):
+        elif self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]
+            + "_branch",
+            self.request.branch,
+        ):
             queryset = queryset.filter(branch=self.request.branch)
         else:
             queryset = queryset.none()
-            
-            
+
         return queryset
 
 
