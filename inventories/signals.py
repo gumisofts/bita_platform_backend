@@ -8,6 +8,5 @@ from inventories.models import Item, ItemVariant, SuppliedItem
 @receiver(post_save, sender=SuppliedItem)
 def create_stock_movement(sender, instance, created, **kwargs):
     if created:
-        instance.variant.stock += instance.quantity
-
+        instance.variant.quantity += instance.quantity
         instance.variant.save()

@@ -46,6 +46,7 @@ class Item(BaseModel):
     )
     inventory_unit = models.CharField(max_length=255)
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
+    branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
@@ -58,7 +59,6 @@ class ItemVariant(BaseModel):
     selling_price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
     )
-    batch_number = models.CharField(max_length=255)
     sku = models.CharField(max_length=255, unique=True)
     expire_date = models.DateField(null=True, blank=True)
     man_date = models.DateField(null=True, blank=True)

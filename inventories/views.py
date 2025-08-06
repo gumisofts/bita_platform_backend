@@ -8,7 +8,7 @@ from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveMode
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-
+from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
 from business.permissions import (
     BranchLevelPermission,
     BusinessLevelPermission,
@@ -17,7 +17,8 @@ from business.permissions import (
 
 from .models import *
 from .serializers import *
-
+from .filters import ItemFilter, ItemVariantFilter, GroupFilter
+from business.models import AdditionalBusinessPermissionNames, Business
 
 class ItemViewset(ModelViewSet):
     queryset = Item.objects.all()
@@ -26,45 +27,23 @@ class ItemViewset(ModelViewSet):
         IsAuthenticated,
         GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
     ]
+    filterset_class = ItemFilter
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        category_id = self.request.query_params.get("category_id")
-        if category_id:
-            queryset = queryset.filter(category_id=category_id)
-        business_id = self.request.query_params.get("business_id")
-        if business_id:
-            queryset = queryset.filter(business_id=business_id)
-        returnable = self.request.query_params.get("returnable")
-        if returnable and returnable.lower() == "true":
-            queryset = queryset.filter(is_returnable=True)
-        elif returnable and returnable.lower() == "false":
-            queryset = queryset.filter(is_returnable=False)
-        online = self.request.query_params.get("online")
-        if online and online.lower() == "true":
-            queryset = queryset.filter(make_online_available=True)
-        elif online and online.lower() == "false":
-            queryset = queryset.filter(make_online_available=False)
-        search_term = self.request.query_params.get("search")
-        if search_term:
-            queryset = queryset.filter(
-                Q(name__icontains=search_term)
-                | Q(sku__icontains=search_term)
-                | Q(category__name__icontains=search_term)
-                | Q(group__name__icontains=search_term)
-                | Q(itemvariant__name__icontains=search_term)
-                | Q(itemvariant__sku__icontains=search_term)
-                | Q(itemvariant__batch_number__icontains=search_term)
-                | Q(itemvariant__expire_date__icontains=search_term)
-                | Q(itemvariant__man_date__icontains=search_term)
-            )
-
+        
+        if self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0]+"_business",self.request.business):
+            queryset = queryset.filter(business=self.request.business)
+        elif self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0]+"_branch",self.request.branch):
+            queryset = queryset.filter(branch=self.request.branch)
+        else:
+            queryset = queryset.none()
         return queryset
 
 
 class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
     serializer_class = SupplySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
     queryset = Supply.objects.all()
 
     def get_queryset(self):
@@ -77,7 +56,7 @@ class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
 
 class SupplyItemViewset(CreateModelMixin, GenericViewSet):
     serializer_class = SuppliedItemSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
     queryset = SuppliedItem.objects.all()
 
     def get_queryset(self):
@@ -91,7 +70,7 @@ class SupplyItemViewset(CreateModelMixin, GenericViewSet):
 class PricingViewset(ModelViewSet):
     queryset = Pricing.objects.all()
     serializer_class = PricingSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
 
     def get_queryset(self):
         queryset = self.queryset
@@ -104,69 +83,36 @@ class PricingViewset(ModelViewSet):
 class GroupViewset(ModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
+    filterset_class = GroupFilter
 
     def get_queryset(self):
         queryset = self.queryset
-        item_id = self.request.query_params.get("item_id")
-        business_id = self.request.query_params.get("business_id")
-
-        name = self.request.query_params.get("name")
-
-        if name:
-            queryset = queryset.filter(name__icontains=name)
-        if business_id:
-            queryset = queryset.filter(business=business_id)
-        if item_id:
-            queryset = queryset.filter(item=item_id)
+        if self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_GROUP.value[0]+"_business",self.request.business):
+            queryset = queryset.filter(business=self.request.business)
+        elif self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_GROUP.value[0]+"_branch",self.request.branch):
+            queryset = queryset.filter(branch=self.request.branch)
+        else:
+            queryset = queryset.none()
         return queryset
 
 
 class ItemVariantViewset(ModelViewSet):
     queryset = ItemVariant.objects.all()
     serializer_class = ItemVariantSerializer
-    permission_classes = [IsAuthenticated]
-
+    permission_classes = [IsAuthenticated, GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission]
+    filterset_class = ItemVariantFilter
     def get_queryset(self):
         queryset = self.queryset
-        item_id = self.request.query_params.get("item_id")
-        business_id = self.request.query_params.get("business_id")
-        name = self.request.query_params.get("name")
-
-        price_from = self.request.query_params.get("price_from")
-        price_to = self.request.query_params.get("price_to")
-        batch_number = self.request.query_params.get("batch_number")
-        sku = self.request.query_params.get("sku")
-        expire_date_from = self.request.query_params.get("expire_date_from")
-        expire_date_to = self.request.query_params.get("expire_date_to")
-        man_date_from = self.request.query_params.get("man_date_from")
-        man_date_to = self.request.query_params.get("man_date_to")
-
-        if price_from:
-            queryset = queryset.filter(selling_price__gte=price_from)
-        if price_to:
-            queryset = queryset.filter(selling_price__lte=price_to)
-        if expire_date_from:
-            queryset = queryset.filter(expire_date__gte=expire_date_from)
-        if expire_date_to:
-            queryset = queryset.filter(expire_date__lte=expire_date_to)
-        if man_date_from:
-            queryset = queryset.filter(man_date__gte=man_date_from)
-        if man_date_to:
-            queryset = queryset.filter(man_date__lte=man_date_to)
-        if batch_number:
-            queryset = queryset.filter(batch_number__icontains=batch_number)
-        if sku:
-            queryset = queryset.filter(sku__icontains=sku)
-
-        if name:
-            queryset = queryset.filter(name__icontains=name)
-
-        if business_id:
-            queryset = queryset.filter(item__business=business_id)
-
-        if item_id:
-            queryset = queryset.filter(item=item_id)
+   
+        if self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]+"_business",self.request.business):
+            queryset = queryset.filter(item__business=self.request.business)
+        elif self.request.user.has_perm(AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]+"_branch",self.request.branch):
+            queryset = queryset.filter(branch=self.request.branch)
+        else:
+            queryset = queryset.none()
+            
+            
         return queryset
 
 

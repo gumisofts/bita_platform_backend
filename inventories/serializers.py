@@ -3,7 +3,7 @@ from rest_framework import serializers
 from inventories.models import *
 
 from .models import Item
-
+from business.models import Branch
 # Category, Store, Supply, Location, StockMovement, ReturnRecall, ItemImage, SupplyReservation
 
 

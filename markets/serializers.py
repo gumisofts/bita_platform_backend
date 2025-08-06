@@ -96,7 +96,6 @@ class MarketplaceItemVariantSerializer(serializers.ModelSerializer):
             "selling_price",
             "quantity",
             "sku",
-            "batch_number",
             "expire_date",
             "man_date",
             "is_default",
