@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             model_name="item",
             name="branch",
             field=models.ForeignKey(
-                default="f0c5ed02-ccce-4665-93a1-73c4295e5c1a",
+                default="9b28e884-c273-4122-a40d-75fc2befc153",
                 on_delete=django.db.models.deletion.CASCADE,
                 to="business.branch",
             ),
