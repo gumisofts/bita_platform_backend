@@ -250,6 +250,7 @@ class InventoryMovementItem(BaseModel):
     movement = models.ForeignKey(
         InventoryMovement, on_delete=models.CASCADE, related_name="movement_items"
     )
+    variant = models.ForeignKey(ItemVariant, on_delete=models.CASCADE)
     supplied_item = models.ForeignKey(SuppliedItem, on_delete=models.CASCADE)
     quantity_requested = models.PositiveIntegerField()
     quantity_shipped = models.PositiveIntegerField(default=0)

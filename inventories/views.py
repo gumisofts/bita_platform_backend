@@ -315,7 +315,7 @@ class InventoryMovementViewSet(ModelViewSet):
                         expire_date=movement_item.supplied_item.expire_date,
                         man_date=movement_item.supplied_item.man_date,
                         business=movement.business,
-                        supplier=movement_item.supplied_item.supplier,
+                        variant=movement_item.variant,
                     )
 
             movement.status = "received"

@@ -33,6 +33,8 @@ class ItemViewSetTest(APITestCase):
             name="Test Group", description="Test Desc", business=self.business
         )
         self.category = Category.objects.create(name="Test Category")
+        
+        self.branch = Branch.objects.get(business=self.business)
 
         self.item = Item.objects.create(
             name="Test Item",
@@ -41,12 +43,13 @@ class ItemViewSetTest(APITestCase):
             min_selling_quota=1,
             inventory_unit="pcs",
             business=self.business,
+            branch=self.branch,
         )
         self.item.categories.add(self.category)
 
     def test_list_items(self):
         url = reverse("items-list")  # assuming router is registered
-        response = self.client.get(url)
+        response = self.client.get(url+"?business_id="+str(self.business.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
 
@@ -59,8 +62,9 @@ class ItemViewSetTest(APITestCase):
             "min_selling_quota": 1,
             "inventory_unit": "box",
             "business": str(self.business.id),
+            "branch": str(self.branch.id),
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url+"?business_id="+str(self.business.id), data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Item.objects.count(), 2)
 
@@ -127,6 +131,15 @@ class SuppliedItemViewSetTest(APITestCase):
             description="desc",
             inventory_unit="pcs",
             business=self.business,
+            branch=self.branch,
+        )
+        self.variant = ItemVariant.objects.create(
+            item=self.item,
+            name="Variant A",
+            quantity=10,
+            selling_price=20,
+            sku="SKU123",
+            notify_below=5,
         )
 
         self.supplied_item = SuppliedItem.objects.create(
@@ -137,6 +150,7 @@ class SuppliedItemViewSetTest(APITestCase):
             product_number="PROD001",
             business=self.business,
             supply=self.supply,
+            variant=self.variant,
         )
 
     def test_create_supplied_item(self):
@@ -149,6 +163,7 @@ class SuppliedItemViewSetTest(APITestCase):
             "product_number": "PROD002",
             "business": str(self.business.id),
             "supply": str(self.supply.id),
+            "variant": str(self.variant.id),
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -173,18 +188,19 @@ class PricingViewSetTest(APITestCase):
         self.business = Business.objects.create(
             name="Pricing Business", owner=self.user
         )
+        self.branch = Branch.objects.create(name="Branch", business=self.business)
         self.item = Item.objects.create(
             name="Item for Pricing",
             description="desc",
             inventory_unit="pcs",
             business=self.business,
+            branch=self.branch,
         )
         self.variant = ItemVariant.objects.create(
             item=self.item,
             name="Variant A",
             quantity=10,
             selling_price=20,
-            batch_number="B123",
             sku="SKU123",
             notify_below=5,
         )
@@ -197,7 +213,7 @@ class PricingViewSetTest(APITestCase):
 
     def test_list_pricings(self):
         url = reverse("pricings-list")
-        response = self.client.get(url)
+        response = self.client.get(url+"?business_id="+str(self.business.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
 
@@ -207,6 +223,7 @@ class PricingViewSetTest(APITestCase):
             "price": 200,
             "item_variant": str(self.variant.id),
             "min_selling_quota": 2,
+            "branch": str(self.branch.id),
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -236,7 +253,7 @@ class GroupViewSetTest(APITestCase):
 
     def test_list_groups(self):
         url = reverse("groups-list")
-        response = self.client.get(url)
+        response = self.client.get(url+"?business_id="+str(self.business.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
 
@@ -261,11 +278,13 @@ class ItemVariantViewSetTest(APITestCase):
         self.business = Business.objects.create(
             name="Variant Business", owner=self.user
         )
+        self.branch = Branch.objects.create(name="Branch", business=self.business)
         self.item = Item.objects.create(
             name="Variant Item",
             description="desc",
             inventory_unit="pcs",
             business=self.business,
+            branch=self.branch,
         )
 
         self.variant = ItemVariant.objects.create(
@@ -273,14 +292,13 @@ class ItemVariantViewSetTest(APITestCase):
             name="Variant 1",
             quantity=5,
             selling_price=100,
-            batch_number="VARBATCH001",
             sku="VARSKU001",
             notify_below=1,
         )
 
     def test_list_variants(self):
         url = reverse("item-variants-list")
-        response = self.client.get(url)
+        response = self.client.get(url+"?business_id="+str(self.business.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
 
@@ -301,7 +319,7 @@ class ItemVariantViewSetTest(APITestCase):
 
     def test_filter_variants_by_item(self):
         url = reverse("item-variants-list")
-        response = self.client.get(url, {"item_id": self.item.id})
+        response = self.client.get(url+"?business_id="+str(self.business.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
 
@@ -334,8 +352,16 @@ class InventoryMovementTest(APITestCase):
             description="Test Description",
             inventory_unit="pcs",
             business=self.business,
+            branch=self.branch_a,
         )
-
+        self.variant = ItemVariant.objects.create(
+            item=self.item,
+            name="Variant A",
+            quantity=10,
+            selling_price=20,
+            sku="SKU123",
+            notify_below=5,
+        )
         self.supplied_item = SuppliedItem.objects.create(
             quantity=100,
             item=self.item,
@@ -344,6 +370,7 @@ class InventoryMovementTest(APITestCase):
             product_number="PROD001",
             business=self.business,
             supply=self.supply_a,
+            variant=self.variant,
         )
 
     def test_create_inventory_movement(self):
@@ -358,6 +385,7 @@ class InventoryMovementTest(APITestCase):
                     "supplied_item_id": str(self.supplied_item.id),
                     "quantity": 10,
                     "notes": "Test item movement",
+                    "variant": str(self.variant.id),
                 }
             ],
         }
@@ -410,7 +438,7 @@ class InventoryMovementTest(APITestCase):
         )
 
         movement_item = InventoryMovementItem.objects.create(
-            movement=movement, supplied_item=self.supplied_item, quantity_requested=10
+            movement=movement, supplied_item=self.supplied_item, quantity_requested=10, variant=self.variant
         )
 
         original_quantity = self.supplied_item.quantity
@@ -452,6 +480,7 @@ class InventoryMovementTest(APITestCase):
             supplied_item=self.supplied_item,
             quantity_requested=10,
             quantity_shipped=10,
+            variant=self.variant
         )
 
         url = reverse("inventory-movements-receive", kwargs={"pk": movement.id})
