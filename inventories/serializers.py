@@ -206,7 +206,7 @@ class InventoryMovementCreateSerializer(serializers.ModelSerializer):
                     supplied_item=supplied_item,
                     quantity_requested=item_data["quantity"],
                     notes=item_data.get("notes", ""),
-                    variant_id=item_data.get("variant", None)
+                    variant_id=item_data.get("variant", None),
                 )
             except SuppliedItem.DoesNotExist:
                 raise serializers.ValidationError(
