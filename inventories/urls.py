@@ -3,7 +3,9 @@ from rest_framework.routers import DefaultRouter
 from inventories.views import *
 
 router = DefaultRouter()
-router.register(r"items/variants/properties", PropertyViewset, basename="item-variants-properties")
+router.register(
+    r"items/variants/properties", PropertyViewset, basename="item-variants-properties"
+)
 router.register(r"items/variants", ItemVariantViewset, basename="item-variants")
 router.register(r"items", ItemViewset, basename="items")
 router.register(r"suppliers", SupplierViewset, basename="suppliers")

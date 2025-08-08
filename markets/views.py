@@ -34,7 +34,7 @@ class MarketplaceProductViewSet(ReadOnlyModelViewSet):
         .prefetch_related(
             "item__categories", "properties", "pricings", "item__itemimage_set"
         )
-        .filter() # TODO: add filters
+        .filter()  # TODO: add filters
     )
 
     permission_classes = [AllowAny]
