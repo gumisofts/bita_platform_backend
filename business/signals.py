@@ -45,14 +45,14 @@ def on_business_created(sender, instance, created, **kwargs):
                 business=instance,
             )
 
-        # Create Owner Employee
-        Employee.objects.create(
-            user=instance.owner,
-            business=instance,
-            role=owner,
-            branch=None,
-        )
-        PermissionManager().assign_owner_permissions(instance.owner, instance)
+            # Create Owner Employee
+            Employee.objects.create(
+                user=instance.owner,
+                business=instance,
+                role=owner,
+                branch=None,
+            )
+            PermissionManager().assign_owner_permissions(instance.owner, instance)
 
 
 @receiver(employee_invitation_status_changed)

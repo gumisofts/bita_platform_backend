@@ -208,16 +208,20 @@ class Business(BaseModel):
         ]
 
 
-class ROLES(enum.Enum):
-    OWNER = "Owner"
-    EMPLOYEE = "Employee"
-    BUSINESS_ADMIN = "Business Admin"
-    BRANCH_MANAGER = "Branch Manager"
+class ROLES(str,enum.Enum):
+    OWNER = "owner"
+    EMPLOYEE = "employee"
+    BUSINESS_ADMIN = "business_admin"
+    BRANCH_MANAGER = "branch_manager"
+    
+    @classmethod
+    def choices(cls):
+        return [( role.value," ".join(role.value.split("_")).capitalize()) for role in cls]
 
 
 class Role(BaseModel):
     role_name = models.CharField(
-        max_length=255, choices=[(tag.value.capitalize(), tag.value) for tag in ROLES]
+        max_length=255, choices=ROLES.choices()
     )
     permissions = models.ManyToManyField(
         Permission,

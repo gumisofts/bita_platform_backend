@@ -11,13 +11,19 @@ class BusinessContextMiddleWare:
 
     def __call__(self, request):
         # Set the business context based on the request
-        business_id = request.GET.get("business_id")
-        branch_id = request.GET.get("branch_id")
+        business_id = request.GET.get("business")
+        branch_id = request.GET.get("branch")
+        if not business_id:
+            business_id = request.GET.get("business_id")
+        if not branch_id:
+            branch_id = request.GET.get("branch_id")
+            
         if business_id:
             try:
                 request.business = Business.objects.get(id=business_id)
             except:
                 request.business = None
+            
         else:
             request.business = None
 
