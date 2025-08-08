@@ -5,7 +5,7 @@ from django.utils import timezone
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin,DestroyModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -17,7 +17,7 @@ from business.permissions import (
     GuardianObjectPermissions,
 )
 
-from .filters import GroupFilter, ItemFilter, ItemVariantFilter
+from .filters import GroupFilter, ItemFilter, ItemVariantFilter, SupplierFilter
 from .models import *
 from .serializers import *
 
@@ -64,6 +64,19 @@ class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
             queryset = queryset.filter(branch__business=business_id)
         return queryset
 
+class SupplierViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
+    serializer_class = SupplierSerializer
+    permission_classes = [
+        IsAuthenticated,
+        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
+    ]
+    queryset = Supplier.objects.all()
+    filterset_class = SupplierFilter
+
+    def get_queryset(self):
+        queryset = self.queryset
+        return queryset.filter(business=self.request.business)
+
 
 class SupplyItemViewset(CreateModelMixin, GenericViewSet):
     serializer_class = SuppliedItemSerializer
@@ -81,20 +94,16 @@ class SupplyItemViewset(CreateModelMixin, GenericViewSet):
         return queryset
 
 
-class PricingViewset(ModelViewSet):
-    queryset = Pricing.objects.all()
+class PricingViewset(CreateModelMixin,DestroyModelMixin,UpdateModelMixin, GenericViewSet):
+    queryset = ItemVariant.objects.all() # Leave here to check for variant permission checks on business and branch level
     serializer_class = PricingSerializer
     permission_classes = [
         IsAuthenticated,
-        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
+         BusinessLevelPermission | BranchLevelPermission,
     ]
 
     def get_queryset(self):
-        queryset = self.queryset
-        variant_id = self.request.query_params.get("variant_id")
-        if variant_id:
-            queryset = queryset.filter(item_variant=variant_id)
-        return queryset
+        return Pricing.objects.all()
 
 
 class GroupViewset(ModelViewSet):
@@ -151,6 +160,14 @@ class ItemVariantViewset(ModelViewSet):
             queryset = queryset.none()
 
         return queryset
+
+class PropertyViewset(CreateModelMixin,DestroyModelMixin,UpdateModelMixin, GenericViewSet):
+    queryset = ItemVariant.objects.all() # Leave here to check for variant permission checks on business and branch level
+    serializer_class = PropertySerializer
+    permission_classes = [IsAuthenticated, BusinessLevelPermission | BranchLevelPermission ]
+    def get_queryset(self):
+        return Property.objects.all()
+    
 
 
 class InventoryMovementViewSet(ModelViewSet):

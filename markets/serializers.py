@@ -96,13 +96,7 @@ class MarketplaceItemVariantSerializer(serializers.ModelSerializer):
             "selling_price",
             "quantity",
             "sku",
-            "expire_date",
-            "man_date",
             "is_default",
-            "is_returnable",
-            "is_visible_online",
-            "receive_online_orders",
-            "notify_below",
             "created_at",
             "updated_at",
             # Item fields
@@ -183,7 +177,6 @@ class MarketplaceItemVariantListSerializer(MarketplaceItemVariantSerializer):
             "is_in_stock",
             "stock_status",
             "discount_percentage",
-            "is_available_online",
             "created_at",
         ]
 

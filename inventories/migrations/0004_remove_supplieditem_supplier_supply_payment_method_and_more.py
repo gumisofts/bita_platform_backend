@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("financials", "0002_alter_businesspaymentmethod_options_and_more"),
+        ("finances", "0002_alter_businesspaymentmethod_options_and_more"),
         ("inventories", "0003_supplieditem_variant_alter_supplieditem_item"),
     ]
 
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 null=True,
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="supplies",
-                to="financials.paymentmethod",
+                to="finances.paymentmethod",
             ),
         ),
         migrations.AddField(

@@ -14,6 +14,12 @@ class ItemSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class PropertySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Property
+        exclude = []
+        read_only_fields = ["id", "created_at", "updated_at"]
+
 class SuppliedItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = SuppliedItem
@@ -67,10 +73,48 @@ class GroupSerializer(serializers.ModelSerializer):
 
 
 class ItemVariantSerializer(serializers.ModelSerializer):
+    
+    class PricingSerializer(serializers.ModelSerializer):
+        
+        class Meta:
+            model = Pricing
+            exclude = ["item_variant"]
+            read_only_fields = ["id", "created_at", "updated_at"]
+            
+    class PropertySerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Property
+            exclude = ["item_variant"]
+            read_only_fields = ["id", "created_at", "updated_at"]
+            
     class Meta:
         model = ItemVariant
         exclude = []
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id","selling_price", "created_at", "updated_at"]
+    properties = PropertySerializer(many=True,required=False)
+    pricings = PricingSerializer(many=True,required=False)
+        
+    def create(self, validated_data):
+        properties = validated_data.pop("properties", [])
+        pricings = validated_data.pop("pricings", [])
+        instance = super().create(validated_data)
+        for property in properties:
+            Property.objects.create(item_variant=instance, **property)
+        for pricing in pricings:
+            Pricing.objects.create(item_variant=instance, **pricing)
+        return instance
+    
+    def update(self, instance, validated_data):
+        properties = validated_data.pop("properties", [])
+        pricings = validated_data.pop("pricings", [])
+        instance = super().update(instance, validated_data)
+        Property.objects.filter(item_variant=instance).delete()
+        Pricing.objects.filter(item_variant=instance).delete()
+        for property in properties:
+            Property.objects.create(item_variant=instance, **property)
+        for pricing in pricings:
+            Pricing.objects.create(item_variant=instance, **pricing)
+        return instance
 
 
 class InventoryMovementItemSerializer(serializers.ModelSerializer):
@@ -214,3 +258,10 @@ class InventoryMovementCreateSerializer(serializers.ModelSerializer):
                 )
 
         return movement
+
+
+class SupplierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Supplier
+        exclude = []
+        read_only_fields = ["id", "created_at", "updated_at"]

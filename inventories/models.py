@@ -47,6 +47,12 @@ class Item(BaseModel):
     inventory_unit = models.CharField(max_length=255)
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=0)
+    notify_below = models.PositiveIntegerField(default=1)
+    receive_online_orders = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    is_returnable = models.BooleanField(default=False)
+    is_visible_online = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -55,18 +61,12 @@ class Item(BaseModel):
 class ItemVariant(BaseModel):
     item = models.ForeignKey(Item, related_name="variants", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
-    quantity = models.PositiveIntegerField()
     selling_price = models.DecimalField(
-        max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
+        max_digits=12, decimal_places=2, validators=[MinValueValidator(1)], null=True, blank=True
     )
+    quantity = models.PositiveIntegerField(default=0)
     sku = models.CharField(max_length=255, unique=True)
-    expire_date = models.DateField(null=True, blank=True)
-    man_date = models.DateField(null=True, blank=True)
     is_default = models.BooleanField(default=False)
-    is_returnable = models.BooleanField(default=False)
-    is_visible_online = models.BooleanField(default=True)
-    receive_online_orders = models.BooleanField(default=True)
-    notify_below = models.PositiveBigIntegerField()
 
     def __str__(self):
         return self.name
@@ -117,7 +117,7 @@ class Supply(BaseModel):
         blank=True,
     )
     payment_method = models.ForeignKey(
-        "financials.PaymentMethod",
+        "finances.PaymentMethod",
         on_delete=models.CASCADE,
         related_name="supplies",
         null=True,
@@ -146,14 +146,20 @@ class SuppliedItem(BaseModel):
     purchase_price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
     )
+    selling_price = models.DecimalField(
+        max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
+    )
+    is_returnable = models.BooleanField(default=False)
+    is_visible_online = models.BooleanField(default=True)
+    notify_below = models.PositiveIntegerField(default=1)
     batch_number = models.CharField(max_length=255)
     product_number = models.CharField(max_length=255, unique=True)
     expire_date = models.DateField(null=True, blank=True)
     man_date = models.DateField(null=True, blank=True)
-    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     supply = models.ForeignKey(
         Supply, on_delete=models.CASCADE, related_name="supplied_items"
     )
+    business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
 
     def __str__(self):
         return self.item.name
