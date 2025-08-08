@@ -1,3 +1,3 @@
-python manage.py makemigrations accounts files financials inventories markets crms
+python manage.py makemigrations accounts files finances inventories markets crms
 
 python manage.py migrate

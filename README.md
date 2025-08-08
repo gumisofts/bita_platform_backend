@@ -234,7 +234,7 @@ python manage.py test
 ├── deployment/               # Deployment-related scripts and configurations
 ├── docker/                   # Docker-related files
 ├── file/                     # Django app for file management
-├── financials/               # Django app for financial functionality
+├── finances/               # Django app for financial functionality
 ├── inventory/                # Django app for inventory management
 ├── notification/             # Django app for notifications
 │   └── templates/

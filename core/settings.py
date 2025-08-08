@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     "notifications",
     "orders",
     "crms",
-    "financials",
+    "finances",
     "markets",
     "chat",
 ]
@@ -174,12 +174,12 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "SERVERS": [
         {
-            "url": "https://apis.bita.gumisofts.com/v01",
-            "description": "V01 Production Server",
-        },
-        {
             "url": "http://localhost:8000",
             "description": "Local Development Server",
+        },
+        {
+            "url": "https://apis.bita.gumisofts.com/v01",
+            "description": "V01 Production Server",
         },
         {
             "url": "https://mpto2cz1lg.execute-api.eu-north-1.amazonaws.com/dev",

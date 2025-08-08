@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from financials.models import BusinessPaymentMethod, Transaction
+from finances.models import BusinessPaymentMethod, Transaction
 
 
 class TransactionSerializer(serializers.ModelSerializer):

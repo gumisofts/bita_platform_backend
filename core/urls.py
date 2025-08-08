@@ -29,7 +29,7 @@ urlpatterns = [
     path("files/", include("files.urls")),
     path("inventories/", include("inventories.urls")),
     path("crms/", include("crms.urls")),
-    path("financials/", include("financials.urls")),
+    path("finances/", include("finances.urls")),
     path("markets/", include("markets.urls")),
     path("chat/", include("chat.urls")),
 ]

@@ -1,5 +1,6 @@
 from django.db import transaction as db_transaction
 from rest_framework import status, viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -17,6 +18,7 @@ class TransactionViewset(ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     http_method_names = ["get", "post"]
+    permission_classes = [IsAuthenticated]
 
 
 # CRUD for Business Payment Methods

@@ -74,7 +74,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        to="financials.paymentmethod",
+                        to="finances.paymentmethod",
                     ),
                 ),
             ],
