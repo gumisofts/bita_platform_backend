@@ -226,7 +226,7 @@ class MarketplaceCategoryTreeSerializer(serializers.ModelSerializer):
 
     def get_product_count(self, obj):
         return ItemVariant.objects.filter(
-            item__categories=obj, is_visible_online=True, quantity__gt=0
+            item__categories=obj, item__is_visible_online=True, quantity__gt=0
         ).count()
 
 
@@ -244,5 +244,5 @@ class MarketplaceIndustrySerializer(serializers.ModelSerializer):
 
     def get_total_products(self, obj):
         return ItemVariant.objects.filter(
-            item__categories__industry=obj, is_visible_online=True, quantity__gt=0
+            item__categories__industry=obj, item__is_visible_online=True, quantity__gt=0
         ).count()

@@ -468,12 +468,14 @@ class MarketplaceStatsViewSet(GenericViewSet):
         """Get marketplace overview statistics"""
         stats = {
             "total_products": ItemVariant.objects.filter(
-                is_visible_online=True, item__business__is_active=True
+                item__is_visible_online=True, item__business__is_active=True
             ).count(),
             "total_businesses": Business.objects.filter(is_active=True).count(),
             "total_categories": Category.objects.filter(is_active=True).count(),
             "products_in_stock": ItemVariant.objects.filter(
-                is_visible_online=True, quantity__gt=0, item__business__is_active=True
+                item__is_visible_online=True,
+                quantity__gt=0,
+                item__business__is_active=True,
             ).count(),
             "verified_businesses": Business.objects.filter(
                 is_active=True, is_verified=True
@@ -491,7 +493,7 @@ class MarketplaceStatsViewSet(GenericViewSet):
                 product_count=Count(
                     "items__variants",
                     filter=Q(
-                        items__variants__is_visible_online=True,
+                        items__variants__item__is_visible_online=True,
                         items__variants__quantity__gt=0,
                     ),
                 ),

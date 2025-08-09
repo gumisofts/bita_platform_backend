@@ -345,6 +345,7 @@ class InventoryMovementViewSet(ModelViewSet):
                         supply=destination_supply,
                         item=movement_item.supplied_item.item,
                         quantity=quantity_received,
+                        selling_price=movement_item.supplied_item.selling_price,
                         purchase_price=movement_item.supplied_item.purchase_price,
                         batch_number=movement_item.supplied_item.batch_number,
                         product_number=f"{movement_item.supplied_item.product_number}-T{movement.id}",  # Avoid duplicate product numbers

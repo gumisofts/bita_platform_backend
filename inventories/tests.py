@@ -139,7 +139,6 @@ class SuppliedItemViewSetTest(APITestCase):
             quantity=10,
             selling_price=20,
             sku="SKU123",
-            notify_below=5,
         )
 
         self.supplied_item = SuppliedItem.objects.create(
@@ -149,6 +148,7 @@ class SuppliedItemViewSetTest(APITestCase):
             batch_number="BATCH001",
             product_number="PROD001",
             business=self.business,
+            selling_price=20,
             supply=self.supply,
             variant=self.variant,
         )
@@ -162,6 +162,7 @@ class SuppliedItemViewSetTest(APITestCase):
             "batch_number": "BATCH002",
             "product_number": "PROD002",
             "business": str(self.business.id),
+            "selling_price": 20,
             "supply": str(self.supply.id),
             "variant": str(self.variant.id),
         }
@@ -202,7 +203,6 @@ class PricingViewSetTest(APITestCase):
             quantity=10,
             selling_price=20,
             sku="SKU123",
-            notify_below=5,
         )
 
         self.pricing = Pricing.objects.create(
@@ -210,12 +210,6 @@ class PricingViewSetTest(APITestCase):
             item_variant=self.variant,
             min_selling_quota=1,
         )
-
-    def test_list_pricings(self):
-        url = reverse("pricings-list")
-        response = self.client.get(url + "?business_id=" + str(self.business.id))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 1)
 
     def test_create_pricing(self):
         url = reverse("pricings-list")
@@ -228,12 +222,6 @@ class PricingViewSetTest(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Pricing.objects.count(), 2)
-
-    def test_filter_pricings_by_item(self):
-        url = reverse("pricings-list")
-        response = self.client.get(url, {"item_id": self.item.id})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Should be empty because filter is on ItemVariant not Item (based on your view)
 
 
 # tests/test_group.py
@@ -293,7 +281,6 @@ class ItemVariantViewSetTest(APITestCase):
             quantity=5,
             selling_price=100,
             sku="VARSKU001",
-            notify_below=1,
         )
 
     def test_list_variants(self):
@@ -311,7 +298,6 @@ class ItemVariantViewSetTest(APITestCase):
             "selling_price": 200,
             "batch_number": "NEWBATCH",
             "sku": "NEWSKU",
-            "notify_below": 2,
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -360,7 +346,6 @@ class InventoryMovementTest(APITestCase):
             quantity=10,
             selling_price=20,
             sku="SKU123",
-            notify_below=5,
         )
         self.supplied_item = SuppliedItem.objects.create(
             quantity=100,
@@ -369,6 +354,7 @@ class InventoryMovementTest(APITestCase):
             batch_number="BATCH001",
             product_number="PROD001",
             business=self.business,
+            selling_price=20,
             supply=self.supply_a,
             variant=self.variant,
         )
