@@ -17,6 +17,10 @@ class Property(BaseModel):
     def __str__(self):
         return self.name
 
+    class Meta:
+        verbose_name = "Property"
+        verbose_name_plural = "Properties"
+
 
 class Group(BaseModel):
     name = models.CharField(max_length=255)
@@ -113,6 +117,9 @@ class Supplier(BaseModel):
 class Supply(BaseModel):
     label = models.CharField(max_length=255)
     branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
+    business = models.ForeignKey(
+        "business.Business", on_delete=models.CASCADE, null=True, blank=True
+    )
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.CASCADE,
@@ -130,6 +137,8 @@ class Supply(BaseModel):
 
     class Meta:
         unique_together = ("label", "branch")
+        verbose_name = "Supply"
+        verbose_name_plural = "Supplies"
 
     def __str__(self):
         return self.label
@@ -137,6 +146,7 @@ class Supply(BaseModel):
 
 class SuppliedItem(BaseModel):
     quantity = models.PositiveIntegerField()
+    initial_quantity = models.PositiveIntegerField(default=0)
     item = models.ForeignKey(
         Item,
         related_name="supplied_items",
@@ -166,7 +176,7 @@ class SuppliedItem(BaseModel):
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
 
     def __str__(self):
-        return self.item.name
+        return f"{self.item} - {self.quantity}"
 
 
 class Pricing(BaseModel):

@@ -177,7 +177,13 @@ try:
             "created_at",
         ]
         list_filter = ["created_at", "item__business"]
-        search_fields = ["item__name", "supplier__name", "supplier__email"]
+        search_fields = [
+            "item__name",
+            "supply__label",
+            "supply__branch__name",
+            "supply__supplier__name",
+            "supply__supplier__email",
+        ]
         readonly_fields = ["id", "created_at", "updated_at"]
         raw_id_fields = ["item", "supply"]
 
@@ -197,7 +203,7 @@ try:
             (
                 _("Business & Supplier"),
                 {
-                    "fields": ("business", "supplier", "supply"),
+                    "fields": ("business", "supply"),
                     "classes": ("collapse",),
                 },
             ),
@@ -232,7 +238,7 @@ try:
             "created_at",
         ]
         list_filter = ["item", "created_at"]
-        search_fields = ["name", "item__name", "sku", "batch_number"]
+        search_fields = ["name", "item__name", "sku"]
         readonly_fields = ["id", "created_at", "updated_at"]
         raw_id_fields = ["item"]
         inlines = [PropertyInline]
@@ -241,18 +247,12 @@ try:
             (None, {"fields": ("id", "name", "item", "quantity", "selling_price")}),
             (
                 _("Product Details"),
-                {"fields": ("batch_number", "sku", "expire_date", "man_date")},
+                {"fields": ("sku",)},
             ),
             (
                 _("Settings"),
                 {
-                    "fields": (
-                        "is_default",
-                        "is_returnable",
-                        "is_visible_online",
-                        "receive_online_orders",
-                        "notify_below",
-                    ),
+                    "fields": ("is_default",),
                     "classes": ("collapse",),
                 },
             ),

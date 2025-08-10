@@ -1,6 +1,7 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import parse_qsl, urlparse
 
 from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
@@ -10,7 +11,8 @@ load_dotenv(".env.production", override=True)
 env = os.getenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = env("SECRET_KEY", get_random_secret_key())
+
+SECRET_KEY = env("DJANGO_SECRET_KEY", get_random_secret_key())
 
 DEBUG = env("DEBUG", False) == "True"
 
@@ -80,16 +82,18 @@ WSGI_APPLICATION = "core.wsgi.app"
 ASGI_APPLICATION = "core.asgi.app"
 
 
+tmpPostgres = urlparse(os.getenv("DJANGO_POSTGRES_URL"))
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("PG_DB_NAME"),
-        "USER": env("PG_USER"),
-        "PASSWORD": env("PG_PASSWORD"),
-        "HOST": env("PG_HOST", "localhost"),
-        "PORT": env("PG_PORT", "5432"),
+        "NAME": tmpPostgres.path[1:],
+        "USER": tmpPostgres.username,
+        "PASSWORD": tmpPostgres.password,
+        "HOST": tmpPostgres.hostname,
+        "PORT": tmpPostgres.port,
         "CONN_MAX_AGE": None,
-        "OPTIONS": {"sslmode": env("PG_SSL_MODE") if env("PG_SSL_MODE") else None},
+        "OPTIONS": dict(parse_qsl(tmpPostgres.query)),
     },
 }
 

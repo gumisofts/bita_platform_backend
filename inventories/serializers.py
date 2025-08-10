@@ -29,27 +29,61 @@ class SuppliedItemSerializer(serializers.ModelSerializer):
 
 
 class SupplySerializer(serializers.ModelSerializer):
-    class SuppliedItemSerializer(serializers.ModelSerializer):
+    class SuppliedItemInSupplySerializer(serializers.ModelSerializer):
         class Meta:
             model = SuppliedItem
-            exclude = ["business"]
-            read_only_fields = ["id", "created_at", "updated_at"]
+            exclude = []
+            read_only_fields = [
+                "id",
+                "business",
+                "supply",
+                "item",
+                "created_at",
+                "updated_at",
+            ]
 
-    item = SuppliedItemSerializer(required=False)
+        def create(self, validated_data):
+            variant = validated_data.get("variant")
+            validated_data["item"] = variant.item
+            print(validated_data)
+
+            supply = super().create(validated_data)
+
+            return supply
+
+        def update(self, instance, validated_data):
+            variant = validated_data.get("variant")
+            validated_data["item"] = variant.item
+            instance = super().update(instance, validated_data)
+            return instance
+
+    item = SuppliedItemInSupplySerializer(required=False)
 
     class Meta:
         model = Supply
         exclude = []
+        extra_kwargs = {
+            "business": {"required": True},
+        }
 
     def create(self, validated_data):
         item = validated_data.pop("item", None)
-
+        business = validated_data.get("business", None)
         supply = super().create(validated_data)
-
         if item:
-            SuppliedItem.objects.create(supply=supply, business=supply.business, **item)
+            item["item"] = item.get("variant").item
+            item["initial_quantity"] = item.get("quantity")
+            SuppliedItem.objects.create(supply=supply, business=business, **item)
 
         return supply
+
+    def update(self, instance, validated_data):
+        item = validated_data.pop("item", None)
+        business = validated_data.get("business", None)
+        instance = super().update(instance, validated_data)
+        if item:
+            SuppliedItem.objects.create(supply=instance, business=business, **item)
+        return instance
 
 
 class PricingSerializer(serializers.ModelSerializer):
