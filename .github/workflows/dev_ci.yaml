@@ -26,7 +26,7 @@ jobs:
         run: |
           echo "DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}" >> .env
           echo "DJANGO_DEBUG=${{ vars.DJANGO_DEBUG }}" >> .env
-          echo "DJANGO_POSTGRES_USER=${{ secrets.DJANGO_POSTGRES_USER }}" >> .env
+          echo "DJANGO_POSTGRES_URL=${{ secrets.DJANGO_POSTGRES_URL }}" >> .env
           echo "REDIS_HOST=${{ vars.REDIS_HOST }}" >> .env
           echo "REDIS_PORT=${{ vars.REDIS_PORT }}" >> .env
           echo "EMAIL_HOST=${{ vars.EMAIL_HOST }}" >> .env
