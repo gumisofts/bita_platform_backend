@@ -65,20 +65,19 @@ class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        
         if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0] + "_business",
+            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLY.value[0] + "_business",
             self.request.business,
         ):
             queryset = queryset.filter(business=self.request.business)
         elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0] + "_branch",
+            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLY.value[0] + "_branch",
             self.request.branch,
         ):
             queryset = queryset.filter(branch=self.request.branch)
         else:
             queryset = queryset.none()
-        return queryset
+        return queryset.order_by("updated_at")
 
 
 class SupplierViewset(ListModelMixin, CreateModelMixin, GenericViewSet):

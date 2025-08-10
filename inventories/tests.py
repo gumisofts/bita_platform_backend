@@ -4,10 +4,16 @@ from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from guardian.shortcuts import assign_perm
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from business.models import Branch, Business, Category
+from business.models import (
+    AdditionalBusinessPermissionNames,
+    Branch,
+    Business,
+    Category,
+)
 from inventories.models import (
     Group,
     InventoryMovement,
@@ -90,13 +96,15 @@ class SupplyViewSetTest(APITestCase):
         self.client.force_authenticate(user=self.user)
         self.business = Business.objects.create(name="Supply Business", owner=self.user)
         self.branch = Branch.objects.create(name="Main Branch", business=self.business)
-        self.supply = Supply.objects.create(label="Supply Label", branch=self.branch,business=self.business)
+        self.supply = Supply.objects.create(
+            label="Supply Label", branch=self.branch, business=self.business
+        )
 
     def test_list_supplies(self):
         url = reverse("supplies-list")
-        response = self.client.get(url)
+        response = self.client.get(url + "?business=" + str(self.business.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["count"], 1)
 
     def test_create_supply(self):
         url = reverse("supplies-list")
@@ -111,7 +119,7 @@ class SupplyViewSetTest(APITestCase):
 
     def test_filter_by_business_id(self):
         url = reverse("supplies-list")
-        response = self.client.get(url, {"business_id": self.business.id})
+        response = self.client.get(url + "?business=" + str(self.business.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
 

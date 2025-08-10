@@ -129,6 +129,11 @@ class AdditionalBusinessPermissionNames(enum.Enum):
     CAN_DELETE_GIFT_CARD = ("can_delete_giftcard", "Can delete gift card")
     CAN_VIEW_GIFT_CARD = ("can_view_giftcard", "Can view gift card")
 
+    CAN_ADD_SUPPLY = ("can_add_supply", "Can add supply")
+    CAN_CHANGE_SUPPLY = ("can_change_supply", "Can change supply")
+    CAN_DELETE_SUPPLY = ("can_delete_supply", "Can delete supply")
+    CAN_VIEW_SUPPLY = ("can_view_supply", "Can view supply")
+
 
 class Address(BaseModel):
     lat = models.FloatField()
