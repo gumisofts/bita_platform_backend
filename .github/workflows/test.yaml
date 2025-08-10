@@ -18,6 +18,8 @@ env:
   EMAIL_HOST: temp
   EMAIL_HOST_USER: temp@gumisofts.com
   EMAIL_PORT: 123
+  DJANGO_DEBUG: True
+  DJANGO_POSTGRES_URL: postgresql://temp_user:temp_password@localhost/temp_db
 
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
