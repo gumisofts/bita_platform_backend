@@ -90,7 +90,7 @@ class SupplyViewSetTest(APITestCase):
         self.client.force_authenticate(user=self.user)
         self.business = Business.objects.create(name="Supply Business", owner=self.user)
         self.branch = Branch.objects.create(name="Main Branch", business=self.business)
-        self.supply = Supply.objects.create(label="Supply Label", branch=self.branch)
+        self.supply = Supply.objects.create(label="Supply Label", branch=self.branch,business=self.business)
 
     def test_list_supplies(self):
         url = reverse("supplies-list")
@@ -103,6 +103,7 @@ class SupplyViewSetTest(APITestCase):
         data = {
             "label": "New Supply",
             "branch": str(self.branch.id),
+            "business": str(self.business.id),
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -112,7 +113,7 @@ class SupplyViewSetTest(APITestCase):
         url = reverse("supplies-list")
         response = self.client.get(url, {"business_id": self.business.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["count"], 1)
 
 
 class SuppliedItemViewSetTest(APITestCase):

@@ -65,11 +65,12 @@ class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
+        
         if self.request.user.has_perm(
             AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0] + "_business",
             self.request.business,
         ):
-            queryset = queryset.filter(branch__business=self.request.business)
+            queryset = queryset.filter(business=self.request.business)
         elif self.request.user.has_perm(
             AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0] + "_branch",
             self.request.branch,
