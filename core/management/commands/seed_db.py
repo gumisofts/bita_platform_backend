@@ -64,26 +64,28 @@ class Command(BaseCommand):
             categories = self.create_categories(industries)
             addresses = self.create_addresses()
             users = self.create_users(options["users"])
-            businesses = self.create_businesses(
-                options["businesses"], users, addresses, categories
-            )
-            roles = self.create_roles(businesses)
-            branches = self.create_branches(businesses, addresses)
-            employees = self.create_employees(users, businesses, roles, branches)
-            inventory_groups = self.create_inventory_groups(businesses)
-            items = self.create_items(businesses, inventory_groups, categories)
-            orders = self.create_orders(users, employees)
-            order_items = self.create_order_items(orders, items)
-            user_devices = self.create_user_devices(users)
+            # businesses = self.create_businesses(
+            #     options["businesses"], users, addresses, categories
+            # )
+            # roles = self.create_roles(businesses)
+            # branches = self.create_branches(businesses, addresses)
+            # employees = self.create_employees(users, businesses, roles, branches)
+            # inventory_groups = self.create_inventory_groups(businesses)
+            # items = self.create_items(businesses, inventory_groups, categories)
+            # orders = self.create_orders(users, employees)
+            # order_items = self.create_order_items(orders, items)
+            # user_devices = self.create_user_devices(users)
 
             self.stdout.write(
                 self.style.SUCCESS(
                     f"Successfully seeded database with:\n"
+                    f"- {len(industries)} industries\n"
+                    f"- {len(categories)} categories\n"
                     f"- {len(users)} users\n"
-                    f"- {len(businesses)} businesses\n"
-                    f"- {len(items)} inventory items\n"
-                    f"- {len(orders)} orders\n"
-                    f"- {len(employees)} employees"
+                    # f"- {len(businesses)} businesses\n"
+                    # f"- {len(items)} inventory items\n"
+                    # f"- {len(orders)} orders\n"
+                    # f"- {len(employees)} employees"
                 )
             )
 
@@ -117,18 +119,40 @@ class Command(BaseCommand):
                 self.stdout.write(f"Deleted {count} {model.__name__} records")
 
     def create_industries(self):
-        """Create sample industries"""
+        """Create comprehensive industry data"""
         industry_names = [
+            # Core Industries
             "Retail & E-commerce",
             "Food & Beverage",
-            "Technology",
-            "Healthcare",
+            "Technology & Software",
+            "Healthcare & Medical",
             "Manufacturing",
             "Automotive",
             "Real Estate",
             "Finance & Banking",
-            "Education",
-            "Entertainment",
+            "Education & Training",
+            "Entertainment & Media",
+            # Service Industries
+            "Professional Services",
+            "Construction & Engineering",
+            "Transportation & Logistics" "Hospitality & Tourism",
+            "Agriculture & Farming",
+            "Energy & Utilities",
+            "Telecommunications",
+            "Fashion & Apparel",
+            "Beauty & Personal Care",
+            "Sports & Recreation",
+            # Specialized Industries
+            "Legal Services",
+            "Insurance",
+            "Non-profit & NGO",
+            "Government & Public Sector",
+            "Mining & Natural Resources",
+            "Chemical & Pharmaceutical",
+            "Aerospace & Defense",
+            "Marine & Shipping",
+            "Waste Management & Recycling",
+            "Security Services",
         ]
 
         industries = []
@@ -140,39 +164,296 @@ class Command(BaseCommand):
             if created:
                 self.stdout.write(f"Created industry: {name}")
 
+        self.stdout.write(f"Created/verified {len(industries)} industries")
         return industries
 
     def create_categories(self, industries):
-        """Create sample categories"""
+        """Create comprehensive category data"""
         category_data = {
+            # Core Industries
             "Retail & E-commerce": [
-                "Electronics",
-                "Clothing",
-                "Books",
+                "Electronics & Gadgets",
+                "Clothing & Apparel",
+                "Books & Media",
                 "Home & Garden",
+                "Sports & Outdoors",
+                "Health & Beauty",
+                "Toys & Games",
+                "Jewelry & Accessories",
+                "Pet Supplies",
+                "Office Supplies",
+                "Art & Crafts",
+                "Musical Instruments",
             ],
-            "Food & Beverage": ["Restaurants", "Cafes", "Grocery", "Catering"],
-            "Technology": ["Software", "Hardware", "AI/ML", "Cloud Services"],
-            "Healthcare": ["Pharmacy", "Medical Equipment", "Telemedicine", "Wellness"],
+            "Food & Beverage": [
+                "Restaurants",
+                "Cafes & Coffee Shops",
+                "Fast Food",
+                "Fine Dining",
+                "Bakeries",
+                "Grocery Stores",
+                "Catering Services",
+                "Food Trucks",
+                "Bars & Pubs",
+                "Specialty Foods",
+                "Organic Foods",
+                "Frozen Foods",
+            ],
+            "Technology & Software": [
+                "Software Development",
+                "Web Development",
+                "Mobile Apps",
+                "AI & Machine Learning",
+                "Cloud Services",
+                "Cybersecurity",
+                "Data Analytics",
+                "IT Consulting",
+                "Hardware & Components",
+                "Gaming",
+                "IoT Solutions",
+                "Blockchain",
+            ],
+            "Healthcare & Medical": [
+                "Hospitals",
+                "Clinics",
+                "Pharmacies",
+                "Medical Equipment",
+                "Telemedicine",
+                "Mental Health",
+                "Dental Care",
+                "Eye Care",
+                "Physical Therapy",
+                "Medical Research",
+                "Home Healthcare",
+                "Emergency Services",
+            ],
             "Manufacturing": [
                 "Industrial Equipment",
                 "Automotive Parts",
-                "Textiles",
-                "Chemicals",
+                "Electronics Manufacturing",
+                "Textiles & Clothing",
+                "Chemical Products",
+                "Food Processing",
+                "Plastic & Rubber",
+                "Metal Fabrication",
+                "Machinery",
+                "Packaging",
+            ],
+            # Service Industries
+            "Professional Services": [
+                "Consulting",
+                "Accounting",
+                "Marketing & Advertising",
+                "HR Services",
+                "Business Strategy",
+                "Project Management",
+                "Design Services",
+                "Translation",
+                "Research Services",
+                "Event Planning",
+                "Public Relations",
+                "Training",
+            ],
+            "Construction & Engineering": [
+                "Residential Construction",
+                "Commercial Construction",
+                "Civil Engineering",
+                "Electrical Work",
+                "Plumbing",
+                "HVAC",
+                "Architecture",
+                "Interior Design",
+                "Landscaping",
+                "Roofing",
+                "Renovation",
+                "Infrastructure",
+            ],
+            "Transportation & Logistics": [
+                "Shipping & Freight",
+                "Public Transportation",
+                "Taxi & Ride Sharing",
+                "Delivery Services",
+                "Warehousing",
+                "Supply Chain",
+                "Moving Services",
+                "International Shipping",
+                "Fleet Management",
+                "Logistics Software",
+            ],
+            "Hospitality & Tourism": [
+                "Hotels",
+                "Resorts",
+                "Travel Agencies",
+                "Tour Operators",
+                "Vacation Rentals",
+                "Event Venues",
+                "Travel Insurance",
+                "Car Rentals",
+                "Adventure Tourism",
+                "Cultural Tourism",
+                "Business Travel",
+                "Cruise Lines",
+            ],
+            "Agriculture & Farming": [
+                "Crop Production",
+                "Livestock",
+                "Dairy Farming",
+                "Poultry",
+                "Organic Farming",
+                "Agricultural Equipment",
+                "Seeds & Fertilizers",
+                "Food Processing",
+                "Agricultural Technology",
+                "Farm Management",
+            ],
+            # Specialized Industries
+            "Legal Services": [
+                "Corporate Law",
+                "Criminal Law",
+                "Family Law",
+                "Real Estate Law",
+                "Intellectual Property",
+                "Immigration Law",
+                "Tax Law",
+                "Employment Law",
+                "Personal Injury",
+                "Bankruptcy Law",
+                "Contract Law",
+                "Litigation",
+            ],
+            "Finance & Banking": [
+                "Commercial Banking",
+                "Investment Banking",
+                "Insurance",
+                "Credit Unions",
+                "Financial Planning",
+                "Investment Services",
+                "Mortgage Services",
+                "Payment Processing",
+                "Cryptocurrency",
+                "Fintech",
+                "Wealth Management",
+            ],
+            "Education & Training": [
+                "K-12 Education",
+                "Higher Education",
+                "Vocational Training",
+                "Online Learning",
+                "Corporate Training",
+                "Language Learning",
+                "Test Preparation",
+                "Tutoring",
+                "Educational Software",
+                "School Supplies",
+                "Educational Consulting",
+            ],
+            "Entertainment & Media": [
+                "Film & Video",
+                "Music & Audio",
+                "Publishing",
+                "Broadcasting",
+                "Gaming",
+                "Social Media",
+                "Streaming Services",
+                "Event Production",
+                "Photography",
+                "Art & Culture",
+                "Sports Entertainment",
+                "News Media",
+            ],
+            "Automotive": [
+                "Car Sales",
+                "Auto Parts",
+                "Auto Repair",
+                "Car Rental",
+                "Auto Insurance",
+                "Car Wash",
+                "Towing Services",
+                "Fleet Services",
+                "Electric Vehicles",
+                "Motorcycles",
+                "Auto Accessories",
+                "Used Cars",
+            ],
+            "Real Estate": [
+                "Residential Sales",
+                "Commercial Real Estate",
+                "Property Management",
+                "Real Estate Investment",
+                "Property Development",
+                "Real Estate Consulting",
+                "Property Valuation",
+                "Real Estate Marketing",
+                "Rental Services",
+                "Land Sales",
+            ],
+            "Energy & Utilities": [
+                "Electric Power",
+                "Natural Gas",
+                "Renewable Energy",
+                "Water Utilities",
+                "Solar Energy",
+                "Wind Energy",
+                "Energy Consulting",
+                "Smart Grid",
+                "Energy Storage",
+                "Oil & Gas",
+                "Waste-to-Energy",
+                "Hydroelectric",
+            ],
+            "Fashion & Apparel": [
+                "Clothing Design",
+                "Fashion Retail",
+                "Footwear",
+                "Accessories",
+                "Luxury Fashion",
+                "Sportswear",
+                "Children's Clothing",
+                "Plus Size",
+                "Sustainable Fashion",
+                "Custom Tailoring",
+                "Fashion Consulting",
+                "Uniforms",
+            ],
+            "Beauty & Personal Care": [
+                "Skincare",
+                "Cosmetics",
+                "Hair Care",
+                "Nail Care",
+                "Spa Services",
+                "Wellness Products",
+                "Men's Grooming",
+                "Natural Beauty",
+                "Beauty Salons",
+                "Massage Therapy",
+                "Personal Training",
+                "Nutrition",
             ],
         }
 
         categories = []
         for industry in industries:
-            if industry.name in category_data:
-                for cat_name in category_data[industry.name]:
+            # Handle both exact matches and variations
+            industry_key = None
+            for key in category_data.keys():
+                if key == industry.name or key.replace(" & ", " & ") == industry.name:
+                    industry_key = key
+                    break
+
+            if industry_key and industry_key in category_data:
+                for cat_name in category_data[industry_key]:
                     category, created = Category.objects.get_or_create(
                         name=cat_name, industry=industry, defaults={"is_active": True}
                     )
                     categories.append(category)
                     if created:
-                        self.stdout.write(f"Created category: {cat_name}")
+                        self.stdout.write(
+                            f"Created category: {cat_name} ({industry.name})"
+                        )
 
+        self.stdout.write(
+            f"Created/verified {len(categories)} categories across {len([i for i in industries if any(key == i.name or key.replace(' & ', ' & ') == i.name for key in category_data.keys())])} industries"
+        )
         return categories
 
     def create_addresses(self, count=20):
@@ -324,7 +605,7 @@ class Command(BaseCommand):
                 name=business_names[i % len(business_names)] + f" #{i+1}",
                 owner=random.choice(users),
                 business_type=random.choice(business_types),
-                address=random.choice(addresses),
+                address=addresses.pop(0) if addresses else None,
             )
 
             # Add random categories to business
