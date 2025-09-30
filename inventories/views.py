@@ -163,6 +163,9 @@ class ItemVariantViewset(ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
+        item = self.request.query_params.get("item")
+        if item:
+            queryset = queryset.filter(item=item)
 
         if self.request.user.has_perm(
             AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]

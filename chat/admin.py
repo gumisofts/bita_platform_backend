@@ -547,7 +547,7 @@ class ConversationInvitationAdmin(admin.ModelAdmin):
     business_name.short_description = "Business"
 
 
-# Enhanced admin site customization
-admin.site.site_header = "Bita Platform Chat Administration"
-admin.site.site_title = "Chat Admin"
-admin.site.index_title = "Chat Management"
+# Admin site customization
+admin.site.site_header = "Bita Platform Administration"
+admin.site.site_title = "Admin"
+admin.site.index_title = "Management"
