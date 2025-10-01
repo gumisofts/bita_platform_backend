@@ -5,24 +5,25 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import Signal, receiver
 from guardian.shortcuts import assign_perm
 
+from accounts.models import User
 from business.models import *
 from business.permissions import PermissionManager
 
 from .roles import *
-from accounts.models import User
 
 employee_invitation_status_changed = Signal()
+
 
 @receiver(post_save, sender=User)
 def on_user_created(sender, instance, created, **kwargs):
     if created:
         # Create Default Bussiness Branch
         Business.objects.create(
-            name='Personal Business',
+            name="Personal Business",
             owner=instance,
             business_type="retail",
         )
-        
+
 
 @receiver(post_save, sender=Business)
 def on_business_created(sender, instance, created, **kwargs):

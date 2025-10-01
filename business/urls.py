@@ -1,8 +1,19 @@
 from rest_framework.routers import DefaultRouter
 
-router = DefaultRouter()
+from business.views import (
+    AddressViewset,
+    BranchViewset,
+    BusinessImageViewset,
+    BusinessPermissionViewset,
+    BusinessRoleViewset,
+    BusinessViewset,
+    CategoryViewset,
+    EmployeeInvitationViewset,
+    EmployeeViewset,
+    IndustryViewset,
+)
 
-from business.views import *
+router = DefaultRouter()
 
 router.register(r"businesses", BusinessViewset, basename="businesses")
 router.register(r"categories", CategoryViewset, basename="categories")
