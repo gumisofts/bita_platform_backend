@@ -14,15 +14,15 @@ from .roles import *
 employee_invitation_status_changed = Signal()
 
 
-@receiver(post_save, sender=User)
-def on_user_created(sender, instance, created, **kwargs):
-    if created:
-        # Create Default Bussiness Branch
-        Business.objects.create(
-            name="Personal Business",
-            owner=instance,
-            business_type="retail",
-        )
+# @receiver(post_save, sender=User)
+# def on_user_created(sender, instance, created, **kwargs):
+#     if created:
+#         # Create Default Bussiness Branch
+#         Business.objects.create(
+#             name="Personal Business",
+#             owner=instance,
+#             business_type="retail",
+#         )
 
 
 @receiver(post_save, sender=Business)
