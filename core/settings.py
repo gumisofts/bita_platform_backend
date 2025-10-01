@@ -190,6 +190,10 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "SERVERS": [
         {
+            "url": "/",
+            "description": "Current Development Server",
+        },
+        {
             "url": "http://localhost:8000",
             "description": "Local Development Server",
         },

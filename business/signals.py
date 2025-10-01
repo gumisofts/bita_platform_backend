@@ -9,9 +9,20 @@ from business.models import *
 from business.permissions import PermissionManager
 
 from .roles import *
+from accounts.models import User
 
 employee_invitation_status_changed = Signal()
 
+@receiver(post_save, sender=User)
+def on_user_created(sender, instance, created, **kwargs):
+    if created:
+        # Create Default Bussiness Branch
+        Business.objects.create(
+            name='Personal Business',
+            owner=instance,
+            business_type="retail",
+        )
+        
 
 @receiver(post_save, sender=Business)
 def on_business_created(sender, instance, created, **kwargs):

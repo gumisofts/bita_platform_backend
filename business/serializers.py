@@ -70,21 +70,6 @@ class BranchSerializer(serializers.ModelSerializer, BaseSerializerMixin):
         allow_null=False,
     )
 
-    # current_user_role = serializers.SerializerMethodField()
-
-    # def get_current_user_role(self, obj):
-
-    #     employee = Employee.objects.filter(
-    #         Q(branch=obj) | Q(branch=None),
-    #         user=self.context.get("request").user,
-    #         business=obj.business,
-    #     ).first()
-
-    #     if not employee:
-    #         return None
-
-    #     return employee.role.id if employee.role else None
-
     class Meta:
         model = Branch
         fields = "__all__"
