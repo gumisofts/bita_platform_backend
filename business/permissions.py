@@ -1,6 +1,7 @@
 from django.db.models import Q
 from django.http import Http404
-from guardian.shortcuts import assign_perm
+from guardian.backends import ObjectPermissionBackend, check_support
+from guardian.shortcuts import ObjectPermissionChecker, assign_perm, get_content_type
 from rest_framework import exceptions
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
@@ -13,6 +14,28 @@ from business.models import (
     Employee,
     EmployeeInvitation,
 )
+
+# class BusinessPermissionBackend(ObjectPermissionBackend):
+#     def has_perm(self, user, perm, obj=None):
+#         support, user_obj = check_support(user, obj)
+#         if not support:
+#             return False
+
+#         if '.' in perm:
+#             app_label, _ = perm.split('.', 1)
+#             # TODO (David Graham): Check if obj is None or change the method signature
+#             if app_label != obj._meta.app_label:  # type: ignore[union-attr]
+#                 # Check the content_type app_label when permission
+#                 # and obj app labels don't match.
+#                 ctype = get_content_type(obj)
+#                 if app_label != ctype.app_label:
+#                     raise WrongAppError("Passed perm has app label of '%s' while "
+#                                         "given obj has app label '%s' and given obj"
+#                                         "content_type has app label '%s'" %
+#                                         (app_label, obj._meta.app_label, ctype.app_label))   # type: ignore[union-attr]
+
+#         check = ObjectPermissionChecker(user_obj)
+#         return check.has_perm(perm, obj)
 
 
 class BusinessModelObjectPermission(BasePermission):
@@ -293,7 +316,7 @@ class BusinessLevelPermission(BasePermission):
 
     def get_required_object_permissions(self, method, model_cls):
         kwargs = {
-            "app_label": model_cls._meta.app_label,
+            "app_label": "business",
             "model_name": model_cls._meta.model_name,
         }
 
