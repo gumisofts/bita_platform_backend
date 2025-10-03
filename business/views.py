@@ -419,9 +419,16 @@ class EmployeeInvitationViewset(ModelViewSet):
             business = serializer.validated_data.get("business")
 
             existing_invitation = EmployeeInvitation.objects.filter(
-                Q(email=email) | Q(phone_number=phone_number),
-                business=business,
-                status="pending",
+                Q(
+                    email=email,
+                    business=business,
+                    status="pending",
+                )
+                | Q(
+                    phone_number=phone_number,
+                    business=business,
+                    status="pending",
+                )
             ).first()
 
             if existing_invitation:
