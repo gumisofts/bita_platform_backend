@@ -90,7 +90,9 @@ class PricingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pricing
         fields = "__all__"
-        read_only_fields = ["id",]
+        read_only_fields = [
+            "id",
+        ]
 
 
 class ReturnRecallSerializer(serializers.ModelSerializer):
