@@ -90,7 +90,7 @@ class PricingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pricing
         fields = "__all__"
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id",]
 
 
 class ReturnRecallSerializer(serializers.ModelSerializer):
@@ -109,14 +109,14 @@ class GroupSerializer(serializers.ModelSerializer):
 
 class ItemVariantSerializer(serializers.ModelSerializer):
 
-    class PricingSerializer(serializers.ModelSerializer):
+    class InnerPricingSerializer(serializers.ModelSerializer):
 
         class Meta:
             model = Pricing
             exclude = ["item_variant"]
             read_only_fields = ["id", "created_at", "updated_at"]
 
-    class PropertySerializer(serializers.ModelSerializer):
+    class InnerPropertySerializer(serializers.ModelSerializer):
         class Meta:
             model = Property
             exclude = ["item_variant"]
@@ -127,8 +127,8 @@ class ItemVariantSerializer(serializers.ModelSerializer):
         exclude = []
         read_only_fields = ["id", "selling_price", "created_at", "updated_at"]
 
-    properties = PropertySerializer(many=True, required=False)
-    pricings = PricingSerializer(many=True, required=False)
+    properties = InnerPropertySerializer(many=True, required=False)
+    pricings = InnerPricingSerializer(many=True, required=False)
 
     def create(self, validated_data):
         properties = validated_data.pop("properties", [])
