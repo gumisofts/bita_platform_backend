@@ -48,4 +48,4 @@ class BusinessPaymentMethod(BaseModel):
     identifier = models.CharField(max_length=255, unique=True)
 
     def __str__(self):
-        return f"{self.business.name} - {self.payment_method}"
+        return f"{self.label} - {self.business.name}"
