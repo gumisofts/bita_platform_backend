@@ -124,13 +124,13 @@ class ItemVariantSerializer(serializers.ModelSerializer):
             exclude = ["item_variant"]
             read_only_fields = ["id", "created_at", "updated_at"]
 
+    properties = InnerPropertySerializer(many=True, required=False)
+    pricings = InnerPricingSerializer(many=True, required=False)
     class Meta:
         model = ItemVariant
         exclude = []
         read_only_fields = ["id", "selling_price", "created_at", "updated_at"]
 
-    properties = InnerPropertySerializer(many=True, required=False)
-    pricings = InnerPricingSerializer(many=True, required=False)
 
     def create(self, validated_data):
         properties = validated_data.pop("properties", [])
