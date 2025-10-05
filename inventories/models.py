@@ -167,7 +167,7 @@ class SuppliedItem(BaseModel):
     is_visible_online = models.BooleanField(default=True)
     notify_below = models.PositiveIntegerField(default=1)
     batch_number = models.CharField(max_length=255)
-    product_number = models.CharField(max_length=255, unique=True)
+    product_number = models.CharField(max_length=255)
     expire_date = models.DateField(null=True, blank=True)
     man_date = models.DateField(null=True, blank=True)
     supply = models.ForeignKey(
