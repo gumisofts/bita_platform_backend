@@ -128,7 +128,7 @@ class Supply(BaseModel):
         blank=True,
     )
     payment_method = models.ForeignKey(
-        "finances.PaymentMethod",
+        "finances.BusinessPaymentMethod",
         on_delete=models.CASCADE,
         related_name="supplies",
         null=True,
