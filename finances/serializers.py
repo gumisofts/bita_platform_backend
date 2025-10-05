@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from finances.models import BusinessPaymentMethod, Transaction
+from finances.models import BusinessPaymentMethod, PaymentMethod, Transaction
 
 
 class TransactionSerializer(serializers.ModelSerializer):
@@ -11,7 +11,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BusinessPaymentMethod
+        model = PaymentMethod
         exclude = []
 
 

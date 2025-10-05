@@ -1,15 +1,17 @@
 from django.db import transaction as db_transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view
+from rest_framework.mixins import ListModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from inventories.models import SuppliedItem
 
-from .models import BusinessPaymentMethod, Transaction
+from .models import BusinessPaymentMethod, PaymentMethod, Transaction
 from .serializers import (
     BusinessPaymentMethodSerializer,
+    PaymentMethodSerializer,
     TransactionSerializer,
 )
 
@@ -33,6 +35,7 @@ class BusinessPaymentMethodViewset(ModelViewSet):
         return self.queryset
 
 
-class PaymentMethodViewset(ModelViewSet):
-    queryset = BusinessPaymentMethod.objects.all()
-    serializer_class = BusinessPaymentMethodSerializer
+class PaymentMethodViewset(ListModelMixin, GenericViewSet):
+    queryset = PaymentMethod.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = PaymentMethodSerializer
