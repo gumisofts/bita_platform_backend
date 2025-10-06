@@ -55,7 +55,9 @@ class ItemViewset(ModelViewSet):
         return queryset
 
 
-class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
+class SupplyViewset(
+    ListModelMixin, CreateModelMixin, RetrieveModelMixin, GenericViewSet
+):
     serializer_class = SupplySerializer
     permission_classes = [
         IsAuthenticated,
@@ -78,6 +80,11 @@ class SupplyViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
         else:
             queryset = queryset.none()
         return queryset.order_by("updated_at")
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return SupplyDetailsSerializer
+        return self.serializer_class
 
 
 class SupplierViewset(ListModelMixin, CreateModelMixin, GenericViewSet):

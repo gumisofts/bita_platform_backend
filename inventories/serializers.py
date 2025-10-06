@@ -28,6 +28,16 @@ class SuppliedItemSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class SupplyDetailsSerializer(serializers.ModelSerializer):
+    supplied_items = SuppliedItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Supply
+        exclude = []
+        depth = 1
+        read_only_fields = ["id", "created_at", "updated_at", "supplied_items"]
+
+
 class SupplySerializer(serializers.ModelSerializer):
     class SuppliedItemInSupplySerializer(serializers.ModelSerializer):
         class Meta:
