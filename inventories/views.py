@@ -37,6 +37,11 @@ class ItemViewset(ModelViewSet):
     ]
     filterset_class = ItemFilter
 
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return ItemReadSerializer
+        return self.serializer_class
+
     def get_queryset(self):
         queryset = super().get_queryset()
 
@@ -167,6 +172,13 @@ class ItemVariantViewset(ModelViewSet):
         GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
     ]
     filterset_class = ItemVariantFilter
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return ItemVariantReadSerializer
+        if self.action == "list":
+            return ItemVariantReadSerializer
+        return self.serializer_class
 
     def get_queryset(self):
         queryset = self.queryset

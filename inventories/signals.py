@@ -12,6 +12,9 @@ item_variant_sold = Signal()
 @receiver(post_save, sender=SuppliedItem)
 def on_supplied_item_created(sender, instance, created, **kwargs):
     if created:
+        instance.supply.no_of_items += 1
+        instance.supply.total_cost += instance.quantity * instance.selling_price
+        instance.supply.save()
         instance.variant.quantity += instance.quantity
         instance.variant.save()
         max_price = SuppliedItem.objects.filter(

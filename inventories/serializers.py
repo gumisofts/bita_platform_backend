@@ -14,6 +14,14 @@ class ItemSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ItemReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Item
+        exclude = []
+        read_only_fields = ["id", "created_at", "updated_at"]
+        depth = 1
+
+
 class PropertySerializer(serializers.ModelSerializer):
     class Meta:
         model = Property
@@ -119,6 +127,14 @@ class GroupSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class ItemVariantReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ItemVariant
+        exclude = []
+        read_only_fields = ["id", "created_at", "updated_at", "item_details"]
+        depth = 2
+
+
 class ItemVariantSerializer(serializers.ModelSerializer):
 
     class InnerPricingSerializer(serializers.ModelSerializer):
@@ -136,11 +152,18 @@ class ItemVariantSerializer(serializers.ModelSerializer):
 
     properties = InnerPropertySerializer(many=True, required=False)
     pricings = InnerPricingSerializer(many=True, required=False)
+    item_details = ItemSerializer(source="item", read_only=True)
 
     class Meta:
         model = ItemVariant
         exclude = []
-        read_only_fields = ["id", "selling_price", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "selling_price",
+            "created_at",
+            "updated_at",
+            "item_details",
+        ]
 
     def create(self, validated_data):
         properties = validated_data.pop("properties", [])
