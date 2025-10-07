@@ -20,7 +20,7 @@ class Order(BaseModel):
         "crms.Customer", on_delete=models.SET_NULL, null=True, blank=True
     )
     employee = models.ForeignKey(
-        "accounts.Employee", on_delete=models.SET_NULL, null=True, blank=True
+        "business.Employee", on_delete=models.SET_NULL, null=True, blank=True
     )
     total_payable = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     status = models.CharField(
