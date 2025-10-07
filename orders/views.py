@@ -1,14 +1,30 @@
 from django.db import transaction as db_transaction
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from business.permissions import (
+    AdditionalBusinessPermissionNames,
+    BranchLevelPermission,
+    BusinessLevelPermission,
+    GuardianObjectPermissions,
+)
+from core.utils import is_valid_uuid
+from finances.models import Transaction
+from inventories.models import SuppliedItem
 from orders.models import Order, OrderItem
-from orders.serializers import *
+from orders.serializers import OrderItemSerializer, OrderListSerializer, OrderSerializer
 
 
 class OrderItemViewset(ModelViewSet):
     queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
     http_method_names = ["post"]
+    permission_classes = [
+        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
+    ]
 
     def create(self, request, *args, **kwargs):
         with db_transaction.atomic():
@@ -46,6 +62,30 @@ class OrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     http_method_names = ["get", "post", "patch"]
+    permission_classes = [
+        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
+    ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        business_id = self.request.query_params.get("business_id")
+
+        if not business_id or not is_valid_uuid(business_id):
+            raise ValidationError({"detail": "Empty or invalid business_id"})
+
+        if self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_ORDER.value[0] + "_business",
+            self.request.business,
+        ):
+            queryset = queryset.filter(business=self.request.business)
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return OrderListSerializer
+        if self.action == "retrieve":
+            return OrderListSerializer
+        return self.serializer_class
 
     def update(self, request, *args, **kwargs):
         order = self.get_object()

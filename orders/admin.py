@@ -11,8 +11,8 @@ User = get_user_model()
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    fields = ("item", "quantity")
-    raw_id_fields = ("item",)
+    fields = ("variant", "quantity")
+    raw_id_fields = ("variant",)
     readonly_fields = ("created_at", "updated_at")
 
 
@@ -28,12 +28,12 @@ class OrderAdmin(admin.ModelAdmin):
         "created_at",
     ]
     list_filter = ["status", "created_at"]
-    search_fields = ["customer_id", "employee_id"]
+    search_fields = ["customer", "employee"]
     readonly_fields = ["id", "created_at", "updated_at"]
     inlines = [OrderItemInline]
 
     fieldsets = (
-        (None, {"fields": ("id", "customer_id", "employee_id", "status")}),
+        (None, {"fields": ("id", "customer", "employee", "status")}),
         (_("Financial"), {"fields": ("total_payable",)}),
         (
             _("Timestamps"),
@@ -43,19 +43,19 @@ class OrderAdmin(admin.ModelAdmin):
 
     def customer_info(self, obj):
         try:
-            customer = User.objects.get(id=obj.customer_id)
+            customer = User.objects.get(id=obj.customer)
             return f"{customer.email} ({customer.first_name} {customer.last_name})"
         except User.DoesNotExist:
-            return f"Customer ID: {obj.customer_id}"
+            return f"Customer ID: {obj.customer}"
 
     customer_info.short_description = "Customer"
 
     def employee_info(self, obj):
         try:
-            employee = User.objects.get(id=obj.employee_id)
+            employee = User.objects.get(id=obj.employee)
             return f"{employee.email} ({employee.first_name} {employee.last_name})"
         except User.DoesNotExist:
-            return f"Employee ID: {obj.employee_id}"
+            return f"Employee ID: {obj.employee}"
 
     employee_info.short_description = "Employee"
 
@@ -90,19 +90,19 @@ class OrderItemAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "order_id",
-        "item_name",
+        "variant_name",
         "item_business",
         "quantity",
         "order_status",
         "created_at",
     ]
-    list_filter = ["order__status", "item__business", "created_at"]
-    search_fields = ["order__id", "item__name", "item__business__name"]
+    list_filter = ["order__status", "created_at"]
+    search_fields = ["order__id", "variant__name"]
     readonly_fields = ["id", "created_at", "updated_at"]
-    raw_id_fields = ["order", "item"]
+    raw_id_fields = ["order", "variant"]
 
     fieldsets = (
-        (None, {"fields": ("id", "order", "item", "quantity")}),
+        (None, {"fields": ("id", "order", "variant", "quantity")}),
         (
             _("Timestamps"),
             {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
@@ -114,14 +114,14 @@ class OrderItemAdmin(admin.ModelAdmin):
 
     order_id.short_description = "Order ID"
 
-    def item_name(self, obj):
-        return obj.item.name if obj.item else "-"
+    def variant_name(self, obj):
+        return obj.variant.name if obj.variant else "-"
 
-    item_name.short_description = "Item"
+    variant_name.short_description = "Item"
 
     def item_business(self, obj):
-        if obj.item and obj.item.business:
-            return obj.item.business.name
+        if obj.variant and obj.variant.business:
+            return obj.variant.business.name
         return "-"
 
     item_business.short_description = "Business"
