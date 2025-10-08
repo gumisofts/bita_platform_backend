@@ -94,20 +94,19 @@ class TransactionAdmin(admin.ModelAdmin):
         "type_colored",
         "order_info",
         "total_paid_amount",
-        "total_left_amount",
         "payment_status",
         "created_at",
     ]
     list_filter = ["type", "created_at"]
     search_fields = ["order__id", "order__customer_id", "order__employee_id"]
     readonly_fields = ["id", "created_at", "updated_at"]
-    raw_id_fields = ["order"]
+    raw_id_fields = ["order", "payment_method"]
 
     fieldsets = (
         (None, {"fields": ("id", "type", "order")}),
         (
             _("Financial Details"),
-            {"fields": ("total_paid_amount", "total_left_amount")},
+            {"fields": ("total_paid_amount", "payment_method")},
         ),
         (
             _("Timestamps"),
@@ -144,18 +143,18 @@ class TransactionAdmin(admin.ModelAdmin):
     order_info.short_description = "Order"
 
     def payment_status(self, obj):
-        if obj.total_left_amount == 0:
-            return format_html(
-                '<span style="color: #28a745; font-weight: bold;">Fully Paid</span>'
-            )
-        elif obj.total_paid_amount > 0:
-            return format_html(
-                '<span style="color: #ffc107; font-weight: bold;">Partially Paid</span>'
-            )
-        else:
-            return format_html(
-                '<span style="color: #dc3545; font-weight: bold;">Unpaid</span>'
-            )
+        # if obj. == 0:
+        return format_html(
+            '<span style="color: #28a745; font-weight: bold;">Fully Paid</span>'
+        )
+        # elif obj.total_paid_amount > 0:
+        #     return format_html(
+        #         '<span style="color: #ffc107; font-weight: bold;">Partially Paid</span>'
+        #     )
+        # else:
+        #     return format_html(
+        #         '<span style="color: #dc3545; font-weight: bold;">Unpaid</span>'
+        #     )
 
     payment_status.short_description = "Payment Status"
 
