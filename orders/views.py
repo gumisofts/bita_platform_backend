@@ -17,6 +17,7 @@ from finances.models import Transaction
 from inventories.models import SuppliedItem
 from orders.models import Order, OrderItem
 from orders.serializers import OrderItemSerializer, OrderListSerializer, OrderSerializer
+from orders.signals import order_completed
 
 
 class OrderItemViewset(ModelViewSet):
@@ -165,4 +166,5 @@ class OrderViewset(ModelViewSet):
             )
         order.status = Order.StatusChoices.COMPLETED
         order.save()
+        order_completed.send(sender=Order, instance=order)
         return Response(OrderListSerializer(order).data, status=status.HTTP_200_OK)
