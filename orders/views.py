@@ -152,6 +152,11 @@ class OrderViewset(ModelViewSet):
     @action(detail=True, methods=["get"])
     def checkout(self, request, *args, **kwargs):
         order = self.get_object()
+        if order.status == Order.StatusChoices.COMPLETED:
+            return Response(
+                {"error": "Order is already completed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         order.status = Order.StatusChoices.COMPLETED
         order.save()
-        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+        return Response(OrderListSerializer(order).data, status=status.HTTP_200_OK)
