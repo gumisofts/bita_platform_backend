@@ -25,11 +25,33 @@ from .serializers import (
 )
 
 
-class TransactionViewset(ModelViewSet):
+class TransactionViewset(ListModelMixin, GenericViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     http_method_names = ["get", "post"]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [
+        IsAuthenticated,
+        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions,
+    ]
+
+    def get_queryset(self):
+        queryset = self.queryset
+        user = self.request.user
+
+        if self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION.value[0]
+            + "_business",
+            self.request.business,
+        ):
+            queryset = queryset.filter(business=self.request.business)
+        elif self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION.value[0] + "_branch",
+            self.request.branch,
+        ):
+            queryset = queryset.filter(branch=self.request.branch)
+        else:
+            queryset = queryset.none()
+        return queryset
 
 
 # CRUD for Business Payment Methods

@@ -27,6 +27,14 @@ class Transaction(BaseModel):
         null=True,
         blank=True,
     )
+    branch = models.ForeignKey(
+        "business.Branch", related_name="transactions", on_delete=models.CASCADE
+    )
+    business = models.ForeignKey(
+        "business.Business",
+        related_name="transactions",
+        on_delete=models.CASCADE,
+    )
     type = models.CharField(max_length=20, choices=TransactionType.choices)
     total_paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
     total_left_amount = models.DecimalField(max_digits=10, decimal_places=2)
