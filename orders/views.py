@@ -78,16 +78,22 @@ class OrderViewset(ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        business_id = self.request.query_params.get("business_id")
 
-        if not business_id or not is_valid_uuid(business_id):
-            raise ValidationError({"detail": "Empty or invalid business_id"})
+        if not self.request.business:
+            raise ValidationError({"detail": "Empty or invalid business"})
 
         if self.request.user.has_perm(
             AdditionalBusinessPermissionNames.CAN_VIEW_ORDER.value[0] + "_business",
             self.request.business,
         ):
             queryset = queryset.filter(business=self.request.business)
+        elif self.request.user.has_perm(
+            AdditionalBusinessPermissionNames.CAN_VIEW_ORDER.value[0] + "_branch",
+            self.request.branch,
+        ):
+            queryset = queryset.filter(branch=self.request.branch)
+        else:
+            queryset = queryset.none()
         return queryset
 
     def get_serializer_class(self):
