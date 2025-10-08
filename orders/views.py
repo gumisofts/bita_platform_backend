@@ -1,5 +1,6 @@
 from django.db import transaction as db_transaction
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -65,6 +66,15 @@ class OrderViewset(ModelViewSet):
     permission_classes = [
         BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
     ]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            OrderListSerializer(serializer.instance).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -138,3 +148,10 @@ class OrderViewset(ModelViewSet):
             )
 
         return response
+
+    @action(detail=True, methods=["get"])
+    def checkout(self, request, *args, **kwargs):
+        order = self.get_object()
+        order.status = Order.StatusChoices.COMPLETED
+        order.save()
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)

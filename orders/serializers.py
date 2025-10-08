@@ -1,10 +1,24 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
+from business.models import Employee
 from orders.models import *
 
 
+class CurrentEmployeeDefault(serializers.CurrentUserDefault):
+    requires_context = True
+
+    def __call__(self, serializer_field):
+        business = serializer_field.context["request"].business
+        employee = Employee.objects.filter(
+            user=serializer_field.context["request"].user, business=business
+        ).first()
+        return employee
+
+
 class OrderSerializer(ModelSerializer):
+    employee = serializers.HiddenField(default=CurrentEmployeeDefault())
+
     class InternalOrderItemSerializer(ModelSerializer):
         class Meta:
             model = OrderItem
