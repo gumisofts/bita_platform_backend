@@ -38,10 +38,18 @@ class Transaction(BaseModel):
 class BusinessPaymentMethod(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     payment = models.ForeignKey(PaymentMethod, on_delete=models.SET_NULL, null=True)
+
     business = models.ForeignKey(
         "business.Business",
         related_name="payment_methods",
         on_delete=models.CASCADE,
+    )
+    branch = models.ForeignKey(
+        "business.Branch",
+        related_name="payment_methods",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     label = models.CharField(max_length=255)
 
