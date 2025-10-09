@@ -26,6 +26,7 @@ distlib==0.4.0
 Django==5.2.4
 django-admin-interface==0.30.1
 django-colorfield==0.14.0
+django-cors-headers==4.9.0
 django-filter==25.1
 django-guardian==3.0.3
 django-restframework==0.0.1
