@@ -15,6 +15,7 @@ from business.permissions import (
 from core.utils import is_valid_uuid
 from finances.models import Transaction
 from inventories.models import SuppliedItem
+from orders.filters import OrderFilter
 from orders.models import Order, OrderItem
 from orders.serializers import OrderItemSerializer, OrderListSerializer, OrderSerializer
 from orders.signals import order_completed
@@ -67,6 +68,7 @@ class OrderViewset(ModelViewSet):
     permission_classes = [
         BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
     ]
+    filterset_class = OrderFilter
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

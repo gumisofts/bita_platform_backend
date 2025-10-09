@@ -100,13 +100,13 @@ class TransactionAdmin(admin.ModelAdmin):
     list_filter = ["type", "created_at"]
     search_fields = ["order__id", "order__customer_id", "order__employee_id"]
     readonly_fields = ["id", "created_at", "updated_at"]
-    raw_id_fields = ["order", "payment_method"]
+    raw_id_fields = ["order", "payment_method", "business", "branch"]
 
     fieldsets = (
         (None, {"fields": ("id", "type", "order")}),
         (
             _("Financial Details"),
-            {"fields": ("total_paid_amount", "payment_method")},
+            {"fields": ("total_paid_amount", "payment_method", "total_left_amount")},
         ),
         (
             _("Timestamps"),
