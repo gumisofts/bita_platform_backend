@@ -772,3 +772,43 @@ class EmailChangeConfirmSerializer(serializers.Serializer):
         user.save()
         email_change_request.delete()
         return {"detail": "success"}
+
+
+class ConfirmDeleteUserSerializer(serializers.Serializer):
+    code = serializers.CharField(write_only=True)
+    detail = serializers.CharField(read_only=True)
+    email = serializers.CharField(write_only=True, required=False)
+    phone_number = serializers.CharField(write_only=True, required=False)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        code = attrs.get("code")
+        if not attrs.get("email") and not attrs.get("phone_number"):
+            raise serializers.ValidationError(
+                {"email": ["Email or phone number is required"]}
+            )
+
+        if attrs.get("email"):
+            user = User.objects.filter(email=attrs.get("email")).first()
+        if attrs.get("phone_number"):
+            user = User.objects.filter(phone_number=attrs.get("phone_number")).first()
+        if not user:
+            raise serializers.ValidationError({"email": ["User not found"]})
+
+        verification_code = VerificationCode.objects.filter(
+            user=user, is_used=False
+        ).first()
+        if not verification_code:
+            raise serializers.ValidationError({"code": ["No verification code found"]})
+        if (
+            not check_password(code, verification_code.code)
+            or verification_code.expires_at < timezone.now()
+        ):
+            raise serializers.ValidationError({"code": ["Invalid code"]})
+        attrs["user"] = user
+        return attrs
+
+    def create(self, validated_data):
+        user = validated_data.get("user")
+        user.delete()
+        return {"detail": "success"}

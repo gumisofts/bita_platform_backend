@@ -296,26 +296,130 @@ class JWTTokenVerifyView(TokenVerifyView):
         )
 
 
-# class ConfirmVerificationCodeViewset(CreateModelMixin, GenericViewSet):
-#     serializer_class = ConfirmVerificationCodeSerializer
+class ConfirmDeleteUserDeleteView(GenericViewSet):
+    serializer_class = ConfirmDeleteUserSerializer
+    permission_classes = []
 
-#     def create(self, request, *args, **kwargs):
-#         serializer = self.get_serializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         self.perform_create(serializer)
-#         headers = self.get_success_headers(serializer.data)
-#         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+    @action(detail=False, methods=["get"], url_path="")
+    def get_user_detail(self, request):
+        phone_number = request.query_params.get("phone_number")
+        email = request.query_params.get("email")
+        if email:
+            user = User.objects.filter(email=email).first()
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number).first()
+        if not email and not phone_number:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Email and phone number cannot be used together",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not user:
+            return Response(
+                {"success": False, "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        response_data = {
+            "success": True,
+            "account_info": {
+                "name": user.get_full_name(),
+                "email": user.email,
+                "phone": user.phone_number,
+                "created_at": user.created_at,
+                "data_to_be_deleted": [
+                    "Personal information (name, email, phone)",
+                    "Order history and transaction records",
+                    "Saved addresses and payment methods",
+                    "Account preferences and settings",
+                    "Communication history and support tickets",
+                    "Any uploaded documents or files",
+                ],
+            },
+            "message": "User detail fetched successfully",
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
 
+    @action(
+        detail=False,
+        methods=["delete"],
+        url_path="confirm-delete",
+        permission_classes=[IsAuthenticated],
+    )
+    def confirm_delete_user(self, request):
+        user = request.user
+        user.delete()
+        return Response(
+            {"success": True, "message": "User deleted"}, status=status.HTTP_200_OK
+        )
 
-# class SendVerificationCodeViewset(CreateModelMixin, GenericViewSet):
-#     serializer_class = SendVerificationCodeSerializer
+    @action(detail=False, methods=["post"], url_path="verify-code")
+    def verify_code(self, request):
+        code = request.data.get("code")
+        phone_number = request.data.get("phone_number")
+        email = request.data.get("email")
+        if email:
+            user = User.objects.filter(email=email).first()
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number).first()
+        if not user:
+            return Response(
+                {"success": False, "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        verification_code = VerificationCode.objects.filter(
+            user=user, is_used=False
+        ).first()
+        if not verification_code or not check_password(code, verification_code.code):
+            return Response(
+                {"success": False, "message": "Invalid code"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if verification_code.expires_at < timezone.now():
+            return Response(
+                {"success": False, "message": "Code expired"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {
+                "success": True,
+                "message": "Code verified",
+                "token": str(RefreshToken.for_user(user).access_token),
+            },
+            status=status.HTTP_200_OK,
+        )
 
-#     def create(self, request, *args, **kwargs):
-#         serializer = self.get_serializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         self.perform_create(serializer)
-#         headers = self.get_success_headers(serializer.data)
-#         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+    @action(detail=False, methods=["post"], url_path="send-code")
+    def send_delete_user_code(self, request):
+        phone_number = request.data.get("phone_number")
+        email = request.data.get("email")
+        if email:
+            user = User.objects.filter(email=email).first()
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number).first()
+        if not user:
+            return Response(
+                {"success": False, "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        VerificationCode.objects.create(
+            user=user,
+            code="123456",
+            phone_number=phone_number,
+            email=email,
+            expires_at=timezone.now() + timedelta(minutes=5),
+        )
+        # send_verification_code.send(self, phone_number=phone_number, email=email)
+        return Response(
+            {"success": True, "message": "Code sent"}, status=status.HTTP_200_OK
+        )
+
+    #  {
+    #     success: true,
+    #     message: `A verification code has been sent to your ${request.type}.`,
+    #     codeLength: 6,
+    # }
 
 
 class UserDeviceViewset(CreateModelMixin, GenericViewSet):

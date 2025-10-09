@@ -15,41 +15,10 @@ auth_router = URLRouter([path("test/", TestConsumer.as_asgi())])
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet, basename="users")
+router.register(
+    r"auth/delete-account", ConfirmDeleteUserDeleteView, basename="delete-user-account"
+)
 router.register(r"auth", AuthViewset, basename="auth")
-# router.register(r"auth/register", RegisterViewset, basename="auth-register")
-# router.register(
-#     r"auth/refresh/login", RefreshLoginViewset, basename="auth-refresh-login"
-# )
-# router.register(
-#     r"auth/password/reset", ResetRequestViewset, basename="auth-password-reset"
-# )
-# router.register(
-#     r"auth/password/reset/confirm",
-#     ConfirmResetPasswordRequestViewset,
-#     basename="auth-password-reset-confirm",
-# )
-# router.register(
-#     r"auth/password/change", PasswordChangeViewset, basename="auth-password-change"
-# )
-# router.register(
-#     r"auth/password/reset/request",
-#     ResetPasswordRequestViewset,
-#     basename="auth-password-reset-request",
-# )
-# router.register(r"auth/login", LoginViewset, basename="auth-login")
-# router.register(
-#     r"auth/google/login", LoginWithGoogleViewset, basename="auth-google-login"
-# )
-# router.register(
-#     r"auth/verifications/confirm",
-#     ConfirmVerificationCodeViewset,
-#     basename="auth-verification-confirm",
-# )
-# router.register(
-#     r"auth/verifications/send",
-#     SendVerificationCodeViewset,
-#     basename="auth-verification-send",
-# )
 
 router.register(r"user_devices", UserDeviceViewset, basename="user-devices")
 
