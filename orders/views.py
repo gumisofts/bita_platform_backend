@@ -70,15 +70,6 @@ class OrderViewset(ModelViewSet):
     ]
     filterset_class = OrderFilter
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            OrderListSerializer(serializer.instance).data,
-            status=status.HTTP_201_CREATED,
-        )
-
     def get_queryset(self):
         queryset = super().get_queryset()
 
@@ -100,8 +91,6 @@ class OrderViewset(ModelViewSet):
         return queryset
 
     def get_serializer_class(self):
-        if self.action == "list":
-            return OrderListSerializer
         if self.action == "retrieve":
             return OrderListSerializer
         return self.serializer_class
