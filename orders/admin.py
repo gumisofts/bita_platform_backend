@@ -27,7 +27,7 @@ class OrderAdmin(admin.ModelAdmin):
         "item_count",
         "created_at",
     ]
-    list_filter = ["status", "created_at"]
+    list_filter = ["status", "created_at", "branch", "business"]
     search_fields = ["customer", "employee"]
     readonly_fields = ["id", "created_at", "updated_at"]
     inlines = [OrderItemInline]
@@ -43,19 +43,23 @@ class OrderAdmin(admin.ModelAdmin):
 
     def customer_info(self, obj):
         try:
-            customer = User.objects.get(id=obj.customer)
-            return f"{customer.email} ({customer.first_name} {customer.last_name})"
+            if obj.customer:
+                return f"{obj.customer.email} ({obj.customer.full_name})"
+            else:
+                return "N/A"
         except User.DoesNotExist:
-            return f"Customer ID: {obj.customer}"
+            return f"Customer ID: {obj.customer.id}"
 
     customer_info.short_description = "Customer"
 
     def employee_info(self, obj):
         try:
-            employee = User.objects.get(id=obj.employee)
-            return f"{employee.email} ({employee.first_name} {employee.last_name})"
+            if obj.employee and obj.employee.user:
+                return f"{obj.employee.user.email} ({obj.employee.full_name})"
+            else:
+                return "N/A"
         except User.DoesNotExist:
-            return f"Employee ID: {obj.employee}"
+            return f"Employee ID: {obj.employee.id}"
 
     employee_info.short_description = "Employee"
 

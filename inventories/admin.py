@@ -64,12 +64,12 @@ class ItemAdmin(admin.ModelAdmin):
     list_filter = ["business", "group", "inventory_unit", "categories", "created_at"]
     search_fields = ["name", "description", "business__name", "group__name"]
     readonly_fields = ["id", "created_at", "updated_at"]
-    raw_id_fields = ["business", "group"]
+    raw_id_fields = ["business", "group", "branch"]
     filter_horizontal = ["categories"]
     # inlines = [PropertyInline]  # Property is related to ItemVariant, not Item
 
     fieldsets = (
-        (None, {"fields": ("id", "name", "business", "group")}),
+        (None, {"fields": ("id", "name", "business", "branch", "group")}),
         (
             _("Details"),
             {"fields": ("description", "inventory_unit", "min_selling_quota")},

@@ -270,8 +270,19 @@ class Employee(BaseModel):
         related_name="employees",
     )
 
+    @property
+    def full_name(self):
+        full_name = self.user.first_name
+
+        if self.user.last_name:
+            full_name += f" {self.user.last_name}"
+        return full_name
+
     def __str__(self):
-        return f"{self.user.email} - {self.role} at {self.business}"
+        if self.user:
+            return f"{self.user.email} - {self.role} at {self.business}"
+        else:
+            return f"Employee ID: {self.id}"
 
 
 class BusinessActivity(BaseModel):
