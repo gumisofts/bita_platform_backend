@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     "guardian",
     "core",
     "accounts",
-    "platform_control",
+    "administration",
     "files",
     "storages",
     "inventories",
