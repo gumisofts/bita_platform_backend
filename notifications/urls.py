@@ -1,7 +1,7 @@
-from django.urls import path
+from .views import NotificationViewSet
+from rest_framework.routers import DefaultRouter
 
-from . import views
+router = DefaultRouter()
+router.register(r'', NotificationViewSet, basename='notification')
 
-urlpatterns = [
-    path("send-mail/", views.send_single_email, name="send_single_email"),
-]
+urlpatterns = router.urls
