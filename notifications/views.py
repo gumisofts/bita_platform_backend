@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from .filters import NotificationFilter
 from .models import Notification, NotificationRecipient
 from .serializers import NotificationMarkAsReadSerializer, NotificationSerializer
 
@@ -17,6 +18,7 @@ class NotificationViewSet(ListModelMixin, GenericViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = NotificationFilter
 
     def get_queryset(self):
         return self.queryset.filter(recipients__recipient=self.request.user)
