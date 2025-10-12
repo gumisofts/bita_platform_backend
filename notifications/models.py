@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 
+from core.models import BaseModel
+
 # Create your models here.
 MESSAGE_FORMAT_CHOICES = [
     ("text", "Text"),
@@ -23,7 +25,7 @@ NOTIFICATION_TYPE_CHOICES = [
 ]
 
 
-class Notification(models.Model):
+class Notification(BaseModel):
     title = models.CharField(max_length=255)
     message = models.TextField()
     message_format = models.CharField(max_length=255, choices=MESSAGE_FORMAT_CHOICES)
@@ -53,4 +55,4 @@ class NotificationRecipient(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.recipient.email
+        return f"{self.recipient.email}: {self.recipient.phone_number} - {self.notification.title}"
