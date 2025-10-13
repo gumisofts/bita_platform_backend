@@ -1,13 +1,15 @@
 - name: Django Application server set up
-  hosts: myhosts
+  hosts: main
   tasks:
     - name: Update packages
       become: true
+      tags: [installation]
       ansible.builtin.apt:
         upgrade: yes
 
     - name: Install Nginx and python
       become: true
+      tags: [installation, app,nginx]
       ansible.builtin.apt:
         name:
           - nginx
@@ -15,64 +17,97 @@
           - python3-venv
 
     - name: Getting code base
+      tags: [installation, app]
       ansible.builtin.git:
         accept_hostkey: true
         clone: yes
         update: yes
-        name: git@github.com:gumi-apps/django-backend-template.git
+        name: git@github.com:gumisofts/django_entrance_tricks.git
         dest: app
         force: yes
     - name: Setup Environment for Django App
+      tags: [installation, app]
       ansible.builtin.shell:
         chdir: ~/app
         cmd: python3 -m venv env
     - name: Install Pip requirements
+      tags: [installation, app]
       ansible.builtin.pip:
         virtualenv: ~/app/env
         requirements: ~/app/requirements.txt
+
+    - name: Create log directory
+      tags: [installation, app]
+      ansible.builtin.file:
+        path: /var/log/gunicorn
+        state: directory
+        mode: '0755'
+
     - name: Setup unix socket
       become: true
+      tags: [installation, app]
       ansible.builtin.copy:
         force: true
-        src: ../deployment/app.socket
+        src: ../app.socket
         dest: /etc/systemd/system/app.socket
     - name: Setup Service
       become: true
+      tags: [installation, app]
       ansible.builtin.copy:
         force: true
-        src: ../deployment/app.service
+        src: ../app.service
         dest: /etc/systemd/system/app.service
     - name: Copy Environmental Variables
-      # become: true
+      tags: [installation, app]
       copy:
-        dest: ~/app/config/
+        dest: ~/app/
         force: true
-        src: ../config/.env
+        src: ../.env
 
     - name: Enable app Service
       become: true
+      tags: [restart, app]
       ansible.builtin.systemd_service:
         name: app
-        state: started
+        state: reloaded
         enabled: true
         daemon_reload: true
 
-    - name: Upload nginx conf
+
+    - name: Upload ssl certificate
       become: true
+      tags: [installation,nginx]
       ansible.builtin.copy:
         force: true
-        src: ../deployment/app.conf
-        dest: /etc/nginx/conf.d/
+        src: ../api.bita.gumisofts.com.crt
+        dest: /etc/ssl/certs/api.bita.gumisofts.com.crt
+    - name: Upload ssl certificate private key
+      become: true
+      tags: [installation,nginx]
+      ansible.builtin.copy:
+        force: true
+        src: ../api.bita.gumisofts.com.pem
+        dest: /etc/ssl/certs/api.bita.gumisofts.com.pem
+
+    - name: Upload nginx conf
+      become: true
+      tags: [installation,nginx]
+      ansible.builtin.copy:
+        force: true
+        src: ../nginx.conf
+        dest: /etc/nginx/conf.d/app.conf
 
     - name: Enable Nginx Services on Boot
+      tags: [restart,nginx]
       ansible.builtin.systemd_service:
         name: nginx
         enabled: true
-        state: started
-    - name: Enable Bita_markets Service
+        state: reloaded
+    - name: Enable app Service
       become: true
+      tags: [restart]
       ansible.builtin.systemd_service:
-        name: bita_markets
+        name: app
         enabled: true
-        state: started
+        state: reloaded
         daemon_reload: true
