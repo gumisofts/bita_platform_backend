@@ -111,3 +111,9 @@ class SignedURLSerializer(serializers.Serializer):
         """
         mime_type, _ = mimetypes.guess_type(file_path)
         return mime_type or "application/octet-stream"
+
+
+class FileModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FileModel
+        fields = "__all__"
