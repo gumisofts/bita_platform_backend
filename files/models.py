@@ -17,6 +17,7 @@ class FileMeta(models.Model):
     key = models.CharField(max_length=255, primary_key=True)
     public_url = models.CharField(max_length=255)
 
+
 class FilePurpose(models.TextChoices):
     PROFILE_PICTURE = "PROFILE_PICTURE"
     ITEM = "ITEM"
@@ -26,16 +27,17 @@ class FilePurpose(models.TextChoices):
     INVOICE = "INVOICE"
     OTHER = "OTHER"
 
+
 class FileModel(BaseModel):
-    
+
     def upload_to(self, filename):
         return f"{self.purpose.lower()}/{filename}"
-    
+
     file = models.FileField(upload_to=upload_to)
     purpose = models.CharField(max_length=255, choices=FilePurpose.choices)
 
     def __str__(self):
         return self.file.name
-    
+
     def get_file_url(self):
         return self.file.url

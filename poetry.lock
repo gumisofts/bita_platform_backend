@@ -859,6 +859,7 @@ files = [
 ]
 
 [package.dependencies]
+boto3 = {version = ">=1.4.4", optional = true, markers = "extra == \"s3\""}
 Django = ">=3.2"
 
 [package.extras]
@@ -3047,4 +3048,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10.12"
-content-hash = "e8703451e69ac69cda786837d70b67f6b05e61eb939abc31afeffb5cd13d6926"
+content-hash = "e8f276ae9df4e920d33e35ad23fae6d519c1637267bf59ee96e377bbc8d62472"

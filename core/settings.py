@@ -24,7 +24,8 @@ CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000"
 )
 
 AUTH_USER_MODEL = "accounts.User"
-INSTALLED_APPS = [
+
+DEFAULT_APPS = [
     "admin_interface",
     "colorfield",
     "django.contrib.admin",
@@ -35,11 +36,17 @@ INSTALLED_APPS = [
     "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
     "corsheaders",
+]
+
+THIRD_PARTY_APPS = [
     "rest_framework",
     "drf_spectacular",
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
     "guardian",
+]
+
+LOCAL_APPS = [
     "core",
     "accounts",
     "administration",
@@ -54,6 +61,8 @@ INSTALLED_APPS = [
     "markets",
     "chat",
 ]
+
+INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -135,7 +144,16 @@ USE_I18N = True
 USE_TZ = True
 
 STORAGES = {
-    # ...
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        "OPTIONS": {
+            "bucket_name": os.getenv("AWS_STORAGE_BUCKET_NAME"),
+            "region_name": os.getenv("AWS_S3_REGION_NAME"),
+            "querystring_auth": True,
+        },
+        "FILE_UPLOAD_PERMISSIONS": 0o644,
+        "FILE_UPLOAD_DIRECTORY_PERMISSIONS": 0o755,
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },

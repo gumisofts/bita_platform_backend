@@ -25,7 +25,9 @@ class FileMetaDataViewset(
     permission_classes = [IsAuthenticated]
 
 
-class FileModelViewset(CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewSet):
+class FileModelViewset(
+    CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewSet
+):
     serializer_class = FileModelSerializer
     permission_classes = [IsAuthenticated]
     queryset = FileModel.objects.all()

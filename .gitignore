@@ -167,3 +167,6 @@ staticfiles/**
 nogit/
 env/
 nogit/
+
+*.pem
+*.crt
