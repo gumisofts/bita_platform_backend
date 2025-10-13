@@ -6,7 +6,7 @@ import multiprocessing
 bind = "unix:/run/app.sock"
 
 # Worker class (sync is default; you can switch to "gevent" or "uvicorn.workers.UvicornWorker" for ASGI apps)
-worker_class = "sync"
+worker_class = "uvicorn.workers.UvicornWorker"
 
 # Recommended formula: (2 x $num_cores) + 1
 workers = multiprocessing.cpu_count() * 2 + 1

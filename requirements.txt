@@ -57,6 +57,7 @@ google-resumable-media==2.7.2
 googleapis-common-protos==1.70.0
 grpcio==1.75.1
 grpcio-status==1.75.1
+gunicorn==23.0.0
 h11==0.16.0
 h2==4.3.0
 hjson==3.1.0
@@ -136,6 +137,7 @@ typing_extensions==4.14.1
 tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.5.0
+uvicorn==0.37.0
 vine==5.1.0
 virtualenv==20.33.1
 wcwidth==0.2.14

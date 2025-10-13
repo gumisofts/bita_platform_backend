@@ -7,7 +7,7 @@ myhosts:
     c:
       ansible_host: 172.25.0.4
     aws:
-      ansible_host: 13.60.156.50
+      ansible_host: 13.51.169.26
   vars:
     ansible_user: ubuntu
     ansible_ssh_pass: test

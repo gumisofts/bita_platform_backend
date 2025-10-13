@@ -1,11 +1,13 @@
 - name: Django Application server set up
-  hosts: main
+  hosts: aws
   tasks:
     - name: Update packages
       become: true
       tags: [installation]
       ansible.builtin.apt:
         upgrade: yes
+        update_cache: yes
+  
 
     - name: Install Nginx and python
       become: true
@@ -22,7 +24,7 @@
         accept_hostkey: true
         clone: yes
         update: yes
-        name: git@github.com:gumisofts/django_entrance_tricks.git
+        name: git@github.com:gumisofts/bita_platform_backend.git
         dest: app
         force: yes
     - name: Setup Environment for Django App
@@ -35,13 +37,6 @@
       ansible.builtin.pip:
         virtualenv: ~/app/env
         requirements: ~/app/requirements.txt
-
-    - name: Create log directory
-      tags: [installation, app]
-      ansible.builtin.file:
-        path: /var/log/gunicorn
-        state: directory
-        mode: '0755'
 
     - name: Setup unix socket
       become: true
