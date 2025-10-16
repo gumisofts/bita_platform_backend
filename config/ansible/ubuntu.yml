@@ -1,0 +1,108 @@
+- name: Django Application server set up
+  hosts: aws
+  tasks:
+    - name: Update packages
+      become: true
+      tags: [installation]
+      ansible.builtin.apt:
+        upgrade: yes
+        update_cache: yes
+
+
+    - name: Install Nginx and python
+      become: true
+      tags: [installation, app,nginx]
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - python3-dev
+          - python3-venv
+
+    - name: Getting code base
+      tags: [installation, app]
+      ansible.builtin.git:
+        accept_hostkey: true
+        clone: yes
+        update: yes
+        name: git@github.com:gumisofts/bita_platform_backend.git
+        dest: app
+        force: yes
+    - name: Setup Environment for Django App
+      tags: [installation, app]
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: python3 -m venv env
+    - name: Install Pip requirements
+      tags: [installation, app]
+      ansible.builtin.pip:
+        virtualenv: ~/app/env
+        requirements: ~/app/requirements.txt
+
+    - name: Setup unix socket
+      become: true
+      tags: [installation, app]
+      ansible.builtin.copy:
+        force: true
+        src: ../app.socket
+        dest: /etc/systemd/system/app.socket
+    - name: Setup Service
+      become: true
+      tags: [installation, app]
+      ansible.builtin.copy:
+        force: true
+        src: ../app.service
+        dest: /etc/systemd/system/app.service
+    - name: Copy Environmental Variables
+      tags: [installation, app]
+      copy:
+        dest: ~/app/
+        force: true
+        src: ../.env
+
+    - name: Enable app Service
+      become: true
+      tags: [restart, app]
+      ansible.builtin.systemd_service:
+        name: app
+        state: reloaded
+        enabled: true
+        daemon_reload: true
+
+
+    - name: Upload ssl certificate
+      become: true
+      tags: [installation,nginx]
+      ansible.builtin.copy:
+        force: true
+        src: ../api.bita.gumisofts.com.crt
+        dest: /etc/ssl/certs/api.bita.gumisofts.com.crt
+    - name: Upload ssl certificate private key
+      become: true
+      tags: [installation,nginx]
+      ansible.builtin.copy:
+        force: true
+        src: ../api.bita.gumisofts.com.pem
+        dest: /etc/ssl/certs/api.bita.gumisofts.com.pem
+
+    - name: Upload nginx conf
+      become: true
+      tags: [installation,nginx]
+      ansible.builtin.copy:
+        force: true
+        src: ../nginx.conf
+        dest: /etc/nginx/conf.d/app.conf
+
+    - name: Enable Nginx Services on Boot
+      tags: [restart,nginx]
+      ansible.builtin.systemd_service:
+        name: nginx
+        enabled: true
+        state: reloaded
+    - name: Enable app Service
+      become: true
+      tags: [restart]
+      ansible.builtin.systemd_service:
+        name: app
+        enabled: true
+        state: reloaded
+        daemon_reload: true

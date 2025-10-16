@@ -6,10 +6,11 @@ from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 from django.urls import path
 
+from accounts.urls import auth_router
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
 
 asgi_app = get_asgi_application()
-from accounts.urls import auth_router
 
 app = ProtocolTypeRouter(
     {

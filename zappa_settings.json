@@ -1,0 +1,37 @@
+{
+    "dev": {
+        "aws_region": "eu-north-1",
+        "django_settings": "core.settings",
+        "exclude": [
+            "boto3",
+            "dateutil",
+            "botocore",
+            "s3transfer",
+            "concurrent"
+        ],
+        "profile_name": "bita",
+        "project_name": "bita-platform-b",
+        "runtime": "python3.12",
+        "s3_bucket": "zappa-bita",
+        "slim_handler": true,
+        "certificate_arn": "arn:aws:acm:us-east-1:626635425063:certificate/dae101ec-26dc-4170-9d2d-20858cc710b1",
+        "domain": "bita.dev.gumisofts.com"
+    },
+    "pro": {
+        "aws_region": "eu-north-1",
+        "django_settings": "core.settings",
+        "exclude": [
+            "boto3",
+            "dateutil",
+            "botocore",
+            "s3transfer",
+            "concurrent"
+        ],
+        "profile_name": "bita",
+        "project_name": "bita-platform-b",
+        "runtime": "python3.12",
+        "s3_bucket": "zappa-bita",
+        "certificate_arn": "arn:aws:acm:us-east-1:626635425063:certificate/dae101ec-26dc-4170-9d2d-20858cc710b1",
+        "domain": "bita.v01.gumisofts.com"
+    }
+}

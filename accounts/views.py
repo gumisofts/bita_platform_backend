@@ -6,328 +6,268 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from drf_spectacular.utils import (
     OpenApiExample,
+    OpenApiParameter,
+    OpenApiTypes,
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import generics, status, viewsets
-from rest_framework.permissions import AllowAny
+from rest_framework.decorators import action
+from rest_framework.mixins import (
+    CreateModelMixin,
+    DestroyModelMixin,
+    ListModelMixin,
+    RetrieveModelMixin,
+    UpdateModelMixin,
+)
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework_simplejwt.tokens import AccessToken
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+)
 
-from .models import (
-    Address,
-    Branch,
-    Business,
-    Category,
-    EmailChangeRequest,
-    Employee,
-    PhoneChangeRequest,
-    Role,
-    RolePermission,
-)
-from .serializers import (
-    AddressSerializer,
-    BranchSerializer,
-    BusinessSerializer,
-    CategorySerializer,
-    CustomTokenObtainPairSerializer,
-    EmailChangeRequestSerializer,
-    EmployeeInvitationSerializer,
-    PasswordChangeSerializer,
-    PasswordResetSerializer,
-    PhoneChangeRequestSerializer,
-    RolePermissionSerializer,
-    RoleSerializer,
-    SetNewPasswordSerializer,
-    UserSerializer,
-)
+from accounts.models import *
+from accounts.serializers import *
 
 User = get_user_model()
 
 
-@extend_schema(
-    summary="User Management",
-    description="Retrieve, create, update, or delete users.",
-)
-@extend_schema_view(
-    list=extend_schema(
-        summary="List Users",
-        description="Retrieve a list of all users. (Admin only)",
-    ),
-    create=extend_schema(
-        summary="Create User",
-        description="Create a new user. (Registration endpoint)",
-        examples=[
-            OpenApiExample(
-                "Example 1",
-                value={
-                    "email": "user@example.com",
-                    "first_name": "string",
-                    "last_name": "string",
-                    "phone": "924530740",
-                    "password": "password",
-                },
-                request_only=True,  # Ensures this is only for requests
-            ),
-        ],
-    ),
-    retrieve=extend_schema(
-        summary="Retrieve User",
-        description="Retrieve a single user by its ID. \
-            (Admin or the user queried)",
-    ),
-    update=extend_schema(
-        summary="Update User",
-        description="Update a user completely.",
-    ),
-    partial_update=extend_schema(
-        summary="Partial Update User",
-        description="Partially update a user instance.",
-    ),
-    destroy=extend_schema(
-        summary="Delete User",
-        description="Delete a user instance.",
-    ),
-)
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(
+    ListModelMixin,
+    RetrieveModelMixin,
+    GenericViewSet,
+    UpdateModelMixin,
+    CreateModelMixin,
+):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
+    @action(
+        detail=False,
+        methods=["delete"],
+        permission_classes=[IsAuthenticated],
+    )
+    def delete(self, request, *args, **kwargs):
+        instance = request.user
         instance.is_active = False
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
+    def me(self, request):
+        user = request.user
+        serializer = UserSerializer(user, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-class PhoneChangeRequestView(generics.GenericAPIView):
-    serializer_class = PhoneChangeRequestSerializer
 
-    def post(self, request):
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
+class AuthViewset(GenericViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+    def get_success_headers(self, data):
+        try:
+            return {"Location": str(data[api_settings.URL_FIELD_NAME])}
+        except (TypeError, KeyError):
+            return {}
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[],
+        serializer_class=RegisterSerializer,
+    )
+    def register(self, request):
+        user = request.data
+        serializer = RegisterSerializer(data=user)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        headers = self.get_success_headers(serializer.data)
         return Response(
-            {"detail": "Phone change request sent."}, status=status.HTTP_200_OK
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
 
-
-class PhoneChangeConfirmView(generics.GenericAPIView):
-    def post(self, request, uidb64, token):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response(
-                {"detail": "Invalid link."}, status=status.HTTP_400_BAD_REQUEST
-            )
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Invalid or expired token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        phone_request = (
-            PhoneChangeRequest.objects.filter(
-                user=user,
-                expires_at__gte=timezone.now(),
-            )
-            .order_by("-created_at")
-            .first()
-        )
-        if not phone_request:
-            return Response(
-                {"detail": "No valid phone change request found"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        user.phone_number = phone_request.new_phone
-        user.save()
-        phone_request.delete()
-        return Response(
-            {"detail": "Phone number has been changed."},
-            status=status.HTTP_200_OK,
-        )
-
-
-class EmailChangeRequestView(generics.GenericAPIView):
-    serializer_class = EmailChangeRequestSerializer
-
-    def post(self, request):
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {"detail": "Email change confirmation link sent."},
-            status=status.HTTP_200_OK,
-        )
-
-
-class EmailChangeConfirmView(generics.GenericAPIView):
-    def post(self, request, uidb64, token):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response(
-                {"detail": "Invalid link."}, status=status.HTTP_400_BAD_REQUEST
-            )
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Invalid or expired token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        email_request = (
-            EmailChangeRequest.objects.filter(
-                user=user,
-                expires_at__gte=timezone.now(),
-            )
-            .order_by("-created_at")
-            .first()
-        )
-        if not email_request:
-            return Response(
-                {"detail": "No valid email change request found"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        user.email = email_request.new_email
-        user.save()
-        email_request.delete()
-        return Response(
-            {"detail": "Email has been changed."}, status=status.HTTP_200_OK
-        )
-
-
-class BusinessViewSet(viewsets.ModelViewSet):
-    queryset = Business.objects.all()
-    serializer_class = BusinessSerializer
-
-
-@extend_schema_view(
-    post=extend_schema(
-        summary="Password Reset",
-        description="Send a password reset link to the user's email.",
-    ),
-)
-class PasswordResetView(generics.GenericAPIView):
-    serializer_class = PasswordResetSerializer
-
-    def post(self, request):
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {"detail": "Password reset link sent."}, status=status.HTTP_200_OK
-        )
-
-
-@extend_schema_view(
-    post=extend_schema(
-        summary="Password Reset Confirm",
-        description="Confirm the password reset by setting a new password.",
-    ),
-)
-class PasswordResetConfirmView(generics.GenericAPIView):
-    serializer_class = SetNewPasswordSerializer
-
-    def post(self, request, uidb64, token):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response(
-                {"detail": "Invalid link."}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Invalid or expired token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[],
+        serializer_class=LoginSerializer,
+    )
+    def login(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(user)
-        return Response(
-            {"detail": "Password has been reset."}, status=status.HTTP_200_OK
-        )
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
 
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[],
+        url_path="google/login",
+        serializer_class=LoginWithGoogleIdTokenSerializer,
+    )
+    def login_with_google(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
 
-@extend_schema_view(
-    put=extend_schema(
-        summary="Password Change",
-        description="Change the user's password.",
-    ),
-)
-class PasswordChangeView(generics.UpdateAPIView):
-    serializer_class = PasswordChangeSerializer
-    http_method_names = ["put"]
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[],
+        serializer_class=RefreshLoginSerializer,
+    )
+    def refresh_login(self, request):
+        serializer = RefreshLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
 
-    def get_object(self):
-        return self.request.user
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="password/reset/request",
+        permission_classes=[],
+        serializer_class=ResetPasswordRequestSerializer,
+    )
+    def reset_request(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
 
-    def update(self, request, *args, **kwargs):
-        user = self.get_object()
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="phone/change/request",
+        permission_classes=[IsAuthenticated],
+        serializer_class=PhoneChangeRequestSerializer,
+    )
+    def phone_change_request(self, request):
         serializer = self.get_serializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save(user)
-        update_session_auth_hash(request, user)  # Keep the user logged in
-        return Response(
-            {"detail": "Password has been changed."}, status=status.HTTP_200_OK
-        )
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
 
-
-@extend_schema_view(
-    post=extend_schema(
-        summary="Login",
-        description="Obtain a new access token by \
-            exchanging username and password.",
-    ),
-)
-class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
-
-
-@extend_schema_view(
-    list=extend_schema(
-        summary="List Businesses",
-        description="Retrieve a list of all businesses. (Admin only)",
-    ),
-    retrieve=extend_schema(
-        summary="Retrieve Business",
-        description="Retrieve a single business by its ID. \
-            (Admin or the business owner queried)",
-    ),
-    create=extend_schema(
-        summary="Create Business",
-        description="Create a new business.",
-    ),
-    update=extend_schema(
-        summary="Update Business",
-        description="Update a business completely.",
-    ),
-    partial_update=extend_schema(
-        summary="Partial Update Business",
-        description="Partially update a business instance.",
-    ),
-    destroy=extend_schema(
-        summary="Delete Business",
-        description="Delete a business instance.",
-    ),
-)
-@extend_schema_view(
-    post=extend_schema(
-        summary="Token verification",
-        description="Verify the token and return user data.",
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="phone/change/confirm",
+        permission_classes=[],
+        serializer_class=PhoneChangeConfirmSerializer,
     )
-)
+    def phone_change_confirm(self, request):
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="email/change/request",
+        permission_classes=[IsAuthenticated],
+        serializer_class=EmailChangeRequestSerializer,
+    )
+    def email_change_request(self, request):
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="email/change/confirm",
+        permission_classes=[],
+        serializer_class=EmailChangeConfirmSerializer,
+    )
+    def email_change_confirm(self, request):
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="password/reset/confirm",
+        permission_classes=[],
+        serializer_class=ConfirmResetPasswordRequestViewsetSerializer,
+    )
+    def confirm_reset_password_request(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["patch"],
+        url_path="password/change",
+        permission_classes=[IsAuthenticated],
+        serializer_class=PasswordChangeSerializer,
+    )
+    def password_change(self, request):
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="verifications/send",
+        permission_classes=[AllowAny],
+        serializer_class=SendVerificationCodeSerializer,
+    )
+    def send_verification_code(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="verifications/confirm",
+        permission_classes=[AllowAny],
+        serializer_class=ConfirmVerificationCodeSerializer,
+    )
+    def confirm_verification_code(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+
 class JWTTokenVerifyView(TokenVerifyView):
     permission_classes = (AllowAny,)
 
@@ -356,82 +296,133 @@ class JWTTokenVerifyView(TokenVerifyView):
         )
 
 
-class AddressViewSet(viewsets.ModelViewSet):
-    queryset = Address.objects.all()
-    serializer_class = AddressSerializer
+class ConfirmDeleteUserDeleteView(GenericViewSet):
+    serializer_class = ConfirmDeleteUserSerializer
+    permission_classes = []
 
+    @action(detail=False, methods=["get"], url_path="")
+    def get_user_detail(self, request):
+        phone_number = request.query_params.get("phone_number")
+        email = request.query_params.get("email")
+        if email:
+            user = User.objects.filter(email=email).first()
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number).first()
+        if not email and not phone_number:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Email and phone number cannot be used together",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not user:
+            return Response(
+                {"success": False, "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        response_data = {
+            "success": True,
+            "account_info": {
+                "name": user.get_full_name(),
+                "email": user.email,
+                "phone": user.phone_number,
+                "created_at": user.created_at,
+                "data_to_be_deleted": [
+                    "Personal information (name, email, phone)",
+                    "Order history and transaction records",
+                    "Saved addresses and payment methods",
+                    "Account preferences and settings",
+                    "Communication history and support tickets",
+                    "Any uploaded documents or files",
+                ],
+            },
+            "message": "User detail fetched successfully",
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
 
-class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-
-
-class RoleViewSet(viewsets.ModelViewSet):
-    queryset = Role.objects.all()
-    serializer_class = RoleSerializer
-
-
-class RolePermissionViewSet(viewsets.ModelViewSet):
-    queryset = RolePermission.objects.all()
-    serializer_class = RolePermissionSerializer
-
-
-class EmployeeInvitationView(generics.GenericAPIView):
-    serializer_class = EmployeeInvitationSerializer
-
-    def post(self, request):
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+    @action(
+        detail=False,
+        methods=["delete"],
+        url_path="confirm-delete",
+        permission_classes=[IsAuthenticated],
+    )
+    def confirm_delete_user(self, request):
+        user = request.user
+        user.delete()
         return Response(
-            {"detail": "Employee invitation sent."},
+            {"success": True, "message": "User deleted"}, status=status.HTTP_200_OK
+        )
+
+    @action(detail=False, methods=["post"], url_path="verify-code")
+    def verify_code(self, request):
+        code = request.data.get("code")
+        phone_number = request.data.get("phone_number")
+        email = request.data.get("email")
+        if email:
+            user = User.objects.filter(email=email).first()
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number).first()
+        if not user:
+            return Response(
+                {"success": False, "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        verification_code = VerificationCode.objects.filter(
+            user=user, is_used=False
+        ).first()
+        if not verification_code or not check_password(code, verification_code.code):
+            return Response(
+                {"success": False, "message": "Invalid code"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if verification_code.expires_at < timezone.now():
+            return Response(
+                {"success": False, "message": "Code expired"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {
+                "success": True,
+                "message": "Code verified",
+                "token": str(RefreshToken.for_user(user).access_token),
+            },
             status=status.HTTP_200_OK,
         )
 
-
-class EmployeeInvitationConfirmView(generics.GenericAPIView):
-
-    def post(self, request, business_id, role_id, uidb64, token):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+    @action(detail=False, methods=["post"], url_path="send-code")
+    def send_delete_user_code(self, request):
+        phone_number = request.data.get("phone_number")
+        email = request.data.get("email")
+        if email:
+            user = User.objects.filter(email=email).first()
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number).first()
+        if not user:
             return Response(
-                {"detail": "Invalid link."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"success": False, "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Invalid or expired token."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            business = Business.objects.get(pk=business_id)
-            role = Role.objects.get(pk=role_id)
-        except (Business.DoesNotExist, Role.DoesNotExist):
-            return Response(
-                {"detail": "Invalid business or role."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        Employee.objects.create(user=user, business=business, role=role)
+        VerificationCode.objects.create(
+            user=user,
+            code="123456",
+            phone_number=phone_number,
+            email=email,
+            expires_at=timezone.now() + timedelta(minutes=5),
+        )
+        # send_verification_code.send(self, phone_number=phone_number, email=email)
         return Response(
-            {"detail": "Employee added to the business."},
-            status=status.HTTP_200_OK,
+            {"success": True, "message": "Code sent"}, status=status.HTTP_200_OK
         )
 
-
-class BranchViewSet(viewsets.ModelViewSet):
-    queryset = Branch.objects.all()
-    serializer_class = BranchSerializer
-
-
-def api_documentation(request):
-    return render(request, "index.html")
+    #  {
+    #     success: true,
+    #     message: `A verification code has been sent to your ${request.type}.`,
+    #     codeLength: 6,
+    # }
 
 
-# Password Change
-# Invitation to Business
-# Login
-# Signup
+class UserDeviceViewset(CreateModelMixin, GenericViewSet):
+    serializer_class = UserDeviceSerializer
+
+    permission_classes = []

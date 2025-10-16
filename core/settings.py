@@ -1,59 +1,87 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import parse_qsl, urlparse
 
 from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
-from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
 
-load_dotenv()
+load_dotenv(override=True)
 load_dotenv(".env.production", override=True)
-env = os.getenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = env("SECRET_KEY", get_random_secret_key())
 
-DEBUG = env("DEBUG", False) == "True"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
-ALLOWED_HOSTS = env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+DEBUG = os.getenv("DJANGO_DEBUG", False) == "True"
+
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 
-# Application definition
-
-CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(
+    ","
+)
 
 AUTH_USER_MODEL = "accounts.User"
-INSTALLED_APPS = [
-    "daphne",
+
+DEFAULT_APPS = [
+    "admin_interface",
+    "colorfield",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
+    "corsheaders",
+]
+
+THIRD_PARTY_APPS = [
     "rest_framework",
     "drf_spectacular",
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
-    "accounts",
-    "file",
-    "storages",
-    "notification",
-    "inventory",
+    "guardian",
 ]
+
+LOCAL_APPS = [
+    "core",
+    "accounts",
+    "administration",
+    "files",
+    "storages",
+    "inventories",
+    "business",
+    "notifications",
+    "orders",
+    "crms",
+    "finances",
+    "markets",
+    "chat",
+]
+
+INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "business.middleware.BusinessContextMiddleWare",
 ]
 
 ROOT_URLCONF = "core.urls"
+
+CORS_ALLOWED_ORIGINS = os.getenv(
+    "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"
+).split(",")
 
 TEMPLATES = [
     {
@@ -75,25 +103,21 @@ WSGI_APPLICATION = "core.wsgi.app"
 ASGI_APPLICATION = "core.asgi.app"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+tmpPostgres = urlparse(os.getenv("DJANGO_POSTGRES_URL"))
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("PG_DB_NAME", "dev"),
-        "USER": env("PG_USER", "dev"),
-        "PASSWORD": env("PG_PASSWORD", "developer@123"),
-        "HOST": env("PG_HOST", "localhost"),
-        "PORT": env("PG_PORT", "5432"),
+        "NAME": tmpPostgres.path[1:],
+        "USER": tmpPostgres.username,
+        "PASSWORD": tmpPostgres.password,
+        "HOST": tmpPostgres.hostname,
+        "PORT": tmpPostgres.port,
         "CONN_MAX_AGE": None,
-        "OPTIONS": {"sslmode": env("PG_SSL_MODE")},
+        "OPTIONS": dict(parse_qsl(tmpPostgres.query)),
     },
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -111,9 +135,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "UTC"
@@ -122,25 +143,37 @@ USE_I18N = True
 
 USE_TZ = True
 
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        "OPTIONS": {
+            "bucket_name": os.getenv("AWS_STORAGE_BUCKET_NAME"),
+            "region_name": os.getenv("AWS_S3_REGION_NAME"),
+            "querystring_auth": True,
+        },
+        "FILE_UPLOAD_PERMISSIONS": 0o644,
+        "FILE_UPLOAD_DIRECTORY_PERMISSIONS": 0o755,
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
-STATIC_URL = "static/"
+STATIC_URL = os.getenv("STATIC_URL", "static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
 STATIC_ROOT = BASE_DIR / "static"
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
+    "COERCE_DECIMAL_TO_STRING": False,
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
@@ -149,14 +182,14 @@ REST_FRAMEWORK = {
 
 EMAIL_USE_TLS = True
 EMAIL_BACKEND = "django_smtp_ssl.SSLEmailBackend"
-EMAIL_HOST = env("EMAIL_HOST")
-EMAIL_PORT = env("EMAIL_PORT")
-EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 
 ADMIN = ("Murad", "nuradhussen082@gmail.com")
 
-CELERY_BROKER_URL = f"redis://{env('REDIS_USERNAME','default')}:{env('REDIS_PASSWORD','')}@{env('REDIS_HOST','localhost')}:{env('REDIS_PORT',6379)}"
-CELERY_BACKEND_URL = f"redis://{env('REDIS_USERNAME','default')}:{env('REDIS_PASSWORD','')}@{env('REDIS_HOST','localhost')}:{env('REDIS_PORT',6379)}"
+CELERY_BROKER_URL = os.getenv("DJANGO_CELERY_BROKER_URL")
+CELERY_BACKEND_URL = os.getenv("DJANGO_CELERY_BACKEND_URL")
 
 
 SIMPLE_JWT = {
@@ -176,75 +209,62 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Description of documentation",
     "VERSION": "0.0.1",
     "SERVE_INCLUDE_SCHEMA": True,
-    # OTHER SETTINGS
-    "SWAGGER_UI_DIST": "SIDECAR",  # shorthand to use the sidecar instead
+    "SWAGGER_UI_DIST": "SIDECAR",
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     "REDOC_DIST": "SIDECAR",
-    # for binary data upload support
     "COMPONENT_SPLIT_REQUEST": True,
+    "SERVERS": [
+        {
+            "url": "/",
+            "description": "Current Development Server",
+        },
+        {
+            "url": "http://localhost:8000",
+            "description": "Local Development Server",
+        },
+        {
+            "url": "https://apis.bita.gumisofts.com/v01",
+            "description": "V01 Production Server",
+        },
+        {
+            "url": "https://mpto2cz1lg.execute-api.eu-north-1.amazonaws.com/dev",
+            "description": "Active Development Server",
+        },
+        {
+            "url": "https://mpto2cz1lg.execute-api.eu-north-1.amazonaws.com/v01",
+            "description": "Alias of V01 Production Server",
+        },
+    ],
 }
 
 AUTHENTICATION_BACKENDS = [
-    "accounts.backends.EmailOrPhoneBackend",
-    "django.contrib.auth.backends.ModelBackend",
+    "accounts.backends.PhoneBackend",
+    "accounts.backends.EmailBackend",
+    "accounts.backends.ModelBackend",
+    "guardian.backends.ObjectPermissionBackend",
 ]
 
-# TODO Remove these
-EMAIL_URL = ""
-NOTIFICATION_API_KEY = ""
 
-
-# AWS Credentials
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
-AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "eu-north-1")
 
-# S3 Storage Configuration
-AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+GOOGLE_WEB_CLIENT_ID = os.getenv("GOOGLE_WEB_CLIENT_ID")
+
+AWS_S3_CUSTOM_DOMAIN = None
+
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
 }
 
-# Drf-Spectacular Additional Settings
-ITEM_LIST_QUERY_PARAMETERS = [
-    OpenApiParameter(
-        name="category_id",
-        description="Filter by category ID",
-        required=False,
-        type=OpenApiTypes.INT,
-    ),
-    OpenApiParameter(
-        name="manufacturer_id",
-        description="Filter by manufacturer ID",
-        required=False,
-        type=OpenApiTypes.INT,
-    ),
-    OpenApiParameter(
-        name="visible",
-        description="Filter by visibility (true/false)",
-        required=False,
-        type=OpenApiTypes.BOOL,
-    ),
-    OpenApiParameter(
-        name="returnable",
-        description="Filter by returnable (true/false)",
-        required=False,
-        type=OpenApiTypes.BOOL,
-    ),
-    OpenApiParameter(
-        name="search",
-        description="Search term",
-        required=False,
-        type=OpenApiTypes.STR,
-    ),
-]
+AWS_QUERYSTRING_AUTH = True
+AWS_QUERYSTRING_EXPIRE = 3600
 
-SUPPLY_RESERVATION_LIST_QUERY_PARAMETERS = [
-    OpenApiParameter(
-        name="status",
-        description="Filter by reservation status (active, cancelled, fulfilled)",
-        required=False,
-        type=OpenApiTypes.STR,
-    ),
-]
+
+# Guardian settings
+GUARDIAN_RAISE_403 = True
+ANONYMOUS_USER_NAME = None
+
+X_FRAME_OPTIONS = "SAMEORIGIN"
+SILENCED_SYSTEM_CHECKS = ["security.W019"]

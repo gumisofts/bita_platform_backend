@@ -1,22 +1,46 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
 
+User = get_user_model()
 
-class EmailOrPhoneBackend(ModelBackend):
-    def authenticate(self, request, username=None, password=None, **kwargs):
-        UserModel = get_user_model()
-        user = None
-        if "@" in username:
-            try:
-                user = UserModel.objects.get(email=username)
-            except UserModel.DoesNotExist:
-                return None
-        else:
-            try:
-                user = UserModel.objects.get(phone_number=username)
-            except UserModel.DoesNotExist:
-                return None
 
-        if user.check_password(password) and self.user_can_authenticate(user):
+class EmailBackend(ModelBackend):
+
+    def user_can_authenticate(self, user):
+        return super().user_can_authenticate(user) and user.is_email_verified
+
+    def authenticate(self, request, email, password, **kwargs):
+        user = User.objects.filter(email=email).first()
+
+        if user and user.check_password(password) and self.user_can_authenticate(user):
             return user
-        return None
+
+
+class PhoneBackend(ModelBackend):
+    def user_can_authenticate(self, user):
+        return super().user_can_authenticate(user) and user.is_phone_verified
+
+    def authenticate(
+        self, request, username=None, phone_number=None, password=None, **kwargs
+    ):
+        if username is not None:
+            phone_number = username
+        if phone_number is None:
+            return None
+
+        user = User.objects.filter(
+            phone_number=User.normalize_phone(phone_number)
+        ).first()
+
+        print(user)
+        if user and user.check_password(password) and self.user_can_authenticate(user):
+            return user
+
+
+class ModelBackend(ModelBackend):
+    def user_can_authenticate(self, user):
+        return (
+            super().user_can_authenticate(user)
+            and user.is_email_verified
+            and user.is_phone_verified
+        )

@@ -14,33 +14,42 @@ def validate_phone(phone):
 
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, email, phone_number, password=None, **extra_fields):
+    def create(self, **kwargs):
+        return self.create_user(**kwargs)
+
+    def create_user(
+        self,
+        email=None,
+        phone_number=None,
+        password=None,
+        **extra_fields,
+    ):
         """Create and return a regular user."""
-        if not email:
-            raise ValueError("The Email field must be set")
-        if not phone_number:
-            raise ValueError("The Phone field must be set")
-        validate_phone(phone_number)
-        email = self.normalize_email(email)
+        if phone_number:
+            validate_phone(phone_number)
+        if email:
+            email = self.normalize_email(email)
         user = self.model(
             email=email,
             phone_number=phone_number,
             **extra_fields,
         )
-        user.set_password(password)
-        user.save(using=self._db)
+        if password:
+            user.set_password(password)
+        user.save()
         return user
 
     def create_superuser(
         self,
-        email,
-        phone_number,
+        email=None,
+        phone_number=None,
         password=None,
         **extra_fields,
     ):
         """Create and return a superuser."""
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_phone_verified", True)
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")
