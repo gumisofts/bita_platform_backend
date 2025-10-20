@@ -2,7 +2,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Plan, Download, Waitlist, FAQ, Contact
-from .serializers import PlanSerializer, DownloadSerializer, WaitlistSerializer, FAQSerializer, ContactSerializer
+from .serializers import (
+    PlanSerializer,
+    DownloadSerializer,
+    WaitlistSerializer,
+    FAQSerializer,
+    ContactSerializer,
+)
 from django.shortcuts import get_object_or_404
 
 
@@ -36,7 +42,10 @@ class WaitlistView(APIView):
     def post(self, request, *args, **kwargs):
         email = request.data.get("email")
         if Waitlist.objects.filter(email=email).exists():
-            return Response({"email": ["This email is already in the waitlist."]}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"email": ["This email is already in the waitlist."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = WaitlistSerializer(data=request.data)
         if serializer.is_valid():
@@ -46,7 +55,7 @@ class WaitlistView(APIView):
             return Response(response_data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 
 class FAQView(APIView):
 
@@ -59,7 +68,7 @@ class FAQView(APIView):
             faqs = FAQ.objects.all()
             serializer = FAQSerializer(faqs, many=True)
             return Response({"faqs": serializer.data}, status=status.HTTP_200_OK)
-    
+
 
 class ContactView(APIView):
     def post(self, request, *args, **kwargs):
@@ -70,8 +79,8 @@ class ContactView(APIView):
                 {
                     "id": contact.id,
                     "received_at": contact.received_at,
-                    "message": "Your message has been received. We will contact you soon."
+                    "message": "Your message has been received. We will contact you soon.",
                 },
-                status=status.HTTP_201_CREATED
+                status=status.HTTP_201_CREATED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

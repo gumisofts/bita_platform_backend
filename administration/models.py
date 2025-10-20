@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
 
+
 class Plan(models.Model):
     name = models.CharField(max_length=100)
     price = models.CharField(max_length=50)
