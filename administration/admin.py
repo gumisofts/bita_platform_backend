@@ -1,17 +1,31 @@
 from django.contrib import admin
+from django import forms
+import json
 from .models import Plan, Download, Waitlist, FAQ, Contact
+
+
+class PlanAdminForm(forms.ModelForm):
+    features = forms.JSONField(
+        required=False,
+        help_text='Enter JSON array of strings, e.g. ["users", "reports"].',
+    )
+
+    class Meta:
+        model = Plan
+        fields = "__all__"
 
 
 @admin.register(Plan)
 class PlanAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "price", "currency", "billing_period")
+    form = PlanAdminForm
+    list_display = ("id", "name", "price", "currency", "billing_period", "features")
     search_fields = ("name", "price")
     ordering = ("name",)
 
 
 @admin.register(Download)
 class DownloadAdmin(admin.ModelAdmin):
-    list_display = ("id", "platform", "download_link")
+    list_display = ("id", "platform", "icon", "file")
     search_fields = ("platform",)
 
 

@@ -38,14 +38,13 @@ class PlanSerializer(serializers.ModelSerializer):
 
 
 class DownloadSerializer(serializers.ModelSerializer):
-    icon_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
-    download_link = serializers.URLField(
-        required=False, allow_null=True, allow_blank=True
-    )
+    # Uploadable fields
+    icon = serializers.ImageField(required=False, allow_null=True)
+    file = serializers.FileField(required=False, allow_null=True)
 
     class Meta:
         model = Download
-        fields = ["id", "platform", "icon_url", "download_link"]
+        fields = ["id", "platform", "icon", "file"]
         read_only_fields = ["id"]
 
 

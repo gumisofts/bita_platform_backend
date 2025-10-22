@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.postgres.fields import ArrayField
 
 
 class Plan(models.Model):
@@ -7,7 +6,7 @@ class Plan(models.Model):
     price = models.CharField(max_length=50)
     currency = models.CharField(max_length=10)
     billing_period = models.CharField(max_length=20)
-    features = ArrayField(models.CharField(max_length=200), default=list, blank=True)
+    features = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return self.name
@@ -15,8 +14,8 @@ class Plan(models.Model):
 
 class Download(models.Model):
     platform = models.CharField(max_length=50)
-    icon_url = models.URLField(max_length=255, blank=True, null=True)
-    download_link = models.URLField(max_length=255, blank=True, null=True)
+    icon = models.ImageField(upload_to="downloads/icons/", blank=True, null=True)
+    file = models.FileField(upload_to="downloads/files/", blank=True, null=True)
 
     def __str__(self):
         return self.platform
