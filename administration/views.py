@@ -1,12 +1,13 @@
-from rest_framework import status, viewsets, mixins
+from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
-from .models import Plan, Download, Waitlist, FAQ, Contact
+
+from .models import FAQ, Contact, Download, Plan, Waitlist
 from .serializers import (
-    PlanSerializer,
-    DownloadSerializer,
-    WaitlistSerializer,
-    FAQSerializer,
     ContactSerializer,
+    DownloadSerializer,
+    FAQSerializer,
+    PlanSerializer,
+    WaitlistSerializer,
 )
 
 

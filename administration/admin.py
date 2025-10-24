@@ -1,7 +1,9 @@
-from django.contrib import admin
-from django import forms
 import json
-from .models import Plan, Download, Waitlist, FAQ, Contact
+
+from django import forms
+from django.contrib import admin
+
+from .models import FAQ, Contact, Download, Plan, Waitlist
 
 
 class PlanAdminForm(forms.ModelForm):

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from .models import Plan, Download, Waitlist, FAQ, Contact
+
+from .models import FAQ, Contact, Download, Plan, Waitlist
 
 
 class PlanSerializer(serializers.ModelSerializer):
