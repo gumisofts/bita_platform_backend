@@ -64,6 +64,16 @@ class WaitlistSerializer(serializers.ModelSerializer):
         fields = ["id", "email", "created_at"]
         read_only_fields = ["id", "created_at"]
 
+    def create(self, validated_data):
+        instance = Waitlist.objects.create(**validated_data)
+        self._response_data = {
+            "id": instance.id,
+            "email": instance.email,
+            "created_at": instance.created_at,
+            "message": "added to waitlist",
+        }
+        return instance
+
 
 class FAQSerializer(serializers.ModelSerializer):
     class Meta:
@@ -91,3 +101,12 @@ class ContactSerializer(serializers.ModelSerializer):
                 "Message must be at least 10 characters long."
             )
         return value.strip()
+
+    def create(self, validated_data):
+        contact = Contact.objects.create(**validated_data)
+        self._response_data = {
+            "id": contact.id,
+            "received_at": contact.received_at,
+            "message": "Your message has been received. We will contact you soon.",
+        }
+        return contact

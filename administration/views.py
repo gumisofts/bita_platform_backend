@@ -10,7 +10,6 @@ from .serializers import (
     WaitlistSerializer,
 )
 
-
 class PlanViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Plan.objects.all()
     serializer_class = PlanSerializer
@@ -35,11 +34,8 @@ class WaitlistViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
         headers = self.get_success_headers(serializer.data)
-        return Response(
-            {**serializer.data, "message": "added to waitlist"},
-            status=status.HTTP_201_CREATED,
-            headers=headers,
-        )
+        response_data = getattr(serializer, "_response_data", serializer.data)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class ContactViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
@@ -49,14 +45,7 @@ class ContactViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        contact = serializer.save()
+        instance = serializer.save()
         headers = self.get_success_headers(serializer.data)
-        return Response(
-            {
-                "id": contact.id,
-                "received_at": contact.received_at,
-                "message": "Your message has been received. We will contact you soon.",
-            },
-            status=status.HTTP_201_CREATED,
-            headers=headers,
-        )
+        response_data = getattr(serializer, "_response_data", serializer.data)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
