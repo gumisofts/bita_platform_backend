@@ -10,6 +10,7 @@ from .serializers import (
     WaitlistSerializer,
 )
 
+
 class PlanViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Plan.objects.all()
     serializer_class = PlanSerializer
