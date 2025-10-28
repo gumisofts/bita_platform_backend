@@ -2,7 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from .models import FAQ, Contact, Download, Plan, Waitlist
+from .models import FAQ, Contact, Download, Plan, PlanFeature, Waitlist
 
 
 class AdministrationEndpointsTest(APITestCase):
@@ -10,13 +10,16 @@ class AdministrationEndpointsTest(APITestCase):
         self.client = APIClient()
 
     def test_list_plans_and_faqs(self):
-        Plan.objects.create(
+
+        p = Plan.objects.create(
             name="Basic",
             price="10.00",
             currency="USD",
             billing_period="monthly",
-            features=["a", "b"],
         )
+        PlanFeature.objects.create(name="a", plan=p)
+        PlanFeature.objects.create(name="b", plan=p)
+
         FAQ.objects.create(question="Q1?", answer="A1")
 
         plans_resp = self.client.get("/administration/plans/")

@@ -13,16 +13,19 @@ from .serializers import (
 class PlanViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Plan.objects.all()
     serializer_class = PlanSerializer
+    pagination_class = None
 
 
 class DownloadViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Download.objects.all()
     serializer_class = DownloadSerializer
+    pagination_class = None
 
 
 class FAQViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = FAQ.objects.all()
     serializer_class = FAQSerializer
+    pagination_class = None
 
 
 class WaitlistViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):

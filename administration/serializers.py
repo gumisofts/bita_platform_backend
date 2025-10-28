@@ -5,8 +5,10 @@ from .models import FAQ, Contact, Download, Plan, Waitlist
 
 
 class PlanSerializer(serializers.ModelSerializer):
-    features = serializers.ListField(
-        child=serializers.CharField(max_length=200), required=False, allow_empty=True
+    features = serializers.SlugRelatedField(
+        many=True,
+        read_only=True,
+        slug_field="name",
     )
 
     class Meta:
