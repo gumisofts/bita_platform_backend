@@ -39,7 +39,6 @@ class PlanSerializer(serializers.ModelSerializer):
 
 
 class DownloadSerializer(serializers.ModelSerializer):
-    # Uploadable fields
     icon = serializers.ImageField(required=False, allow_null=True)
     file = serializers.FileField(required=False, allow_null=True)
 
@@ -71,7 +70,6 @@ class WaitlistSerializer(serializers.ModelSerializer):
 
     def get_message(self, obj):
         return "added to waitlist"
-        return instance
 
 
 class FAQSerializer(serializers.ModelSerializer):
