@@ -3,7 +3,12 @@ import json
 from django import forms
 from django.contrib import admin
 
-from .models import FAQ, Contact, Download, Plan, Waitlist
+from .models import FAQ, Contact, Download, Plan, PlanFeature, Waitlist
+
+
+class PlanFeatureInline(admin.TabularInline):
+    model = PlanFeature
+    extra = 1
 
 
 class PlanAdminForm(forms.ModelForm):
@@ -19,10 +24,11 @@ class PlanAdminForm(forms.ModelForm):
 
 @admin.register(Plan)
 class PlanAdmin(admin.ModelAdmin):
-    form = PlanAdminForm
-    list_display = ("id", "name", "price", "currency", "billing_period", "features")
+    list_display = ("id", "name", "price", "currency", "billing_period")
     search_fields = ("name", "price")
     ordering = ("name",)
+
+    inlines = [PlanFeatureInline]
 
 
 @admin.register(Download)
