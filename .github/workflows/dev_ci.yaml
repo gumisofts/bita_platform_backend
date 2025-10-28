@@ -3,7 +3,7 @@ name: Deploy dev on lambda
 on:
   push:
     branches:
-      - dev-v01
+      - main
 jobs:
   deploy:
     runs-on: ubuntu-latest
