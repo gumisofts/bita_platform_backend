@@ -58,20 +58,19 @@ class WaitlistSerializer(serializers.ModelSerializer):
             )
         ]
     )
+    message = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Waitlist
-        fields = ["id", "email", "created_at"]
+        fields = ["id", "email", "created_at", "message"]
         read_only_fields = ["id", "created_at"]
 
     def create(self, validated_data):
         instance = Waitlist.objects.create(**validated_data)
-        self._response_data = {
-            "id": instance.id,
-            "email": instance.email,
-            "created_at": instance.created_at,
-            "message": "added to waitlist",
-        }
+        return instance
+
+    def get_message(self, obj):
+        return "added to waitlist"
         return instance
 
 
@@ -104,9 +103,13 @@ class ContactSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         contact = Contact.objects.create(**validated_data)
-        self._response_data = {
-            "id": contact.id,
-            "received_at": contact.received_at,
-            "message": "Your message has been received. We will contact you soon.",
-        }
         return contact
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance and getattr(instance, "pk", None):
+            data.setdefault(
+                "message",
+                "Your message has been received. We will contact you soon.",
+            )
+        return data
