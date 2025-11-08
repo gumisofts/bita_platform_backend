@@ -121,6 +121,18 @@ class EmployeeSerializer(serializers.ModelSerializer, BaseSerializerMixin):
 
 
 class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMixin):
+    class CompanySmallDetailSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Business
+            fields = ["id", "name"]
+
+    class BranchSmallDetailSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Branch
+            fields = ["id", "name"]
+
+    branch = BranchSmallDetailSerializer(read_only=True)
+    business = CompanySmallDetailSerializer(read_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

@@ -59,12 +59,21 @@
         force: true
         src: ../.env
 
+    - name: Enable app socket
+      become: true
+      tags: [restart, app]
+      ansible.builtin.systemd_service:
+        name: app.socket
+        enabled: true
+        state: started
+        daemon_reload: true
+
     - name: Enable app Service
       become: true
       tags: [restart, app]
       ansible.builtin.systemd_service:
         name: app
-        state: reloaded
+        state: started
         enabled: true
         daemon_reload: true
 
@@ -92,17 +101,42 @@
         src: ../nginx.conf
         dest: /etc/nginx/conf.d/app.conf
 
+    - name: Test nginx configuration
+      become: true
+      tags: [restart,nginx]
+      ansible.builtin.command:
+        cmd: nginx -t
+      register: nginx_test
+      failed_when: false
+
+    - name: Display nginx test output if failed
+      tags: [restart,nginx]
+      debug:
+        var: nginx_test.stderr_lines
+      when: nginx_test.rc != 0
+
     - name: Enable Nginx Services on Boot
+      become: true
       tags: [restart,nginx]
       ansible.builtin.systemd_service:
         name: nginx
         enabled: true
-        state: reloaded
+        state: restarted
+      when: nginx_test.rc == 0
+    - name: Enable app socket
+      become: true
+      tags: [restart]
+      ansible.builtin.systemd_service:
+        name: app.socket
+        enabled: true
+        state: started
+        daemon_reload: true
+
     - name: Enable app Service
       become: true
       tags: [restart]
       ansible.builtin.systemd_service:
         name: app
         enabled: true
-        state: reloaded
+        state: restarted
         daemon_reload: true

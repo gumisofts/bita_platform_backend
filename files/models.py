@@ -28,12 +28,21 @@ class FilePurpose(models.TextChoices):
     OTHER = "OTHER"
 
 
+class FileType(models.TextChoices):
+    IMAGE = "IMAGE"
+    DOCUMENT = "DOCUMENT"
+    VIDEO = "VIDEO"
+    AUDIO = "AUDIO"
+    OTHER = "OTHER"
+
+
 class FileModel(BaseModel):
 
     def upload_to(self, filename):
         return f"{self.purpose.lower()}/{filename}"
 
     file = models.FileField(upload_to=upload_to)
+    file_type = models.CharField(max_length=50, choices=FileType.choices)
     purpose = models.CharField(max_length=255, choices=FilePurpose.choices)
 
     def __str__(self):
