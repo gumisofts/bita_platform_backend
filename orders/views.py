@@ -180,6 +180,7 @@ class HomeStatsViewSet(GenericViewSet):
     permission_classes = [
         BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
     ]
+    queryset = Order.objects.all()
 
     def _get_business_and_branch(self):
         """Get business and branch from query params or request context"""
