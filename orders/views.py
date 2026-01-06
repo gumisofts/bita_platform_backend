@@ -551,10 +551,10 @@ class HomeStatsViewSet(GenericViewSet):
 
         return {
             "range": range_type,
-            "totalSales": {"value": float(total_sales), "currency": "ETB"},
-            "lowStockItems": low_stock_items,
-            "itemsExpiring": expiring_items,
-            "salesLogged": sales_logged,
+            "total_sales": {"value": float(total_sales), "currency": "ETB"},
+            "low_stock_items": low_stock_items,
+            "items_expiring": expiring_items,
+            "sales_logged": sales_logged,
         }
 
     @extend_schema(
@@ -638,7 +638,7 @@ class HomeStatsViewSet(GenericViewSet):
                         "type": "object",
                         "properties": {
                             "range": {"type": "string"},
-                            "totalSales": {
+                            "total_sales": {
                                 "type": "object",
                                 "properties": {
                                     "value": {"type": "number"},
@@ -647,7 +647,7 @@ class HomeStatsViewSet(GenericViewSet):
                             },
                             "lowStockItems": {"type": "integer"},
                             "itemsExpiring": {"type": "integer"},
-                            "salesLogged": {"type": "integer"},
+                            "sales_logged": {"type": "integer"},
                         },
                     },
                 },
@@ -701,8 +701,8 @@ class HomeStatsViewSet(GenericViewSet):
 
         return Response(
             {
-                "bestSeller": best_seller,
-                "salesDistribution": sales_distribution,
+                "best_seller": best_seller,
+                "sales_distribution": sales_distribution,
                 "summary": summary,
             }
         )
