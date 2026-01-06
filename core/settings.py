@@ -163,6 +163,11 @@ STATIC_URL = os.getenv("STATIC_URL", "static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
 STATIC_ROOT = BASE_DIR / "static"
 
+# WhiteNoise configuration
+WHITENOISE_USE_FINDERS = DEBUG  # Use finders in development, storage in production
+WHITENOISE_AUTOREFRESH = DEBUG  # Auto-refresh in development
+WHITENOISE_MAX_AGE = 31536000 if not DEBUG else 0  # 1 year cache in production
+WHITENOISE_MANIFEST_STRICT = not DEBUG  # Strict manifest checking in production
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
