@@ -67,9 +67,8 @@ class OrderHistory(BaseModel):
     """
     Model to track all changes made to an order
     """
-    order = models.ForeignKey(
-        Order, on_delete=models.CASCADE, related_name="history"
-    )
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="history")
     field_name = models.CharField(
         max_length=100, help_text="Name of the field that was changed"
     )
@@ -85,7 +84,7 @@ class OrderHistory(BaseModel):
         null=True,
         blank=True,
         related_name="order_changes",
-        help_text="User who made the change"
+        help_text="User who made the change",
     )
     changed_by_employee = models.ForeignKey(
         "business.Employee",
@@ -93,7 +92,7 @@ class OrderHistory(BaseModel):
         null=True,
         blank=True,
         related_name="order_changes",
-        help_text="Employee who made the change"
+        help_text="Employee who made the change",
     )
     change_reason = models.TextField(
         null=True, blank=True, help_text="Optional reason for the change"
