@@ -285,6 +285,7 @@ class EmployeeInvitationViewset(ModelViewSet):
         detail=True,
         methods=["patch"],
         url_path="status",
+        permission_classes=[IsAuthenticated],
         serializer_class=EmployeeInvitationStatusSerializer,
     )
     def update_status(self, request, pk=None):

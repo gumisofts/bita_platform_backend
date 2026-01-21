@@ -133,6 +133,14 @@ class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMi
             if not regex_validator.regex.match(phone_number):
                 raise ValidationError({"phone_number": "Invalid phone number"})
 
+        # Require a branch for every role except 'Business Admin'
+        role = attrs.get("role")
+        branch = attrs.get("branch")
+
+        if role and hasattr(role, "role_name"):
+            if role.role_name != "Business Admin" and branch is None:
+                raise ValidationError({"branch": "Branch is required for this role."})
+
         return attrs
 
     class Meta:
