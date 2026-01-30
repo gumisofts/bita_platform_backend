@@ -135,11 +135,10 @@ class SupplyViewSetTest(APITestCase):
         supply2 = Supply.objects.get(id=response2.data["id"])
         self.assertEqual(supply2.label, "supply-2")
 
-    def test_create_supply_with_existing_label_increments(self):
-        """When provided label already exists for branch, use label-1, label-2, ..."""
+    def test_create_supply_with_existing_label_reuses_supply(self):
+        """When provided label already exists for branch, return existing supply."""
         url = reverse("supplies-list")
-        # supply-1 already taken by creating without label first
-        Supply.objects.create(
+        existing = Supply.objects.create(
             label="supply-1", branch=self.branch, business=self.business
         )
         data = {
@@ -149,13 +148,13 @@ class SupplyViewSetTest(APITestCase):
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        supply = Supply.objects.get(id=response.data["id"])
-        self.assertEqual(supply.label, "supply-1-1")
-        # Create another with same label
+        self.assertEqual(response.data["id"], str(existing.id))
+        self.assertEqual(Supply.objects.count(), 2)  # setUp supply + supply-1
+        # Same label again still returns same supply
         response2 = self.client.post(url, data)
         self.assertEqual(response2.status_code, status.HTTP_201_CREATED)
-        supply2 = Supply.objects.get(id=response2.data["id"])
-        self.assertEqual(supply2.label, "supply-1-2")
+        self.assertEqual(response2.data["id"], str(existing.id))
+        self.assertEqual(Supply.objects.count(), 2)
 
     def test_filter_by_business_id(self):
         url = reverse("supplies-list")

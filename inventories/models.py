@@ -160,23 +160,6 @@ def get_next_supply_label(branch):
         n += 1
 
 
-def get_available_supply_label(branch, preferred_label=None):
-    """Return an available label for the branch.
-    If preferred_label is None or blank, uses get_next_supply_label.
-    If preferred_label is provided and already exists, appends -1, -2, ... until available.
-    """
-    if not preferred_label:
-        return get_next_supply_label(branch)
-    if not Supply.objects.filter(branch=branch, label=preferred_label).exists():
-        return preferred_label
-    n = 1
-    while True:
-        label = f"{preferred_label}-{n}"
-        if not Supply.objects.filter(branch=branch, label=label).exists():
-            return label
-        n += 1
-
-
 class SuppliedItem(BaseModel):
     quantity = models.PositiveIntegerField()
     initial_quantity = models.PositiveIntegerField(default=0)
