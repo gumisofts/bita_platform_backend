@@ -1,3 +1,4 @@
+from django.db import IntegrityError
 from rest_framework import serializers
 
 from business.models import Branch, Category
@@ -87,12 +88,32 @@ class SupplySerializer(serializers.ModelSerializer):
         exclude = []
         extra_kwargs = {
             "business": {"required": True},
+            "label": {"required": False, "allow_blank": True},
         }
+
+    def to_internal_value(self, data):
+        """Set label to an available value before unique-together validation runs."""
+        internal = super().to_internal_value(data)
+        branch = internal.get("branch")
+        if branch is not None:
+            preferred = internal.get("label") or None
+            internal["label"] = get_available_supply_label(branch, preferred)
+        return internal
 
     def create(self, validated_data):
         item = validated_data.pop("item", None)
         business = validated_data.get("business", None)
-        supply = super().create(validated_data)
+        branch = validated_data.get("branch")
+        for attempt in range(5):  # retry on unique constraint race
+            try:
+                supply = super().create(validated_data)
+                break
+            except IntegrityError:
+                if attempt == 4:
+                    raise
+                validated_data["label"] = get_available_supply_label(
+                    branch, validated_data.get("label") or None
+                )
         if item:
             item["item"] = item.get("variant").item
             item["initial_quantity"] = item.get("quantity")

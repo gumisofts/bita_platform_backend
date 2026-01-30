@@ -374,9 +374,14 @@ class InventoryMovementViewSet(ModelViewSet):
 
                 # Add inventory to destination
                 # First, try to find existing supply in destination branch
+                source_supply = movement_item.supplied_item.supply
+                source_label = source_supply.label
+                if not source_label:
+                    # Group by source supply so all items go to same destination supply
+                    source_label = f"supply-{source_supply.id}"
                 destination_supply, created = Supply.objects.get_or_create(
                     branch=movement.to_branch,
-                    label=movement_item.supplied_item.supply.label,
+                    label=source_label,
                 )
 
                 # Check if same item already exists in destination supply
