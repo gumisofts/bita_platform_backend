@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from business.models import Branch
+from business.models import Branch, Category
 from inventories.models import *
 
 from .models import Item
@@ -9,6 +9,10 @@ from .models import Item
 
 
 class ItemSerializer(serializers.ModelSerializer):
+    categories = serializers.PrimaryKeyRelatedField(
+        many=True, allow_empty=True, queryset=Category.objects.all()
+    )
+
     class Meta:
         model = Item
         fields = "__all__"
