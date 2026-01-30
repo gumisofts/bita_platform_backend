@@ -12,6 +12,7 @@ class ItemSerializer(serializers.ModelSerializer):
     categories = serializers.PrimaryKeyRelatedField(
         many=True, allow_empty=True, queryset=Category.objects.all()
     )
+    description = serializers.CharField(required=False)
 
     class Meta:
         model = Item

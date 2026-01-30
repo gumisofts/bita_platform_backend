@@ -17,6 +17,12 @@ class PaymentMethodSerializer(serializers.ModelSerializer):
 
 
 class BusinessPaymentMethodSerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(read_only=True)
+
     class Meta:
         model = BusinessPaymentMethod
         exclude = []
+        extra_kwargs = {
+            "label": {"required": False, "allow_blank": True},
+            "identifier": {"required": False, "allow_blank": True},
+        }
