@@ -84,7 +84,7 @@ class SupplyViewset(
             queryset = queryset.filter(branch=self.request.branch)
         else:
             queryset = queryset.none()
-        return queryset.order_by("updated_at")
+        return queryset.order_by("-updated_at")
 
     def get_serializer_class(self):
         if self.action == "retrieve":

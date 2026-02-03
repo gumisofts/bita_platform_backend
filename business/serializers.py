@@ -121,6 +121,7 @@ class EmployeeSerializer(serializers.ModelSerializer, BaseSerializerMixin):
 
 
 class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMixin):
+    business = BusinessSerializer(read_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

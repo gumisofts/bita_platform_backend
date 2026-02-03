@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Coalesce, Count, F, Q, Sum, Value
 from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -99,7 +99,7 @@ class OrderViewset(ModelViewSet):
             queryset = queryset.filter(branch=self.request.branch)
         else:
             queryset = queryset.none()
-        return queryset
+        return queryset.order_by("-created_at")
 
     def get_serializer_class(self):
         if self.action == "retrieve":
@@ -170,6 +170,161 @@ class OrderViewset(ModelViewSet):
         order.save()
         order_completed.send(sender=Order, instance=order)
         return Response(OrderListSerializer(order).data, status=status.HTTP_200_OK)
+
+    def _get_date_range_for_filter(self, filter_type):
+        """Get date range based on filter type (today, this_week, this_year)"""
+        now = timezone.now()
+
+        if filter_type == "today":
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = now
+        elif filter_type == "this_week":
+            # Start of week (Monday)
+            days_since_monday = now.weekday()
+            start = (now - timedelta(days=days_since_monday)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            end = now
+        elif filter_type == "this_year":
+            start = now.replace(
+                month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+            end = now
+        else:
+            raise ValidationError(
+                {
+                    "detail": f"Invalid filter type: {filter_type}. Use: today, this_week, this_year"
+                }
+            )
+
+        return start, end
+
+    @extend_schema(
+        summary="Get best sellers",
+        description="Returns a list of best selling items filtered by time period",
+        parameters=[
+            OpenApiParameter(
+                name="filter",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Time filter: today, this_week, this_year",
+                required=False,
+                default="today",
+            ),
+            OpenApiParameter(
+                name="limit",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description="Number of results to return (default: 10)",
+                required=False,
+            ),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "filter": {"type": "string"},
+                    "count": {"type": "integer"},
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_id": {"type": "string", "format": "uuid"},
+                                "item_name": {"type": "string"},
+                                "variant_id": {"type": "string", "format": "uuid"},
+                                "variant_name": {"type": "string"},
+                                "total_quantity_sold": {"type": "integer"},
+                                "total_revenue": {"type": "number"},
+                                "currency": {"type": "string"},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    )
+    @action(detail=False, methods=["get"])
+    def best_sellers(self, request):
+        """
+        Get best selling items filtered by time period
+
+        Query parameters:
+        - filter: Time filter (today, this_week, this_year). Default: today
+        - limit: Number of results to return. Default: 10
+        """
+        # Get filter parameter
+        filter_type = request.query_params.get("filter", "today")
+
+        # Validate and parse limit parameter
+        try:
+            limit = int(request.query_params.get("limit", 10))
+            if limit < 1:
+                raise ValueError("Limit must be positive")
+        except (ValueError, TypeError):
+            return Response(
+                {"detail": "Invalid limit parameter. Must be a positive integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate filter type
+        try:
+            start_date, end_date = self._get_date_range_for_filter(filter_type)
+        except ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get base queryset filtered by business/branch
+        queryset = self.get_queryset()
+
+        # Filter completed orders within date range
+        completed_orders = queryset.filter(
+            status=Order.StatusChoices.COMPLETED,
+            created_at__gte=start_date,
+            created_at__lte=end_date,
+        )
+
+        # Aggregate order items by variant and calculate metrics
+        best_sellers = (
+            OrderItem.objects.filter(order__in=completed_orders)
+            .select_related("variant", "variant__item")
+            .values(
+                "variant__item__id",
+                "variant__item__name",
+                "variant__id",
+                "variant__name",
+            )
+            .annotate(
+                total_quantity_sold=Sum("quantity"),
+                total_revenue=Sum(
+                    F("quantity")
+                    * Coalesce(F("variant__selling_price"), Value(Decimal("0")))
+                ),
+            )
+            .order_by("-total_revenue", "-total_quantity_sold")[:limit]
+        )
+
+        # Format results
+        results = []
+        for seller in best_sellers:
+            results.append(
+                {
+                    "item_id": str(seller["variant__item__id"]),
+                    "item_name": seller["variant__item__name"],
+                    "variant_id": str(seller["variant__id"]),
+                    "variant_name": seller["variant__name"],
+                    "total_quantity_sold": seller["total_quantity_sold"],
+                    "total_revenue": float(seller["total_revenue"]),
+                    "currency": "ETB",
+                }
+            )
+
+        return Response(
+            {
+                "filter": filter_type,
+                "count": len(results),
+                "results": results,
+            }
+        )
 
 
 class HomeStatsViewSet(GenericViewSet):
@@ -308,17 +463,24 @@ class HomeStatsViewSet(GenericViewSet):
         return start, end
 
     def _get_best_seller(self, base_filter):
-        """Get best selling item"""
+        """Get best selling item by revenue"""
         # Get completed orders
         completed_orders = Order.objects.filter(
             base_filter, status=Order.StatusChoices.COMPLETED
         )
 
-        # Aggregate order items by variant/item
+        # Aggregate order items by variant/item and calculate revenue (quantity * selling_price)
+        # Use Coalesce to handle NULL selling_price values (treat as 0)
         best_seller = (
             OrderItem.objects.filter(order__in=completed_orders)
+            .select_related("variant", "variant__item")
             .values("variant__item__id", "variant__item__name")
-            .annotate(total_sales=Sum("quantity"))
+            .annotate(
+                total_sales=Sum(
+                    F("quantity")
+                    * Coalesce(F("variant__selling_price"), Value(Decimal("0")))
+                )
+            )
             .order_by("-total_sales")
             .first()
         )
@@ -335,8 +497,14 @@ class HomeStatsViewSet(GenericViewSet):
         # Calculate progress percent (compare with second best seller)
         second_best = (
             OrderItem.objects.filter(order__in=completed_orders)
+            .select_related("variant", "variant__item")
             .values("variant__item__id")
-            .annotate(total_sales=Sum("quantity"))
+            .annotate(
+                total_sales=Sum(
+                    F("quantity")
+                    * Coalesce(F("variant__selling_price"), Value(Decimal("0")))
+                )
+            )
             .order_by("-total_sales")
             .exclude(variant__item__id=best_seller["variant__item__id"])
             .first()
@@ -356,7 +524,7 @@ class HomeStatsViewSet(GenericViewSet):
         return {
             "itemId": str(best_seller["variant__item__id"]),
             "itemName": best_seller["variant__item__name"],
-            "totalSales": best_seller["total_sales"],
+            "totalSales": float(best_seller["total_sales"]),
             "currency": "ETB",
             "progressPercent": progress_percent,
         }

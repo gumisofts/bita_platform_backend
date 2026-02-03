@@ -199,26 +199,27 @@ class EmployeeViewset(ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
-        business_id = self.request.query_params.get("business_id")
+        business = self.request.business
+        branch = self.request.branch
 
-        if not business_id or not is_valid_uuid(business_id):
-            raise ValidationError({"detail": "Empty or invalid business_id"})
+        if not business:
+            raise ValidationError({"detail": "Empty or invalid business"})
 
         queryset = get_objects_for_user(user, "view_employee", queryset)
 
-        queryset = queryset.filter(business=business_id)
+        queryset = queryset.filter(business=business)
 
         business = get_objects_for_user(
             user,
             "can_view_employee_business",
-            Business.objects.filter(id=business_id),
+            Business.objects.filter(id=business.id),
             accept_global_perms=False,
         ).first()
 
         if business:
             queryset = queryset | business.employees.all()
 
-        return queryset
+        return queryset.distinct()
 
 
 class EmployeeInvitationViewset(ModelViewSet):
@@ -271,7 +272,7 @@ class EmployeeInvitationViewset(ModelViewSet):
         user = request.user
         queryset = EmployeeInvitation.objects.filter(
             Q(phone_number=user.phone_number) | Q(email=user.email), status="pending"
-        )
+        ).select_related("business", "business__address")
 
         page = self.paginate_queryset(queryset)
         if page is not None:

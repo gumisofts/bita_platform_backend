@@ -12,7 +12,9 @@ class ItemSerializer(serializers.ModelSerializer):
     categories = serializers.PrimaryKeyRelatedField(
         many=True, allow_empty=True, queryset=Category.objects.all()
     )
-    description = serializers.CharField(required=False)
+    description = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
 
     class Meta:
         model = Item
@@ -143,6 +145,10 @@ class ReturnRecallSerializer(serializers.ModelSerializer):
 
 
 class GroupSerializer(serializers.ModelSerializer):
+    description = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+
     class Meta:
         model = Group
         fields = "__all__"

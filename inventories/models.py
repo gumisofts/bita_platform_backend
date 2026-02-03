@@ -24,7 +24,7 @@ class Property(BaseModel):
 
 class Group(BaseModel):
     name = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
     business = models.ForeignKey(
         "business.Business", on_delete=models.CASCADE, related_name="groups"
     )
@@ -40,7 +40,7 @@ class Group(BaseModel):
 
 class Item(BaseModel):
     name = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
     group = models.ForeignKey(
         Group, on_delete=models.CASCADE, related_name="items", null=True, blank=True
     )  # TODO change it to m2m
