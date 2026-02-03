@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
-from django.db.models import Coalesce, Count, F, Q, Sum, Value
+from django.db.models import Count, F, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiParameter,

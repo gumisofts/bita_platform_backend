@@ -364,3 +364,6 @@ class SupplierSerializer(serializers.ModelSerializer):
         model = Supplier
         exclude = []
         read_only_fields = ["id", "created_at", "updated_at"]
+        extra_kwargs = {
+            "email": {"required": False, "allow_blank": True},
+        }

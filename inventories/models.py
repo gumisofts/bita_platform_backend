@@ -95,7 +95,7 @@ class ItemImage(BaseModel):
 
 class Supplier(BaseModel):
     name = models.CharField(max_length=255)
-    email = models.EmailField()
+    email = models.EmailField(blank=True, null=True)
     phone_number = models.CharField(
         max_length=15,
         validators=[
