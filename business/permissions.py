@@ -242,6 +242,7 @@ class PermissionManager:
             AdditionalBusinessPermissionNames.CAN_VIEW_ITEM,
             AdditionalBusinessPermissionNames.CAN_ADD_ITEM,
             AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLIER,
+            AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD,
         ]
         perms = [perm.value[0] + "_branch" for perm in branch_manager_perms]
 

@@ -12,6 +12,9 @@ router.register(
     BusinessPaymentMethodViewset,
     basename="business-payment-methods",
 )
+router.register(r"accounts", AccountViewset, basename="accounts")
 
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("summary/", summary, name="finance-summary"),
+] + router.urls
