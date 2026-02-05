@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
@@ -120,7 +122,79 @@ class CustomUserAdmin(BaseUserAdmin):
 
     verify_phone_selected_users.short_description = "Verify Phone"
 
-    actions = [verify_phone_selected_users]
+    def become_user(self, request, queryset):
+        """
+        Admin action to impersonate a selected user.
+        Only allows impersonating one user at a time.
+        Only staff users can impersonate.
+        """
+        # Check if current user is staff
+        if not request.user.is_staff:
+            self.message_user(
+                request,
+                "Only staff members can impersonate users.",
+                level="error",
+            )
+            return
+
+        if queryset.count() != 1:
+            self.message_user(
+                request,
+                "Please select exactly one user to impersonate.",
+                level="error",
+            )
+            return
+
+        user = queryset.first()
+
+        # Prevent impersonating yourself
+        if user.id == request.user.id:
+            self.message_user(
+                request,
+                "You cannot impersonate yourself.",
+                level="error",
+            )
+            return
+
+        # Check if admin is already impersonating
+        if request.session.get("impersonate_user_id"):
+            self.message_user(
+                request,
+                "You are already impersonating a user. Please stop impersonation first.",
+                level="error",
+            )
+            return
+
+        # Store the original admin user ID in session
+        request.session["impersonate_user_id"] = str(request.user.id)
+        request.session["impersonate_original_user_id"] = str(user.id)
+        request.session.save()
+
+        # Log in as the selected user
+        from django.contrib.auth import login
+
+        login(request, user)
+
+        user_display = user.get_full_name() or user.email or user.phone_number or "User"
+        user_identifier = user.email or user.phone_number or "N/A"
+
+        self.message_user(
+            request,
+            format_html(
+                "Now impersonating user: <strong>{}</strong> ({}). "
+                '<a href="{}">Stop impersonating</a>',
+                user_display,
+                user_identifier,
+                reverse("admin:stop_impersonation"),
+            ),
+        )
+
+        # Redirect to admin index
+        return redirect("admin:index")
+
+    become_user.short_description = "Become user"
+
+    actions = [verify_phone_selected_users, become_user]
 
 
 @admin.register(UserDevice)

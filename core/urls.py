@@ -6,6 +6,8 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from accounts.admin_views import stop_impersonation
+
 urlpatterns = [
     path(
         "docs/swagger/",
@@ -23,6 +25,9 @@ urlpatterns = [
         name="swagger-ui",
     ),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "admin/stop-impersonation/", stop_impersonation, name="admin:stop_impersonation"
+    ),
     path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),
     path("business/", include("business.urls")),
