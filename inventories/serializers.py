@@ -156,6 +156,21 @@ class GroupSerializer(serializers.ModelSerializer):
 
 
 class ItemVariantReadSerializer(serializers.ModelSerializer):
+    class InnerPricingSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Pricing
+            exclude = ["item_variant"]
+            read_only_fields = ["id", "created_at", "updated_at"]
+
+    class InnerPropertySerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Property
+            exclude = ["item_variant"]
+            read_only_fields = ["id", "created_at", "updated_at"]
+
+    properties = InnerPropertySerializer(many=True, read_only=True)
+    pricings = InnerPricingSerializer(many=True, read_only=True)
+
     class Meta:
         model = ItemVariant
         exclude = []
