@@ -35,6 +35,8 @@ class CustomUserAdmin(BaseUserAdmin):
         "is_active",
         "is_superuser",
         "date_joined",
+        "impersonate_link",
+        "get_jwt_token",
     )
     list_filter = (
         "is_staff",
@@ -102,6 +104,13 @@ class CustomUserAdmin(BaseUserAdmin):
 
     inlines = [UserDeviceInline, VerificationCodeInline]
 
+    def changelist_view(self, request, extra_context=None):
+        """
+        Override to pass request to list_display methods.
+        """
+        self.request = request
+        return super().changelist_view(request, extra_context)
+
     def full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip()
 
@@ -113,6 +122,60 @@ class CustomUserAdmin(BaseUserAdmin):
         return format_html(f"Email: {email_status} | Phone: {phone_status}")
 
     verification_status.short_description = "Verification Status"
+
+    def impersonate_link(self, obj):
+        """
+        Display a link to impersonate this user.
+        """
+        # Check if we have access to request
+        if not hasattr(self, "request"):
+            return "-"
+
+        request = self.request
+
+        # Check if current user is staff
+        if not request.user.is_staff:
+            return "-"
+
+        # Don't show link if already impersonating
+        if request.session.get("impersonate_user_id"):
+            return format_html(
+                '<span style="color: #999;">Already impersonating</span>'
+            )
+
+        # Don't show link to impersonate yourself
+        if obj.id == request.user.id:
+            return "-"
+
+        impersonate_url = reverse("impersonate_user", args=[str(obj.id)])
+        return format_html(
+            '<a href="{}" class="button" style="padding: 5px 10px; background: #417690; color: white; text-decoration: none; border-radius: 3px; display: inline-block;">Become User</a>',
+            impersonate_url,
+        )
+
+    impersonate_link.short_description = "Impersonate"
+
+    def get_jwt_token(self, obj):
+        """
+        Display a link to get JWT access token for this user.
+        """
+        # Check if we have access to request
+        if not hasattr(self, "request"):
+            return "-"
+
+        request = self.request
+
+        # Check if current user is staff
+        if not request.user.is_staff:
+            return "-"
+
+        jwt_token_url = reverse("get_user_jwt_token", args=[str(obj.id)])
+        return format_html(
+            '<a href="{}" class="button" style="padding: 5px 10px; background: #28a745; color: white; text-decoration: none; border-radius: 3px; display: inline-block;" target="_blank">Get JWT Token</a>',
+            jwt_token_url,
+        )
+
+    get_jwt_token.short_description = "JWT Token"
 
     def verify_phone_selected_users(self, request, queryset):
         for user in queryset:
@@ -172,8 +235,9 @@ class CustomUserAdmin(BaseUserAdmin):
 
         # Log in as the selected user
         from django.contrib.auth import login
+        from django.contrib.auth.backends import ModelBackend
 
-        login(request, user)
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
 
         user_display = user.get_full_name() or user.email or user.phone_number or "User"
         user_identifier = user.email or user.phone_number or "N/A"
@@ -185,7 +249,7 @@ class CustomUserAdmin(BaseUserAdmin):
                 '<a href="{}">Stop impersonating</a>',
                 user_display,
                 user_identifier,
-                reverse("admin:stop_impersonation"),
+                reverse("stop_impersonation"),
             ),
         )
 
@@ -194,7 +258,7 @@ class CustomUserAdmin(BaseUserAdmin):
 
     become_user.short_description = "Become user"
 
-    actions = [verify_phone_selected_users, become_user]
+    actions = [verify_phone_selected_users]
 
 
 @admin.register(UserDevice)
