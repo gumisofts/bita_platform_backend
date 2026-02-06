@@ -55,8 +55,7 @@ class RoleSerializer(serializers.ModelSerializer):
     permissions = serializers.SerializerMethodField()
 
     def get_permissions(self, obj):
-
-        return map(lambda x: x.codename, obj.permissions.all())
+        return [x.codename for x in obj.permissions.all()]
 
     class Meta:
         model = Role
@@ -121,7 +120,12 @@ class EmployeeSerializer(serializers.ModelSerializer, BaseSerializerMixin):
 
 
 class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMixin):
-    business = BusinessSerializer(read_only=True)
+    business = serializers.PrimaryKeyRelatedField(
+        queryset=Business.objects.all(),
+        required=True,
+        allow_null=False,
+    )
+    business_details = BusinessSerializer(source="business", read_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -139,10 +143,18 @@ class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMi
         branch = attrs.get("branch")
 
         if role and hasattr(role, "role_name"):
-            if role.role_name != "Business Admin" and branch is None:
+            if role.role_name != ROLES.BUSINESS_ADMIN.value and branch is None:
                 raise ValidationError({"branch": "Branch is required for this role."})
 
         return attrs
+
+    def to_representation(self, instance):
+        """Override to include business_details in the response"""
+        representation = super().to_representation(instance)
+        # Include business_details for backward compatibility
+        if hasattr(instance, "business") and instance.business:
+            representation["business"] = BusinessSerializer(instance.business).data
+        return representation
 
     class Meta:
         model = EmployeeInvitation

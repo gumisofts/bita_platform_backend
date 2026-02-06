@@ -399,12 +399,12 @@ class EmployeeInvitationViewset(ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             # Additional validation
-            business_id = serializer.validated_data.get("business")
-            if business_id:
+            business = serializer.validated_data.get("business")
+            if business:
                 user = request.user
                 # Check if user has permission to invite to this business
                 user_business = Business.objects.filter(
-                    Q(owner=user) | Q(employees__user=user), id=business_id.id
+                    Q(owner=user) | Q(employees__user=user), id=business.id
                 ).first()
 
                 if not user_business:
@@ -418,15 +418,15 @@ class EmployeeInvitationViewset(ModelViewSet):
             # Check for duplicate invitations
             email = serializer.validated_data.get("email")
             phone_number = serializer.validated_data.get("phone_number")
-            business = serializer.validated_data.get("business")
 
+            existing_invitation = None
             if email:
                 existing_invitation = EmployeeInvitation.objects.filter(
                     email=email,
                     business=business,
                     status="pending",
                 ).first()
-            if phone_number:
+            if phone_number and not existing_invitation:
                 existing_invitation = EmployeeInvitation.objects.filter(
                     phone_number=phone_number,
                     business=business,
