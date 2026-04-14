@@ -1,0 +1,186 @@
+##############################################################################
+# deploy.yml — Routine application deployment
+#
+# Run this on every code push. Pulls the latest code, syncs the .env,
+# updates Python deps, and restarts all application services.
+#
+# Usage:
+#   ./scripts/deploy-production.sh              # full deploy
+#   ./scripts/deploy-production.sh migrate      # only run migrations
+#   ./scripts/deploy-production.sh collectstatic
+#   ./scripts/deploy-production.sh restart      # only restart services
+#   ./scripts/deploy-production.sh nginx        # only update nginx config
+#   ./scripts/deploy-production.sh domains      # only update Django env domains
+#
+# Available tags: migrate, collectstatic, restart, nginx, domains
+##############################################################################
+- name: Deploy application update
+  hosts: main
+  vars:
+    celery_worker_count: 2
+  tasks:
+    ##########################################################################
+    # Pull code + sync config
+    ##########################################################################
+    - name: Pull latest code
+      ansible.builtin.git:
+        accept_hostkey: true
+        clone: yes
+        update: yes
+        name: git@github.com:gumisofts/bita_platform_backend.git
+        dest: app
+        force: yes
+
+    - name: Sync .env file
+      ansible.builtin.copy:
+        dest: ~/app/
+        force: true
+        src: ../.env
+
+    - name: Install / update pip requirements
+      ansible.builtin.pip:
+        virtualenv: ~/app/env
+        requirements: ~/app/requirements.txt
+
+    ##########################################################################
+    # Domain-aware env vars — derived from ini.yml domain lists so that
+    # DJANGO_ALLOWED_HOSTS and CORS always match the nginx config.
+    # Run with tag "domains" to update only domain config.
+    ##########################################################################
+    - name: Compute all domain names
+      tags: [domains]
+      ansible.builtin.set_fact:
+        _all_domain_names: >-
+          {{ api_domains | map(attribute='name') | list }}
+
+    - name: Update DJANGO_ALLOWED_HOSTS in .env
+      tags: [domains]
+      ansible.builtin.lineinfile:
+        path: ~/app/.env
+        regexp: "^DJANGO_ALLOWED_HOSTS="
+        line: >-
+          DJANGO_ALLOWED_HOSTS={{ (
+            ['localhost', ansible_host] +
+            _all_domain_names +
+            (_all_domain_names | map('regex_replace', '^', 'www.') | list)
+          ) | join(',') }}
+
+    - name: Update DJANGO_CORS_ALLOWED_ORIGINS in .env
+      tags: [domains]
+      ansible.builtin.lineinfile:
+        path: ~/app/.env
+        regexp: "^DJANGO_CORS_ALLOWED_ORIGINS="
+        line: >-
+          DJANGO_CORS_ALLOWED_ORIGINS={{ (
+            ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:5173'] +
+            (_all_domain_names | map('regex_replace', '^', 'https://') | list) +
+            (_all_domain_names | map('regex_replace', '^', 'https://www.') | list)
+          ) | join(',') }}
+
+    ##########################################################################
+    # Database
+    ##########################################################################
+    - name: Run Django migrations
+      tags: [migrate]
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: env/bin/python manage.py migrate --noinput
+
+    ##########################################################################
+    # Static files
+    ##########################################################################
+    - name: Collect static files
+      tags: [collectstatic]
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: env/bin/python manage.py collectstatic --noinput -c
+
+    ##########################################################################
+    # Nginx config sync — regenerate from template and reload if changed.
+    # Run with tag "nginx" to update only nginx (no app restart needed).
+    ##########################################################################
+    - name: Sync nginx configuration from template
+      become: true
+      tags: [nginx]
+      ansible.builtin.template:
+        src: ../nginx.conf.j2
+        dest: /etc/nginx/conf.d/app.conf
+      register: nginx_conf
+
+    - name: Test nginx configuration
+      become: true
+      tags: [nginx]
+      ansible.builtin.command:
+        cmd: nginx -t
+      register: nginx_test
+      failed_when: false
+
+    - name: Show nginx test errors (if any)
+      tags: [nginx]
+      ansible.builtin.debug:
+        var: nginx_test.stderr_lines
+      when: nginx_test.rc != 0
+
+    - name: Reload nginx if test passed
+      become: true
+      tags: [nginx]
+      ansible.builtin.systemd_service:
+        name: nginx
+        state: reloaded
+      when: nginx_test.rc == 0
+
+    ##########################################################################
+    # Sync systemd service files
+    ##########################################################################
+    - name: Copy celery@.service template
+      become: true
+      tags: [restart]
+      ansible.builtin.copy:
+        force: true
+        src: ../celery@.service
+        dest: /etc/systemd/system/celery@.service
+      register: celery_service_file
+
+    - name: Copy celery_beat.service
+      become: true
+      tags: [restart]
+      ansible.builtin.copy:
+        force: true
+        src: ../celery_beat.service
+        dest: /etc/systemd/system/celery_beat.service
+      register: celery_beat_service_file
+
+    - name: Reload systemd if any service file changed
+      become: true
+      tags: [restart]
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: celery_service_file.changed or celery_beat_service_file.changed
+
+    ##########################################################################
+    # Restart services
+    ##########################################################################
+    - name: Restart app service
+      become: true
+      tags: [restart]
+      ansible.builtin.systemd_service:
+        name: app
+        state: restarted
+        daemon_reload: true
+
+    - name: Restart celery worker instances
+      become: true
+      tags: [restart]
+      ansible.builtin.systemd_service:
+        name: "celery@{{ item }}"
+        state: restarted
+        daemon_reload: true
+      loop: "{{ range(1, celery_worker_count + 1) | list }}"
+
+    - name: Restart celery_beat service
+      become: true
+      tags: [restart]
+      ansible.builtin.systemd_service:
+        name: celery_beat
+        state: restarted
+        daemon_reload: true

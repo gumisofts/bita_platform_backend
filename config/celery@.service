@@ -1,0 +1,34 @@
+[Unit]
+Description=Celery worker (instance %i)
+After=network.target
+
+[Service]
+Type=simple
+
+User=ubuntu
+Group=www-data
+
+RuntimeDirectory=/home/ubuntu/app
+WorkingDirectory=/home/ubuntu/app
+ExecStartPre=/bin/mkdir -p /home/ubuntu/app/logs
+ExecStartPre=/bin/chown ubuntu:www-data /home/ubuntu/app/logs
+ExecStartPre=/bin/chmod 755 /home/ubuntu/app/logs
+Environment="DJANGO_SETTINGS_MODULE=core.settings"
+EnvironmentFile=/home/ubuntu/app/.env
+ExecStart=/home/ubuntu/app/env/bin/celery -A core.celery.celery worker \
+    --loglevel=INFO \
+    -Q default \
+    --hostname=default_%i@%%h \
+    --concurrency=8 \
+    --max-tasks-per-child=1000 \
+    --without-heartbeat \
+    -Ofair
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+PrivateTmp=true
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
