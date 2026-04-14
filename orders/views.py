@@ -161,15 +161,26 @@ class OrderViewset(ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def checkout(self, request, *args, **kwargs):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
         order = self.get_object()
         if order.status == Order.StatusChoices.COMPLETED:
             return Response(
                 {"error": "Order is already completed."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        order.status = Order.StatusChoices.COMPLETED
-        order.save()
-        order_completed.send(sender=Order, instance=order)
+
+        try:
+            with db_transaction.atomic():
+                order.status = Order.StatusChoices.COMPLETED
+                order.save()
+                order_completed.send(sender=Order, instance=order)
+        except DjangoValidationError as e:
+            return Response(
+                {"error": e.message},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         return Response(OrderListSerializer(order).data, status=status.HTTP_200_OK)
 
     def _get_date_range_for_filter(self, filter_type):

@@ -1,4 +1,5 @@
 # Signal for creating a transaction when an order is completed
+from django.core.exceptions import ValidationError
 from django.db.models.signals import Signal, post_save, pre_save
 from django.dispatch import receiver
 
@@ -10,9 +11,34 @@ order_completed = Signal()
 
 @receiver(order_completed)
 def on_order_completed(sender, instance, **kwargs):
-    for item in instance.items.all():
-        item.variant.quantity -= item.quantity
-        item.variant.save()
+    from inventories.models import ItemVariant
+
+    items = list(instance.items.select_related("variant").all())
+    variant_ids = [item.variant_id for item in items]
+
+    # Lock the rows to prevent concurrent checkouts from over-selling
+    locked_variants = {
+        v.pk: v
+        for v in ItemVariant.objects.select_for_update().filter(pk__in=variant_ids)
+    }
+
+    # Validate stock availability before touching anything
+    insufficient = []
+    for item in items:
+        variant = locked_variants[item.variant_id]
+        if variant.quantity < item.quantity:
+            insufficient.append(
+                f"'{variant.name}': need {item.quantity}, have {variant.quantity}"
+            )
+
+    if insufficient:
+        raise ValidationError("Insufficient stock for: " + "; ".join(insufficient))
+
+    # All checks passed — decrement inventory
+    for item in items:
+        variant = locked_variants[item.variant_id]
+        variant.quantity -= item.quantity
+        variant.save()
 
 
 @receiver(pre_save, sender=Order)
