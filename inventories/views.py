@@ -1,6 +1,7 @@
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
 from rest_framework import status
@@ -201,7 +202,7 @@ class ItemVariantViewset(ModelViewSet):
         else:
             queryset = queryset.none()
 
-        return queryset
+        return queryset.order_by(Lower("name"), "id")
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
