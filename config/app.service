@@ -11,7 +11,6 @@ Group=www-data
 
 RuntimeDirectory=/home/ubuntu/app
 WorkingDirectory=/home/ubuntu/app
-Environment="DJANGO_SETTINGS_MODULE=core.settings"
 EnvironmentFile=/home/ubuntu/app/.env
 ExecStart=/home/ubuntu/app/env/bin/gunicorn core.asgi:app -c config/gunicorn.conf.py
 ExecReload=/bin/kill -s HUP $MAINPID
