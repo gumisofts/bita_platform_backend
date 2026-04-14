@@ -1,13 +1,35 @@
 myhosts:
   hosts:
-    a:
-      ansible_host: 172.25.0.2
-    b:
-      ansible_host: 172.25.0.3
-    c:
-      ansible_host: 172.25.0.4
-    aws:
-      ansible_host: 13.51.169.26
+    main:
+      ansible_host: 109.199.108.219
   vars:
     ansible_user: ubuntu
-    ansible_ssh_pass: test
+    ansible_ssh_private_key_file: ~/.ssh/contabo.pem
+
+    ##########################################################################
+    # PgBouncer — backend PostgreSQL server to proxy to.
+    # Change pgbouncer_db_host to point PgBouncer at a different RDS instance.
+    # Override credentials via --extra-vars or Ansible Vault.
+    ##########################################################################
+    pgbouncer_db_host: "localhost"
+    pgbouncer_db_port: 5432
+    pgbouncer_db_user: "postgres"
+    pgbouncer_db_password: "'HiddenAmbitions546!"
+
+    ##########################################################################
+    # Domain Configuration
+    # Add or remove entries to expose the app on additional domains.
+    # Each entry requires:
+    #   name      — the bare domain (nginx also adds www.<name> automatically)
+    #   ssl_cert  — absolute path to the PEM certificate on the server
+    #   ssl_key   — absolute path to the PEM private key on the server
+    ##########################################################################
+
+    api_domains:
+      - name: api.bita.gumisofts.com
+        ssl_cert: /etc/ssl/certs/api.bita.gumisofts.com.crt
+        ssl_key: /etc/ssl/certs/api.bita.gumisofts.com.pem
+
+      - name: api.bita.et
+        ssl_cert: /etc/ssl/certs/api.bita.et.crt
+        ssl_key: /etc/ssl/certs/api.bita.et.pem

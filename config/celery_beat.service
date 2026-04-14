@@ -1,22 +1,24 @@
 [Unit]
-Description=gunicorn daemon
-Requires=app.socket
+Description=Celery beat scheduler
 After=network.target
 
 [Service]
-Type=notify
+Type=simple
 
 User=ubuntu
 Group=www-data
 
 RuntimeDirectory=/home/ubuntu/app
 WorkingDirectory=/home/ubuntu/app
+Environment="DJANGO_SETTINGS_MODULE=core.settings"
 EnvironmentFile=/home/ubuntu/app/.env
-ExecStart=/home/ubuntu/app/env/bin/gunicorn core.asgi:app -c config/gunicorn.conf.py
+ExecStart=/home/ubuntu/app/env/bin/celery -A core.celery.celery beat --loglevel=INFO
 ExecReload=/bin/kill -s HUP $MAINPID
 KillMode=mixed
 TimeoutStopSec=5
 PrivateTmp=true
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target

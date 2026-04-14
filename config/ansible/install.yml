@@ -1,0 +1,336 @@
+##############################################################################
+# install.yml — One-time server bootstrap
+#
+# Run this once when provisioning a new server, or when you need to
+# update infrastructure-level config (service files, SSL certs, nginx,
+# system packages).
+#
+# Usage:
+#   ./scripts/setup-production.sh
+#   ./scripts/setup-production.sh nginx        # only nginx tasks
+#   ./scripts/setup-production.sh app          # only app + services
+#   ./scripts/setup-production.sh packages     # only system packages
+#   ./scripts/setup-production.sh pgbouncer    # only PgBouncer tasks
+#
+# Available tags: packages, app, pgbouncer, nginx
+##############################################################################
+- name: Production server bootstrap
+  hosts: main
+  vars:
+    celery_worker_count: 2
+  tasks:
+    ##########################################################################
+    # System packages
+    ##########################################################################
+    - name: Update apt cache and upgrade packages
+      become: true
+      tags: [packages]
+      ansible.builtin.apt:
+        upgrade: yes
+        update_cache: yes
+
+    - name: Install system packages
+      become: true
+      tags: [packages, app, nginx]
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - python3-dev
+          - python3-pip
+          - python3-venv
+          - gcc
+          - libpq-dev
+          - curl
+          - postgresql-client
+
+    ##########################################################################
+    # Application
+    ##########################################################################
+    - name: Clone / update repository
+      tags: [app]
+      ansible.builtin.git:
+        accept_hostkey: true
+        clone: yes
+        update: yes
+        name: git@github.com:gumisofts/bita_platform_backend.git
+        dest: app
+        force: yes
+
+    - name: Create Python virtual environment
+      tags: [app]
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: python3 -m venv env
+        creates: ~/app/env/bin/python
+
+    - name: Upgrade pip
+      tags: [app]
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: env/bin/python -m pip install --upgrade pip
+
+    - name: Install pip requirements
+      tags: [app]
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: env/bin/pip install -r requirements.txt
+
+    - name: Ensure app config directory exists
+      tags: [app]
+      ansible.builtin.file:
+        path: ~/app/config
+        state: directory
+        mode: "0755"
+
+    ##########################################################################
+    # systemd service files
+    ##########################################################################
+    - name: Copy app.socket
+      become: true
+      tags: [app]
+      ansible.builtin.copy:
+        force: true
+        src: ../app.socket
+        dest: /etc/systemd/system/app.socket
+
+    - name: Copy app.service
+      become: true
+      tags: [app]
+      ansible.builtin.copy:
+        force: true
+        src: ../app.service
+        dest: /etc/systemd/system/app.service
+
+    - name: Copy celery@.service template
+      become: true
+      tags: [app]
+      ansible.builtin.copy:
+        force: true
+        src: ../celery@.service
+        dest: /etc/systemd/system/celery@.service
+
+    - name: Copy celery_beat.service
+      become: true
+      tags: [app]
+      ansible.builtin.copy:
+        force: true
+        src: ../celery_beat.service
+        dest: /etc/systemd/system/celery_beat.service
+
+    ##########################################################################
+    # Environment + initial data setup
+    ##########################################################################
+    - name: Copy .env file
+      tags: [app]
+      ansible.builtin.copy:
+        dest: ~/app/
+        force: true
+        src: ../.env
+
+    - name: Compute all domain names
+      tags: [app, domains]
+      ansible.builtin.set_fact:
+        _all_domain_names: >-
+          {{ api_domains | map(attribute='name') | list }}
+
+    - name: Update DJANGO_ALLOWED_HOSTS in .env
+      tags: [app, domains]
+      ansible.builtin.lineinfile:
+        path: ~/app/.env
+        regexp: "^DJANGO_ALLOWED_HOSTS="
+        line: >-
+          DJANGO_ALLOWED_HOSTS={{ (
+            ['localhost', ansible_host] +
+            _all_domain_names +
+            (_all_domain_names | map('regex_replace', '^', 'www.') | list)
+          ) | join(',') }}
+
+    - name: Update DJANGO_CORS_ALLOWED_ORIGINS in .env
+      tags: [app, domains]
+      ansible.builtin.lineinfile:
+        path: ~/app/.env
+        regexp: "^DJANGO_CORS_ALLOWED_ORIGINS="
+        line: >-
+          DJANGO_CORS_ALLOWED_ORIGINS={{ (
+            ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:5173'] +
+            (_all_domain_names | map('regex_replace', '^', 'https://') | list) +
+            (_all_domain_names | map('regex_replace', '^', 'https://www.') | list)
+          ) | join(',') }}
+
+    - name: Ensure ~/app/staticfiles directory exists
+      tags: [app]
+      ansible.builtin.file:
+        path: ~/app/staticfiles
+        state: directory
+        mode: "0755"
+
+    - name: Ensure /var/www/static directory exists
+      become: true
+      tags: [app]
+      ansible.builtin.file:
+        path: /var/www/static
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    - name: Ensure /var/www/medias directory exists
+      become: true
+      tags: [app]
+      ansible.builtin.file:
+        path: /var/www/medias
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    - name: Run Django migrations
+      tags: [app]
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: env/bin/python manage.py migrate --noinput
+
+    - name: Collect static files
+      tags: [app]
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: env/bin/python manage.py collectstatic --noinput -c
+
+    ##########################################################################
+    # Enable + start all services
+    ##########################################################################
+    - name: Enable app.socket
+      become: true
+      tags: [app]
+      ansible.builtin.systemd_service:
+        name: app.socket
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Enable app service
+      become: true
+      tags: [app]
+      ansible.builtin.systemd_service:
+        name: app
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Enable celery worker instances
+      become: true
+      tags: [app]
+      ansible.builtin.systemd_service:
+        name: "celery@{{ item }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop: "{{ range(1, celery_worker_count + 1) | list }}"
+
+    - name: Enable celery_beat service
+      become: true
+      tags: [app]
+      ansible.builtin.systemd_service:
+        name: celery_beat
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    ##########################################################################
+    # PgBouncer
+    ##########################################################################
+    - name: Install PgBouncer
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.apt:
+        name: pgbouncer
+        state: present
+        update_cache: yes
+
+    - name: Deploy pgbouncer.ini
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.template:
+        src: ../pgbouncer.ini.j2
+        dest: /etc/pgbouncer/pgbouncer.ini
+        owner: postgres
+        group: postgres
+        mode: "0640"
+
+    - name: Deploy PgBouncer userlist
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.template:
+        src: ../userlist.txt.j2
+        dest: /etc/pgbouncer/userlist.txt
+        owner: postgres
+        group: postgres
+        mode: "0640"
+
+    - name: Ensure PgBouncer log file exists
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.file:
+        path: /var/log/postgresql/pgbouncer.log
+        state: touch
+        owner: postgres
+        group: postgres
+        mode: "0640"
+
+    - name: Enable and start PgBouncer
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.systemd_service:
+        name: pgbouncer
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    ##########################################################################
+    # SSL certificates + Nginx
+    ##########################################################################
+    - name: Upload SSL certificate
+      become: true
+      tags: [nginx]
+      ansible.builtin.copy:
+        force: true
+        src: ../api.bita.gumisofts.com.crt
+        dest: /etc/ssl/certs/api.bita.gumisofts.com.crt
+
+    - name: Upload SSL private key
+      become: true
+      tags: [nginx]
+      ansible.builtin.copy:
+        force: true
+        src: ../api.bita.gumisofts.com.pem
+        dest: /etc/ssl/certs/api.bita.gumisofts.com.pem
+
+    - name: Upload nginx configuration
+      become: true
+      tags: [nginx]
+      ansible.builtin.template:
+        src: ../nginx.conf.j2
+        dest: /etc/nginx/conf.d/app.conf
+
+    - name: Test nginx configuration
+      become: true
+      tags: [nginx]
+      ansible.builtin.command:
+        cmd: nginx -t
+      register: nginx_test
+      failed_when: false
+
+    - name: Show nginx test errors (if any)
+      tags: [nginx]
+      ansible.builtin.debug:
+        var: nginx_test.stderr_lines
+      when: nginx_test.rc != 0
+
+    - name: Enable and start nginx
+      become: true
+      tags: [nginx]
+      ansible.builtin.systemd_service:
+        name: nginx
+        enabled: true
+        state: restarted
+      when: nginx_test.rc == 0
