@@ -12,7 +12,7 @@
 #   ./scripts/deploy-production.sh nginx        # only update nginx config
 #   ./scripts/deploy-production.sh domains      # only update Django env domains
 #
-# Available tags: migrate, collectstatic, restart, nginx, domains
+# Available tags: migrate, collectstatic, pgbouncer, restart, nginx, domains
 ##############################################################################
 - name: Deploy application update
   hosts: main
@@ -128,6 +128,39 @@
         name: nginx
         state: reloaded
       when: nginx_test.rc == 0
+
+    ##########################################################################
+    # PgBouncer config sync
+    ##########################################################################
+    - name: Sync pgbouncer.ini
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.template:
+        src: ../pgbouncer.ini.j2
+        dest: /etc/pgbouncer/pgbouncer.ini
+        owner: postgres
+        group: postgres
+        mode: "0640"
+      register: pgbouncer_ini
+
+    - name: Sync PgBouncer userlist
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.template:
+        src: ../userlist.txt.j2
+        dest: /etc/pgbouncer/userlist.txt
+        owner: postgres
+        group: postgres
+        mode: "0640"
+      register: pgbouncer_userlist
+
+    - name: Reload PgBouncer if config changed
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.systemd_service:
+        name: pgbouncer
+        state: reloaded
+      when: pgbouncer_ini.changed or pgbouncer_userlist.changed
 
     ##########################################################################
     # Sync systemd service files

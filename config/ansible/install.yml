@@ -10,8 +10,9 @@
 #   ./scripts/setup-production.sh nginx        # only nginx tasks
 #   ./scripts/setup-production.sh app          # only app + services
 #   ./scripts/setup-production.sh packages     # only system packages
+#   ./scripts/setup-production.sh pgbouncer    # only PgBouncer tasks
 #
-# Available tags: packages, app, nginx
+# Available tags: packages, app, pgbouncer, nginx
 ##############################################################################
 - name: Production server bootstrap
   hosts: main
@@ -216,6 +217,56 @@
       tags: [app]
       ansible.builtin.systemd_service:
         name: celery_beat
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    ##########################################################################
+    # PgBouncer
+    ##########################################################################
+    - name: Install PgBouncer
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.apt:
+        name: pgbouncer
+        state: present
+        update_cache: yes
+
+    - name: Deploy pgbouncer.ini
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.template:
+        src: ../pgbouncer.ini.j2
+        dest: /etc/pgbouncer/pgbouncer.ini
+        owner: postgres
+        group: postgres
+        mode: "0640"
+
+    - name: Deploy PgBouncer userlist
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.template:
+        src: ../userlist.txt.j2
+        dest: /etc/pgbouncer/userlist.txt
+        owner: postgres
+        group: postgres
+        mode: "0640"
+
+    - name: Ensure PgBouncer log file exists
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.file:
+        path: /var/log/postgresql/pgbouncer.log
+        state: touch
+        owner: postgres
+        group: postgres
+        mode: "0640"
+
+    - name: Enable and start PgBouncer
+      become: true
+      tags: [pgbouncer]
+      ansible.builtin.systemd_service:
+        name: pgbouncer
         enabled: true
         state: started
         daemon_reload: true

@@ -1,10 +1,20 @@
 myhosts:
   hosts:
     main:
-      ansible_host: 13.51.169.26
+      ansible_host: 109.199.108.219
   vars:
     ansible_user: ubuntu
-    private_key_file: ~/.ssh/aws
+    ansible_ssh_private_key_file: ~/.ssh/contabo.pem
+
+    ##########################################################################
+    # PgBouncer — backend PostgreSQL server to proxy to.
+    # Change pgbouncer_db_host to point PgBouncer at a different RDS instance.
+    # Override credentials via --extra-vars or Ansible Vault.
+    ##########################################################################
+    pgbouncer_db_host: "localhost"
+    pgbouncer_db_port: 5432
+    pgbouncer_db_user: "postgres"
+    pgbouncer_db_password: "'HiddenAmbitions546!"
 
     ##########################################################################
     # Domain Configuration
@@ -19,3 +29,7 @@ myhosts:
       - name: api.bita.gumisofts.com
         ssl_cert: /etc/ssl/certs/api.bita.gumisofts.com.crt
         ssl_key: /etc/ssl/certs/api.bita.gumisofts.com.pem
+
+      - name: api.bita.et
+        ssl_cert: /etc/ssl/certs/api.bita.et.crt
+        ssl_key: /etc/ssl/certs/api.bita.et.pem

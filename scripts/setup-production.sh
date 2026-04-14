@@ -12,7 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ANSIBLE_DIR="$REPO_ROOT/config/ansible"
 INVENTORY="$ANSIBLE_DIR/ini.yml"
-PRIVATE_KEY="${PRIVATE_KEY:-$HOME/.ssh/aws}"
+PRIVATE_KEY="${PRIVATE_KEY:-$HOME/.ssh/contabo.pem}"
 
 cd "$REPO_ROOT"
 
@@ -27,11 +27,13 @@ if [[ -n "$TAGS" ]]; then
   echo "==> Bootstrapping PRODUCTION — tags: $TAGS"
   ansible-playbook -i "$INVENTORY" "$ANSIBLE_DIR/install.yml" \
     --private-key "$PRIVATE_KEY" \
+    --ask-become-pass \
     --tags "$TAGS"
 else
   echo "==> Full server bootstrap on PRODUCTION"
   ansible-playbook -i "$INVENTORY" "$ANSIBLE_DIR/install.yml" \
-    --private-key "$PRIVATE_KEY"
+    --private-key "$PRIVATE_KEY" \
+    --ask-become-pass
 fi
 
 echo "==> Bootstrap finished."

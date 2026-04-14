@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ANSIBLE_DIR="$REPO_ROOT/config/ansible"
 INVENTORY="$ANSIBLE_DIR/ini.yml"
-PRIVATE_KEY="${PRIVATE_KEY:-$HOME/.ssh/aws}"
+PRIVATE_KEY="${PRIVATE_KEY:-$HOME/.ssh/contabo.pem}"
 
 cd "$REPO_ROOT"
 
@@ -30,11 +30,13 @@ if [[ -n "$TAGS" ]]; then
   echo "==> Deploying to PRODUCTION — tags: $TAGS"
   ansible-playbook -i "$INVENTORY" "$ANSIBLE_DIR/deploy.yml" \
     --private-key "$PRIVATE_KEY" \
+    --ask-become-pass \
     --tags "$TAGS"
 else
   echo "==> Full deploy to PRODUCTION"
   ansible-playbook -i "$INVENTORY" "$ANSIBLE_DIR/deploy.yml" \
-    --private-key "$PRIVATE_KEY"
+    --private-key "$PRIVATE_KEY" \
+    --ask-become-pass
 fi
 
 echo "==> Deployment finished."
