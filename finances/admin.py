@@ -58,7 +58,7 @@ class BusinessPaymentMethodAdmin(admin.ModelAdmin):
         "id",
         "business_name",
         "payment_name",
-        "label",
+        "display_name",
         "identifier",
         "created_at",
     ]

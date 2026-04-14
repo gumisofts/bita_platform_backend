@@ -117,6 +117,45 @@ class SupplyViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Supply.objects.count(), 2)
 
+    def test_create_supply_without_label_uses_counter(self):
+        """When label is omitted, supply gets supply-1, supply-2, ... per branch."""
+        url = reverse("supplies-list")
+        data = {
+            "branch": str(self.branch.id),
+            "business": str(self.business.id),
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        supply = Supply.objects.get(id=response.data["id"])
+        # Existing supply has label "Supply Label", so first auto is supply-1
+        self.assertEqual(supply.label, "supply-1")
+        # Create another without label
+        response2 = self.client.post(url, data)
+        self.assertEqual(response2.status_code, status.HTTP_201_CREATED)
+        supply2 = Supply.objects.get(id=response2.data["id"])
+        self.assertEqual(supply2.label, "supply-2")
+
+    def test_create_supply_with_existing_label_reuses_supply(self):
+        """When provided label already exists for branch, return existing supply."""
+        url = reverse("supplies-list")
+        existing = Supply.objects.create(
+            label="supply-1", branch=self.branch, business=self.business
+        )
+        data = {
+            "label": "supply-1",
+            "branch": str(self.branch.id),
+            "business": str(self.business.id),
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["id"], str(existing.id))
+        self.assertEqual(Supply.objects.count(), 2)  # setUp supply + supply-1
+        # Same label again still returns same supply
+        response2 = self.client.post(url, data)
+        self.assertEqual(response2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response2.data["id"], str(existing.id))
+        self.assertEqual(Supply.objects.count(), 2)
+
     def test_filter_by_business_id(self):
         url = reverse("supplies-list")
         response = self.client.get(url + "?business=" + str(self.business.id))

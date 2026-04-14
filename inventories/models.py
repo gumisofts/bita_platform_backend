@@ -24,7 +24,7 @@ class Property(BaseModel):
 
 class Group(BaseModel):
     name = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
     business = models.ForeignKey(
         "business.Business", on_delete=models.CASCADE, related_name="groups"
     )
@@ -40,7 +40,7 @@ class Group(BaseModel):
 
 class Item(BaseModel):
     name = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
     group = models.ForeignKey(
         Group, on_delete=models.CASCADE, related_name="items", null=True, blank=True
     )  # TODO change it to m2m
@@ -73,7 +73,7 @@ class ItemVariant(BaseModel):
         blank=True,
     )
     quantity = models.PositiveIntegerField(default=0)
-    sku = models.CharField(max_length=255, unique=True)
+    sku = models.CharField(max_length=255, unique=True, null=True)
     is_default = models.BooleanField(default=False)
 
     def __str__(self):
@@ -95,7 +95,7 @@ class ItemImage(BaseModel):
 
 class Supplier(BaseModel):
     name = models.CharField(max_length=255)
-    email = models.EmailField()
+    email = models.EmailField(blank=True, null=True)
     phone_number = models.CharField(
         max_length=15,
         validators=[
@@ -115,7 +115,7 @@ class Supplier(BaseModel):
 
 
 class Supply(BaseModel):
-    label = models.CharField(max_length=255)
+    label = models.CharField(max_length=255, blank=True)
     branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
     business = models.ForeignKey(
         "business.Business", on_delete=models.CASCADE, null=True, blank=True
@@ -145,7 +145,19 @@ class Supply(BaseModel):
         verbose_name_plural = "Supplies"
 
     def __str__(self):
-        return self.label
+        return self.label or ""
+
+
+def get_next_supply_label(branch):
+    """Generate next supply label for a branch: supply-1, supply-2, ...
+    If supply-N already exists, increments until an available label is found.
+    """
+    n = 1
+    while True:
+        label = f"supply-{n}"
+        if not Supply.objects.filter(branch=branch, label=label).exists():
+            return label
+        n += 1
 
 
 class SuppliedItem(BaseModel):

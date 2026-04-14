@@ -1,10 +1,12 @@
 import enum
+from datetime import timedelta
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.validators import RegexValidator
 from django.db import models
+from django.utils import timezone
 
 from core.models import BaseModel
 
@@ -358,6 +360,10 @@ class Branch(BaseModel):
         ]
 
 
+def default_invitation_expiry():
+    return timezone.now() + timedelta(days=7)
+
+
 class EmployeeInvitation(BaseModel):
     STATUS_CHOICES = [
         ("pending", "Pending"),
@@ -372,6 +378,11 @@ class EmployeeInvitation(BaseModel):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, null=True, blank=True)
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
     status = models.CharField(max_length=255, choices=STATUS_CHOICES, default="pending")
+    expires_at = models.DateTimeField(default=default_invitation_expiry)
+
+    @property
+    def is_expired(self):
+        return self.status == "pending" and timezone.now() > self.expires_at
 
     def __str__(self):
         return f"{self.email} - {self.business.name}"

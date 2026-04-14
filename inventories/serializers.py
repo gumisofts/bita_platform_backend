@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from business.models import Branch
+from business.models import Branch, Category
 from inventories.models import *
 
 from .models import Item
@@ -9,6 +9,13 @@ from .models import Item
 
 
 class ItemSerializer(serializers.ModelSerializer):
+    categories = serializers.PrimaryKeyRelatedField(
+        many=True, allow_empty=True, queryset=Category.objects.all()
+    )
+    description = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+
     class Meta:
         model = Item
         fields = "__all__"
@@ -82,12 +89,29 @@ class SupplySerializer(serializers.ModelSerializer):
         exclude = []
         extra_kwargs = {
             "business": {"required": True},
+            "label": {"required": False, "allow_blank": True},
         }
+
+    def get_unique_together_validators(self):
+        """Skip unique-together so we can reuse existing supply via get_or_create."""
+        return []
+
+    def to_internal_value(self, data):
+        """Set label when missing so unique lookup works; when provided we reuse existing."""
+        internal = super().to_internal_value(data)
+        branch = internal.get("branch")
+        if branch is not None and not internal.get("label"):
+            internal["label"] = get_next_supply_label(branch)
+        return internal
 
     def create(self, validated_data):
         item = validated_data.pop("item", None)
         business = validated_data.get("business", None)
-        supply = super().create(validated_data)
+        branch = validated_data.pop("branch")
+        label = validated_data.pop("label")
+        supply, _ = Supply.objects.get_or_create(
+            branch=branch, label=label, defaults=validated_data
+        )
         if item:
             item["item"] = item.get("variant").item
             item["initial_quantity"] = item.get("quantity")
@@ -121,6 +145,10 @@ class ReturnRecallSerializer(serializers.ModelSerializer):
 
 
 class GroupSerializer(serializers.ModelSerializer):
+    description = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+
     class Meta:
         model = Group
         fields = "__all__"
@@ -128,6 +156,21 @@ class GroupSerializer(serializers.ModelSerializer):
 
 
 class ItemVariantReadSerializer(serializers.ModelSerializer):
+    class InnerPricingSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Pricing
+            exclude = ["item_variant"]
+            read_only_fields = ["id", "created_at", "updated_at"]
+
+    class InnerPropertySerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Property
+            exclude = ["item_variant"]
+            read_only_fields = ["id", "created_at", "updated_at"]
+
+    properties = InnerPropertySerializer(many=True, read_only=True)
+    pricings = InnerPricingSerializer(many=True, read_only=True)
+
     class Meta:
         model = ItemVariant
         exclude = []
@@ -336,3 +379,6 @@ class SupplierSerializer(serializers.ModelSerializer):
         model = Supplier
         exclude = []
         read_only_fields = ["id", "created_at", "updated_at"]
+        extra_kwargs = {
+            "email": {"required": False, "allow_blank": True},
+        }
