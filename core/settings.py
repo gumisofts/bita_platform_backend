@@ -16,12 +16,12 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 DEBUG = os.getenv("DJANGO_DEBUG", False) == "True"
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 
-CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(
-    ","
-)
+CORS_ALLOWED_ORIGINS = os.getenv(
+    "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"
+).split(",")
 
 AUTH_USER_MODEL = "accounts.User"
 
