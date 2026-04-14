@@ -11,7 +11,7 @@ Group=www-data
 
 RuntimeDirectory=/home/ubuntu/app
 WorkingDirectory=/home/ubuntu/app
-ExecStart=/root/app/env/bin/gunicorn core.asgi:app -c config/gunicorn.conf.py
+ExecStart=/home/ubuntu/app/env/bin/gunicorn core.asgi:app -c config/gunicorn.conf.py
 ExecReload=/bin/kill -s HUP $MAINPID
 KillMode=mixed
 TimeoutStopSec=5

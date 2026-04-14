@@ -160,6 +160,11 @@ STORAGES = {
     },
 }
 
+if not os.getenv("AWS_STORAGE_BUCKET_NAME") or DEBUG:
+    STORAGES["default"] = {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    }
+
 STATIC_URL = os.getenv("STATIC_URL", "static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
 STATIC_ROOT = BASE_DIR / "static"
