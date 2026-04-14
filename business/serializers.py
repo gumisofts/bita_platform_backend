@@ -151,9 +151,10 @@ class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMi
     def to_representation(self, instance):
         """Override to include business_details in the response"""
         representation = super().to_representation(instance)
-        # Include business_details for backward compatibility
         if hasattr(instance, "business") and instance.business:
-            representation["business"] = BusinessSerializer(instance.business).data
+            representation["business"] = BusinessSerializer(
+                instance.business, context=self.context
+            ).data
         return representation
 
     class Meta:
@@ -163,16 +164,14 @@ class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMi
 
 
 class EmployeeInvitationStatusSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(
-        choices=list(map(lambda x: x[0], EmployeeInvitation.STATUS_CHOICES))
-    )
+    ALLOWED_STATUS_TRANSITIONS = ["accepted", "rejected"]
 
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        status = attrs.get("status")
-        if status not in list(map(lambda x: x[0], EmployeeInvitation.STATUS_CHOICES)):
-            raise ValidationError({"status": "Invalid status"})
-        return attrs
+    status = serializers.ChoiceField(choices=ALLOWED_STATUS_TRANSITIONS)
+
+    def validate_status(self, value):
+        if value not in self.ALLOWED_STATUS_TRANSITIONS:
+            raise ValidationError("Can only accept or reject an invitation.")
+        return value
 
     def update(self, instance, validated_data):
         instance.status = validated_data.get("status")

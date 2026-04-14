@@ -206,20 +206,6 @@ class EmployeeInvitationPermission(BasePermission):
 
 class PermissionManager:
 
-    def assign_employee_permissions(self, employee):
-        if employee.role.role_name == "Owner":
-            self.assign_owner_permissions(employee.business)
-        elif employee.role.role_name == "Manager":
-            self.assign_manager_permissions(employee.business)
-        elif employee.role.role_name == "Employee":
-            self.assign_employee_permissions(employee.business)
-
-    ## Roles
-    # Owner
-    # Business Admin
-    # Branch Manager
-    # Branch Employee
-
     def assign_business_admin_permissions(self, user, business):
         perms = [
             perm.value[0] + "_business" for perm in AdditionalBusinessPermissionNames

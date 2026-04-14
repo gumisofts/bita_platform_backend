@@ -13,6 +13,7 @@ from business.permissions import PermissionManager
 from . import roles
 
 employee_invitation_status_changed = Signal()
+employee_invitation_resend = Signal()
 
 
 def assign_default_permissions_to_role(role):
@@ -144,51 +145,55 @@ def on_employee_invitation_status_changed(sender, instance, status, **kwargs):
     print(instance, status)
 
     if status == "accepted":
-        user = User.objects.filter(
-            Q(phone_number=instance.phone_number) | Q(email=instance.email)
-        ).first()
+        user_q = Q()
+        if instance.phone_number:
+            user_q |= Q(phone_number=instance.phone_number)
+        if instance.email:
+            user_q |= Q(email=instance.email)
+
+        if not user_q:
+            return
+
+        user = User.objects.filter(user_q).first()
 
         if not user:
             return
 
-        # Check if employee already exists for this user and business
-        existing_employee = Employee.objects.filter(
-            user=user, business=instance.business
-        ).first()
+        with transaction.atomic():
+            existing_employee = Employee.objects.filter(
+                user=user, business=instance.business
+            ).first()
 
-        if not existing_employee:
-            # Create Employee if it doesn't exist
-            employee = Employee.objects.create(
-                user=user,
-                business=instance.business,
-                role=instance.role,
-                branch=instance.branch,
-            )
-        else:
-            # Update existing employee with new role and branch
-            employee = existing_employee
-            employee.role = instance.role
-            employee.branch = instance.branch
-            employee.save()
+            if not existing_employee:
+                Employee.objects.create(
+                    user=user,
+                    business=instance.business,
+                    role=instance.role,
+                    branch=instance.branch,
+                )
+            else:
+                existing_employee.role = instance.role
+                existing_employee.branch = instance.branch
+                existing_employee.save()
 
-        # Assign permissions based on role
-        if instance.role.role_name == ROLES.BUSINESS_ADMIN.value:
-            # Assign permissions to the user based on the role
-            PermissionManager().assign_business_admin_permissions(
-                user, instance.business
-            )
+            if instance.role.role_name == ROLES.BUSINESS_ADMIN.value:
+                PermissionManager().assign_business_admin_permissions(
+                    user, instance.business
+                )
+            elif instance.role.role_name == ROLES.EMPLOYEE.value:
+                PermissionManager().assign_employee_permissions(
+                    user, instance.business, instance.branch
+                )
+            elif instance.role.role_name == ROLES.BRANCH_MANAGER.value:
+                PermissionManager().assign_manager_permissions(
+                    user, instance.business, instance.branch
+                )
 
-        elif instance.role.role_name == ROLES.EMPLOYEE.value:
-            # Assign permissions to the user based on the role
-            PermissionManager().assign_employee_permissions(
-                user, instance.business, instance.branch
-            )
 
-        elif instance.role.role_name == ROLES.BRANCH_MANAGER.value:
-            # Assign permissions to the user based on the role
-            PermissionManager().assign_manager_permissions(
-                user, instance.business, instance.branch
-            )
+@receiver(employee_invitation_resend)
+def on_employee_invitation_resend(sender, instance, **kwargs):
+    # TODO: Implement actual email/SMS notification sending
+    print(f"Resending invitation: {instance}")
 
 
 @receiver(post_save, sender=Role)
