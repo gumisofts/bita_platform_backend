@@ -98,7 +98,7 @@
       tags: [collectstatic]
       ansible.builtin.shell:
         chdir: ~/app
-        cmd: env/bin/python manage.py collectstatic --noinput -c
+        cmd: env/bin/python manage.py collectstatic --noinput --clear
 
     ##########################################################################
     # Nginx config sync — regenerate from template and reload if changed.

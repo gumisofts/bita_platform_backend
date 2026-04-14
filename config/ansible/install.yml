@@ -194,7 +194,7 @@
       tags: [app]
       ansible.builtin.shell:
         chdir: ~/app
-        cmd: env/bin/python manage.py collectstatic --noinput -c
+        cmd: env/bin/python manage.py collectstatic --noinput --clear
 
     ##########################################################################
     # Enable + start all services

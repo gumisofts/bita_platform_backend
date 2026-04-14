@@ -165,9 +165,12 @@ if not os.getenv("AWS_STORAGE_BUCKET_NAME") or DEBUG:
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     }
 
-STATIC_URL = os.getenv("STATIC_URL", "static/")
+STATIC_URL = os.getenv("STATIC_URL", "/static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
-STATIC_ROOT = BASE_DIR / "static"
+STATIC_ROOT = Path("/var/www/static")
+
+MEDIA_URL = "/medias/"
+MEDIA_ROOT = Path("/var/www/medias")
 
 # WhiteNoise configuration
 WHITENOISE_USE_FINDERS = DEBUG  # Use finders in development, storage in production
