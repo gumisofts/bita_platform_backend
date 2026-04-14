@@ -2,10 +2,14 @@
 # Bootstrap a new production server (run once, or when updating infrastructure).
 #
 # Usage:
-#   ./scripts/setup-production.sh           # full bootstrap
+#   ./scripts/setup-production.sh           # full bootstrap (install.yml only)
 #   ./scripts/setup-production.sh nginx     # only SSL + nginx tasks
 #   ./scripts/setup-production.sh packages  # only system packages
 #   ./scripts/setup-production.sh app       # only app + services
+#
+# For a brand-new server, run database setup first:
+#   ansible-playbook -i config/ansible/ini.yml config/ansible/database.yml \
+#     --private-key ~/.ssh/contabo.pem --ask-become-pass
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

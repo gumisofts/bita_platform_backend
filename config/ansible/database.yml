@@ -1,0 +1,59 @@
+##############################################################################
+# database.yml — Install and configure local PostgreSQL
+#
+# Run this once before install.yml if you are using a local PostgreSQL
+# instance on the server (not RDS).
+#
+# Usage:
+#   ansible-playbook -i config/ansible/ini.yml config/ansible/database.yml \
+#     --private-key ~/.ssh/contabo.pem --ask-become-pass
+##############################################################################
+- name: Set up local PostgreSQL database
+  hosts: main
+  vars:
+    db_name: bita_prod
+    db_user: postgres
+    db_password: "HiddenAmbitions546!"
+  tasks:
+    - name: Install PostgreSQL
+      become: true
+      ansible.builtin.apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+          - libpq-dev
+          - python3-psycopg2
+        state: present
+        update_cache: yes
+
+    - name: Ensure PostgreSQL service is started and enabled
+      become: true
+      ansible.builtin.systemd_service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Create application database
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        state: present
+
+    - name: Set postgres user password
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        state: present
+
+    - name: Grant all privileges on database to postgres user
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_privs:
+        db: "{{ db_name }}"
+        role: "{{ db_user }}"
+        type: database
+        privs: ALL
+        state: present

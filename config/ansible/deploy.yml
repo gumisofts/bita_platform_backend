@@ -37,10 +37,15 @@
         force: true
         src: ../.env
 
+    - name: Upgrade pip
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: env/bin/python -m pip install --upgrade pip
+
     - name: Install / update pip requirements
-      ansible.builtin.pip:
-        virtualenv: ~/app/env
-        requirements: ~/app/requirements.txt
+      ansible.builtin.shell:
+        chdir: ~/app
+        cmd: env/bin/pip install -r requirements.txt
 
     ##########################################################################
     # Domain-aware env vars — derived from ini.yml domain lists so that
