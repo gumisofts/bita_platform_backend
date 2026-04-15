@@ -9,6 +9,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         exclude = ["delivery_method", "send_to_recipients_only"]
+        read_only_fields = ["event_type", "data", "business"]
 
     def get_is_read(self, obj):
         return obj.recipients.filter(
