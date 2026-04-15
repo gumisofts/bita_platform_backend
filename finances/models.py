@@ -44,6 +44,7 @@ class Transaction(BaseModel):
         blank=True,
     )
     type = models.CharField(max_length=20, choices=TransactionType.choices)
+    category = models.CharField(max_length=100, null=True, blank=True)
     total_paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
     total_left_amount = models.DecimalField(
         max_digits=10, decimal_places=2, default=0.00

@@ -118,6 +118,34 @@ class AccountSerializer(serializers.ModelSerializer):
         return None
 
 
+class HistoricalMonthSerializer(serializers.Serializer):
+    month = serializers.DateTimeField()
+    total_income = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class ReportsSerializer(serializers.Serializer):
+    date = serializers.DateTimeField()
+    monthly_income = serializers.DictField(
+        child=serializers.DecimalField(max_digits=12, decimal_places=2)
+    )
+    monthly_expense = serializers.DictField(
+        child=serializers.DecimalField(max_digits=12, decimal_places=2)
+    )
+    total_monthly_income = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_monthly_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)
+    profit_margin = serializers.DecimalField(max_digits=8, decimal_places=2)
+    historical_data = HistoricalMonthSerializer(many=True)
+    top_income_categories = serializers.DictField(
+        child=serializers.DecimalField(max_digits=12, decimal_places=2)
+    )
+    top_expense_categories = serializers.DictField(
+        child=serializers.DecimalField(max_digits=12, decimal_places=2)
+    )
+
+
 class FinanceSummarySerializer(serializers.Serializer):
     """Serializer for finance summary endpoint."""
 
