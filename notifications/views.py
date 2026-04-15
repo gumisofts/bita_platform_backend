@@ -98,6 +98,8 @@ class NotificationViewSet(ListModelMixin, GenericViewSet):
                 }
             )
         return Response(
-            {"detail": "Failed to deliver push notification. Check FCM token validity."},
+            {
+                "detail": "Failed to deliver push notification. Check FCM token validity."
+            },
             status=status.HTTP_502_BAD_GATEWAY,
         )

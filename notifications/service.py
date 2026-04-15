@@ -88,9 +88,7 @@ def create_notification(
     )
 
     transaction.on_commit(
-        lambda: send_push_notification_task.delay(
-            str(notification.id), user_id_strings
-        )
+        lambda: send_push_notification_task.delay(str(notification.id), user_id_strings)
     )
 
     return notification
