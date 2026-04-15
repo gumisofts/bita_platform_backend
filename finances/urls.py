@@ -17,4 +17,5 @@ router.register(r"accounts", AccountViewset, basename="accounts")
 
 urlpatterns = [
     path("summary/", summary, name="finance-summary"),
+    path("reports/", reports, name="finance-reports"),
 ] + router.urls
