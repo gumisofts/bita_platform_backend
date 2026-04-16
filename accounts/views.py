@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.tokens import default_token_generator
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
@@ -422,7 +422,29 @@ class ConfirmDeleteUserDeleteView(GenericViewSet):
     # }
 
 
-class UserDeviceViewset(CreateModelMixin, GenericViewSet):
+class UserDeviceViewset(CreateModelMixin, ListModelMixin, GenericViewSet):
     serializer_class = UserDeviceSerializer
+    permission_classes = [IsAuthenticated]
 
-    permission_classes = []
+    def get_queryset(self):
+        return UserDevice.objects.filter(user=self.request.user).order_by("-created_at")
+
+    def get_permissions(self):
+        if self.action == "create":
+            return []
+        return super().get_permissions()
+
+    @action(detail=True, methods=["post"], url_path="toggle")
+    def toggle(self, request, pk=None):
+        """Enable or disable push notifications for a specific device."""
+        device = get_object_or_404(UserDevice, pk=pk, user=request.user)
+        device.is_active = not device.is_active
+        device.save(update_fields=["is_active"])
+        state = "enabled" if device.is_active else "disabled"
+        return Response(
+            {
+                "detail": f"Device '{device.name}' ({device.label}) has been {state}.",
+                "id": str(device.id),
+                "is_active": device.is_active,
+            }
+        )

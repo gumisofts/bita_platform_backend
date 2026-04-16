@@ -648,6 +648,7 @@ class UserDeviceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserDevice
         exclude = []
+        read_only_fields = ["is_active"]
 
 
 class PhoneChangeRequestSerializer(serializers.Serializer):
