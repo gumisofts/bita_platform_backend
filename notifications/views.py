@@ -86,6 +86,7 @@ class NotificationViewSet(ListModelMixin, DestroyModelMixin, GenericViewSet):
         """Send a test push notification to a specific device."""
         from accounts.models import UserDevice
 
+        from .deep_links import deep_link_for_notification
         from .firebase import send_notification
 
         serializer = TestPushSerializer(data=request.data)
@@ -113,15 +114,17 @@ class NotificationViewSet(ListModelMixin, DestroyModelMixin, GenericViewSet):
         body = serializer.validated_data["body"]
         event_type = serializer.validated_data.get("event_type", "general")
 
+        push_data = {
+            "event_type": event_type,
+            "test": "true",
+            "device_name": device.name,
+            "deep_link": deep_link_for_notification(event_type, {}),
+        }
         success = send_notification(
             fcm_token=device.fcm_token,
             title=title,
             body=body,
-            data={
-                "event_type": event_type,
-                "test": "true",
-                "device_name": device.name,
-            },
+            data=push_data,
         )
 
         if success:
