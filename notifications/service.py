@@ -4,6 +4,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
+from .deep_links import deep_link_for_notification
 from .models import Notification, NotificationRecipient
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,10 @@ def create_notification(
             )
             return None
 
+    payload = dict(data or {})
+    if "deep_link" not in payload:
+        payload["deep_link"] = deep_link_for_notification(event_type, payload)
+
     notification = Notification.objects.create(
         title=title,
         message=message,
@@ -71,9 +76,15 @@ def create_notification(
         notification_type=notification_type,
         event_type=event_type,
         business=business,
-        data=data or {},
+        data=payload,
         delivery_method="push",
     )
+
+    notification.data = {
+        **notification.data,
+        "notification_id": str(notification.id),
+    }
+    notification.save(update_fields=["data"])
 
     if recipient_user_ids is None:
         recipient_user_ids = _get_business_user_ids(business)
