@@ -138,3 +138,9 @@ class UserDevice(BaseModel):
     app_version = models.CharField(max_length=255, default="unknown")
     app_build_number = models.CharField(max_length=255, default="unknown")
     app_version_code = models.CharField(max_length=255, default="unknown")
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return (
+            f"{self.name} ({self.label}) — {'active' if self.is_active else 'disabled'}"
+        )

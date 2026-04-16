@@ -30,10 +30,14 @@ class NotificationMarkAsReadSerializer(serializers.Serializer):
     notification_ids = serializers.ListField(child=serializers.UUIDField())
 
 
+class NotificationDeleteSerializer(serializers.Serializer):
+    notification_ids = serializers.ListField(child=serializers.UUIDField())
+
+
 class DeviceListSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserDevice
-        fields = ["id", "label", "name", "device_id", "os", "manufacturer"]
+        fields = ["id", "label", "name", "device_id", "os", "manufacturer", "is_active"]
 
 
 class TestPushSerializer(serializers.Serializer):

@@ -25,7 +25,7 @@ def send_push_notification_task(notification_id, user_ids):
         return
 
     tokens = list(
-        UserDevice.objects.filter(user_id__in=user_ids)
+        UserDevice.objects.filter(user_id__in=user_ids, is_active=True)
         .values_list("fcm_token", flat=True)
         .distinct()
     )

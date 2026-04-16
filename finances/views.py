@@ -1,5 +1,6 @@
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
@@ -451,11 +452,9 @@ def _month_range(year, month):
     """Return (start, end) datetime for a given year/month (UTC-aware)."""
     import calendar
 
-    start = timezone.datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
+    start = datetime(year, month, 1, 0, 0, 0, tzinfo=dt_timezone.utc)
     last_day = calendar.monthrange(year, month)[1]
-    end = timezone.datetime(
-        year, month, last_day, 23, 59, 59, 999999, tzinfo=timezone.utc
-    )
+    end = datetime(year, month, last_day, 23, 59, 59, 999999, tzinfo=dt_timezone.utc)
     return start, end
 
 
