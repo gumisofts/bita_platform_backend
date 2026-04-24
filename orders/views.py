@@ -5,14 +5,16 @@ from django.db import transaction as db_transaction
 from django.db.models import Count, F, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiTypes,
     extend_schema,
 )
-from rest_framework import status
+from rest_framework import filters, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -73,6 +75,12 @@ class OrderItemViewset(ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+class OrderPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class OrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
@@ -80,7 +88,18 @@ class OrderViewset(ModelViewSet):
     permission_classes = [
         BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
     ]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_class = OrderFilter
+    search_fields = [
+        "customer__full_name",
+        "customer__phone_number",
+        "customer__email",
+        "employee__user__email",
+        "employee__user__first_name",
+        "employee__user__last_name",
+        "id",
+    ]
+    pagination_class = OrderPagination
 
     def get_queryset(self):
         queryset = super().get_queryset()
