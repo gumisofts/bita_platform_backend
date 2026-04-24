@@ -222,13 +222,52 @@ class PermissionManager:
 
     def assign_manager_permissions(self, user, business, branch):
         branch_manager_perms = [
+            # Groups
             AdditionalBusinessPermissionNames.CAN_VIEW_GROUP,
             AdditionalBusinessPermissionNames.CAN_ADD_GROUP,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_GROUP,
+            # Customers
+            AdditionalBusinessPermissionNames.CAN_VIEW_CUSTOMER,
             AdditionalBusinessPermissionNames.CAN_ADD_CUSTOMER,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_CUSTOMER,
+            # Items
             AdditionalBusinessPermissionNames.CAN_VIEW_ITEM,
             AdditionalBusinessPermissionNames.CAN_ADD_ITEM,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_ITEM,
+            # Item variants
+            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT,
+            AdditionalBusinessPermissionNames.CAN_ADD_ITEM_VARIANT,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_ITEM_VARIANT,
+            # Suppliers
             AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLIER,
+            AdditionalBusinessPermissionNames.CAN_ADD_SUPPLIER,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_SUPPLIER,
+            # Inventory
+            AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY,
+            AdditionalBusinessPermissionNames.CAN_ADD_INVENTORY,
+            AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY_MOVEMENT,
+            AdditionalBusinessPermissionNames.CAN_ADD_INVENTORY_MOVEMENT,
+            # Orders
+            AdditionalBusinessPermissionNames.CAN_VIEW_ORDER,
+            AdditionalBusinessPermissionNames.CAN_ADD_ORDER,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_ORDER,
+            # Transactions
+            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION,
+            AdditionalBusinessPermissionNames.CAN_ADD_TRANSACTION,
+            # Payment methods
             AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_BUSINESS_PAYMENT_METHOD,
+            # Properties
+            AdditionalBusinessPermissionNames.CAN_VIEW_PROPERTY,
+            AdditionalBusinessPermissionNames.CAN_ADD_PROPERTY,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_PROPERTY,
+            # Supply
+            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLY,
+            AdditionalBusinessPermissionNames.CAN_ADD_SUPPLY,
+            # Employees
+            AdditionalBusinessPermissionNames.CAN_VIEW_EMPLOYEE,
+            AdditionalBusinessPermissionNames.CAN_VIEW_EMPLOYEE_INVITATION,
+            AdditionalBusinessPermissionNames.CAN_ADD_EMPLOYEE_INVITATION,
         ]
         perms = [perm.value[0] + "_branch" for perm in branch_manager_perms]
 
@@ -252,17 +291,35 @@ class PermissionManager:
 
     def assign_employee_permissions(self, user, business, branch):
         employee_branch_perms = [
+            # Groups
             AdditionalBusinessPermissionNames.CAN_VIEW_GROUP,
-            AdditionalBusinessPermissionNames.CAN_ADD_GROUP,
+            # Customers
+            AdditionalBusinessPermissionNames.CAN_VIEW_CUSTOMER,
             AdditionalBusinessPermissionNames.CAN_ADD_CUSTOMER,
+            # Items
             AdditionalBusinessPermissionNames.CAN_VIEW_ITEM,
-            AdditionalBusinessPermissionNames.CAN_ADD_ITEM,
-            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLIER,
-            AdditionalBusinessPermissionNames.CAN_ADD_SUPPLIER,
-            AdditionalBusinessPermissionNames.CAN_ADD_ITEM_VARIANT,
+            # Item variants
             AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT,
-            AdditionalBusinessPermissionNames.CAN_ADD_INVENTORY_MOVEMENT,
+            AdditionalBusinessPermissionNames.CAN_ADD_ITEM_VARIANT,
+            # Suppliers
+            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLIER,
+            # Inventory
+            AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY,
             AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY_MOVEMENT,
+            AdditionalBusinessPermissionNames.CAN_ADD_INVENTORY_MOVEMENT,
+            # Orders
+            AdditionalBusinessPermissionNames.CAN_VIEW_ORDER,
+            AdditionalBusinessPermissionNames.CAN_ADD_ORDER,
+            AdditionalBusinessPermissionNames.CAN_CHANGE_ORDER,
+            # Transactions
+            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION,
+            AdditionalBusinessPermissionNames.CAN_ADD_TRANSACTION,
+            # Payment methods
+            AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD,
+            # Properties
+            AdditionalBusinessPermissionNames.CAN_VIEW_PROPERTY,
+            # Supply
+            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLY,
         ]
         perms = [perm.value[0] + "_branch" for perm in employee_branch_perms]
 
