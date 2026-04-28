@@ -198,7 +198,7 @@ class ItemVariantViewset(ModelViewSet):
             + "_branch",
             self.request.branch,
         ):
-            queryset = queryset.filter(branch=self.request.branch)
+            queryset = queryset.filter(item__branch=self.request.branch)
         else:
             queryset = queryset.none()
 
