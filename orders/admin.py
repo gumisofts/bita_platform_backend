@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from .models import *
+from .models import Order, OrderHistory, OrderItem, OrderReturn, OrderReturnItem
 
 User = get_user_model()
 
@@ -149,3 +149,41 @@ def mark_as_cancelled(modeladmin, request, queryset):
 
 # Add actions to OrderAdmin
 OrderAdmin.actions = [mark_as_completed, mark_as_cancelled]
+
+
+class OrderReturnItemInline(admin.TabularInline):
+    model = OrderReturnItem
+    extra = 0
+    readonly_fields = (
+        "order_item",
+        "quantity_returned",
+        "is_restocked",
+        "refund_amount",
+    )
+    can_delete = False
+
+
+@admin.register(OrderReturn)
+class OrderReturnAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "order",
+        "status",
+        "total_refund_amount",
+        "processed_by",
+        "created_at",
+    ]
+    list_filter = ["status", "created_at"]
+    search_fields = ["order__id"]
+    readonly_fields = ["id", "created_at", "updated_at", "total_refund_amount"]
+    inlines = [OrderReturnItemInline]
+
+    fieldsets = (
+        (None, {"fields": ("id", "order", "status", "reason")}),
+        (_("Financial"), {"fields": ("total_refund_amount", "refund_method")}),
+        (_("Processed by"), {"fields": ("processed_by",)}),
+        (
+            _("Timestamps"),
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )

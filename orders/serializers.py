@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
 from business.models import Employee
-from orders.models import *
+from orders.models import Order, OrderItem, OrderReturn, OrderReturnItem
 
 
 class CurrentEmployeeDefault(serializers.CurrentUserDefault):
@@ -105,3 +105,62 @@ class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = "__all__"
+
+
+class OrderReturnItemInputSerializer(serializers.Serializer):
+    order_item_id = serializers.UUIDField()
+    quantity_returned = serializers.IntegerField(min_value=1)
+
+
+class OrderReturnCreateSerializer(serializers.Serializer):
+    items = OrderReturnItemInputSerializer(many=True, min_length=1)
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+    refund_method = serializers.UUIDField(
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text="BusinessPaymentMethod UUID for the refund",
+    )
+
+
+class OrderReturnItemReadSerializer(ModelSerializer):
+    variant_name = serializers.CharField(
+        source="order_item.variant.name", read_only=True
+    )
+    item_name = serializers.CharField(
+        source="order_item.variant.item.name", read_only=True
+    )
+
+    class Meta:
+        model = OrderReturnItem
+        fields = [
+            "id",
+            "order_item",
+            "variant_name",
+            "item_name",
+            "quantity_returned",
+            "is_restocked",
+            "refund_amount",
+        ]
+
+
+class OrderReturnReadSerializer(ModelSerializer):
+    items = OrderReturnItemReadSerializer(many=True, read_only=True)
+    processed_by_name = serializers.CharField(
+        source="processed_by.full_name", read_only=True
+    )
+
+    class Meta:
+        model = OrderReturn
+        fields = [
+            "id",
+            "order",
+            "status",
+            "reason",
+            "refund_method",
+            "total_refund_amount",
+            "processed_by",
+            "processed_by_name",
+            "items",
+            "created_at",
+        ]
