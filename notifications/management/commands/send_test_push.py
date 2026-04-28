@@ -83,7 +83,11 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _prompt(self, prompt_text, default=""):
-        value = input(f"{prompt_text} [{default}]: ").strip() if default else input(f"{prompt_text}: ").strip()
+        value = (
+            input(f"{prompt_text} [{default}]: ").strip()
+            if default
+            else input(f"{prompt_text}: ").strip()
+        )
         return value or default
 
     def _pick_user(self):
@@ -100,7 +104,9 @@ class Command(BaseCommand):
 
         self.stdout.write("\nMultiple users found:")
         for idx, u in enumerate(users, start=1):
-            self.stdout.write(f"  [{idx}] {u.email or '—'}  |  {u.phone_number or '—'}  |  {u.get_full_name()}")
+            self.stdout.write(
+                f"  [{idx}] {u.email or '—'}  |  {u.phone_number or '—'}  |  {u.get_full_name()}"
+            )
         choice = self._prompt("Pick number")
         try:
             return users[int(choice) - 1]
@@ -116,7 +122,11 @@ class Command(BaseCommand):
 
         self.stdout.write("\nRegistered devices:")
         for idx, d in enumerate(devices, start=1):
-            status = self.style.SUCCESS("active") if d.is_active else self.style.ERROR("disabled")
+            status = (
+                self.style.SUCCESS("active")
+                if d.is_active
+                else self.style.ERROR("disabled")
+            )
             self.stdout.write(
                 f"  [{idx}] {d.name} ({d.label})  |  {d.os}  |  "
                 f"token: {d.fcm_token[:24]}…  |  {status}"
@@ -169,7 +179,9 @@ class Command(BaseCommand):
                 )
             if not device.is_active:
                 self.stdout.write(
-                    self.style.WARNING(f"Device '{device.name}' is disabled — proceeding anyway.")
+                    self.style.WARNING(
+                        f"Device '{device.name}' is disabled — proceeding anyway."
+                    )
                 )
             devices = [device]
         else:
@@ -177,7 +189,9 @@ class Command(BaseCommand):
 
         # ── Notification content ──────────────────────────────────────
         title = options["title"] or self._prompt("Title", default="Test Notification")
-        body = options["body"] or self._prompt("Body", default="This is a test push notification.")
+        body = options["body"] or self._prompt(
+            "Body", default="This is a test push notification."
+        )
         event_type = options["event_type"]
 
         data = {
@@ -212,7 +226,9 @@ class Command(BaseCommand):
                 )
             else:
                 self.stdout.write(
-                    self.style.ERROR("✗ Delivery failed for all devices. Check FCM tokens / Firebase credentials.")
+                    self.style.ERROR(
+                        "✗ Delivery failed for all devices. Check FCM tokens / Firebase credentials."
+                    )
                 )
         else:
             device = devices[0]
