@@ -1,11 +1,9 @@
 from uuid import uuid4
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from core.models import BaseModel
-
-# Create your models here.
-# Define Order status
 
 
 class Order(BaseModel):
@@ -108,3 +106,77 @@ class OrderHistory(BaseModel):
 
     def __str__(self):
         return f"Order {self.order.id} - {self.field_name} changed at {self.created_at}"
+
+
+class OrderReturn(BaseModel):
+    class StatusChoices(models.TextChoices):
+        PARTIAL = "PARTIAL", "Partial"
+        FULL = "FULL", "Full"
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="returns")
+    reason = models.TextField(null=True, blank=True)
+    refund_method = models.ForeignKey(
+        "finances.BusinessPaymentMethod",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    total_refund_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0
+    )
+    status = models.CharField(
+        max_length=10, choices=StatusChoices.choices, default=StatusChoices.FULL
+    )
+    processed_by = models.ForeignKey(
+        "business.Employee",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="processed_returns",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Return for Order {self.order_id} ({self.status})"
+
+
+class OrderReturnItem(BaseModel):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    order_return = models.ForeignKey(
+        OrderReturn, on_delete=models.CASCADE, related_name="items"
+    )
+    order_item = models.ForeignKey(
+        OrderItem, on_delete=models.CASCADE, related_name="return_items"
+    )
+    quantity_returned = models.PositiveIntegerField()
+    is_restocked = models.BooleanField(
+        default=False,
+        help_text="Whether the variant stock was incremented on return.",
+    )
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def clean(self):
+        already_returned = (
+            OrderReturnItem.objects.filter(order_item=self.order_item)
+            .exclude(order_return=self.order_return)
+            .aggregate(total=models.Sum("quantity_returned"))["total"]
+            or 0
+        )
+        available = self.order_item.quantity - already_returned
+        if self.quantity_returned > available:
+            raise ValidationError(
+                f"Cannot return {self.quantity_returned} units of "
+                f"'{self.order_item.variant.name}'; only {available} eligible."
+            )
+
+    class Meta:
+        unique_together = ("order_return", "order_item")
+
+    def __str__(self):
+        return (
+            f"Return {self.quantity_returned}× {self.order_item.variant.name} "
+            f"(Order {self.order_item.order_id})"
+        )

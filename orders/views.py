@@ -19,7 +19,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from business.models import Branch, Business
+import inventories.models as inventories_models
+from business.models import Branch, Business, Employee
 from business.permissions import (
     AdditionalBusinessPermissionNames,
     BranchLevelPermission,
@@ -27,11 +28,17 @@ from business.permissions import (
     GuardianObjectPermissions,
 )
 from core.utils import is_valid_uuid
-from finances.models import Transaction
+from finances.models import BusinessPaymentMethod, Transaction
 from inventories.models import Item, ItemVariant, SuppliedItem
 from orders.filters import OrderFilter
-from orders.models import Order, OrderItem
-from orders.serializers import OrderItemSerializer, OrderListSerializer, OrderSerializer
+from orders.models import Order, OrderItem, OrderReturn, OrderReturnItem
+from orders.serializers import (
+    OrderItemSerializer,
+    OrderListSerializer,
+    OrderReturnCreateSerializer,
+    OrderReturnReadSerializer,
+    OrderSerializer,
+)
 from orders.signals import order_completed
 
 
@@ -201,6 +208,203 @@ class OrderViewset(ModelViewSet):
             )
 
         return Response(OrderListSerializer(order).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="return")
+    def return_order(self, request, *args, **kwargs):
+        """
+        Initiate a (partial or full) return for a completed order.
+
+        Expected payload:
+        {
+            "items": [
+                {"order_item_id": "<uuid>", "quantity_returned": <int>},
+                ...
+            ],
+            "reason": "optional reason string",
+            "refund_method": "<BusinessPaymentMethod UUID>"   // optional
+        }
+
+        Side effects (all inside one atomic transaction):
+        - OrderReturn + OrderReturnItem records are created.
+        - ItemVariant.quantity incremented for every returnable item.
+        - A REFUND Transaction is recorded against the order.
+        - Order.status set to RETURNED on a full return, unchanged on partial.
+        """
+        order = self.get_object()
+
+        if order.status != Order.StatusChoices.COMPLETED:
+            return Response(
+                {"error": "Only completed orders can be returned."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = OrderReturnCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        order_items_map = {
+            str(oi.id): oi for oi in order.items.select_related("variant__item").all()
+        }
+
+        # Resolve refund method
+        refund_method = None
+        if data["refund_method"]:
+            try:
+                refund_method = BusinessPaymentMethod.objects.get(
+                    id=data["refund_method"],
+                    business=order.business,
+                )
+            except BusinessPaymentMethod.DoesNotExist:
+                return Response(
+                    {
+                        "error": "Invalid refund_method: payment method not found for this business."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Validate every requested return line before touching the DB
+        errors = []
+        validated_lines = []
+        for line in data["items"]:
+            oi_id = str(line["order_item_id"])
+            qty = line["quantity_returned"]
+
+            if oi_id not in order_items_map:
+                errors.append(f"order_item {oi_id} does not belong to this order.")
+                continue
+
+            order_item = order_items_map[oi_id]
+            already_returned = (
+                OrderReturnItem.objects.filter(order_item=order_item).aggregate(
+                    total=Sum("quantity_returned")
+                )["total"]
+                or 0
+            )
+            available = order_item.quantity - already_returned
+            if qty > available:
+                errors.append(
+                    f"'{order_item.variant.name}': requested {qty}, "
+                    f"but only {available} eligible for return."
+                )
+                continue
+
+            validated_lines.append(
+                {
+                    "order_item": order_item,
+                    "quantity_returned": qty,
+                    "is_returnable": order_item.variant.item.is_returnable,
+                }
+            )
+
+        if errors:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Determine full vs partial
+        total_ordered = sum(oi.quantity for oi in order_items_map.values())
+        total_already_returned = (
+            OrderReturnItem.objects.filter(order_item__order=order).aggregate(
+                total=Sum("quantity_returned")
+            )["total"]
+            or 0
+        )
+        total_now_returning = sum(l["quantity_returned"] for l in validated_lines)
+        return_status = (
+            OrderReturn.StatusChoices.FULL
+            if (total_already_returned + total_now_returning) >= total_ordered
+            else OrderReturn.StatusChoices.PARTIAL
+        )
+
+        # Resolve the employee making the return
+        employee = Employee.objects.filter(
+            user=request.user, business=order.business
+        ).first()
+
+        try:
+            with db_transaction.atomic():
+                # Lock variants that will be restocked
+                returnable_variant_ids = [
+                    l["order_item"].variant_id
+                    for l in validated_lines
+                    if l["is_returnable"]
+                ]
+                locked_variants = {
+                    v.pk: v
+                    for v in inventories_models.ItemVariant.objects.select_for_update().filter(
+                        pk__in=returnable_variant_ids
+                    )
+                }
+
+                total_refund = Decimal("0")
+                return_item_payloads = []
+
+                for line in validated_lines:
+                    order_item = line["order_item"]
+                    qty = line["quantity_returned"]
+                    selling_price = order_item.variant.selling_price or Decimal("0")
+                    line_refund = selling_price * qty
+                    total_refund += line_refund
+
+                    is_restocked = False
+                    if line["is_returnable"]:
+                        variant = locked_variants[order_item.variant_id]
+                        variant.quantity += qty
+                        variant.save()
+                        is_restocked = True
+
+                    return_item_payloads.append(
+                        {
+                            "order_item": order_item,
+                            "quantity_returned": qty,
+                            "is_restocked": is_restocked,
+                            "refund_amount": line_refund,
+                        }
+                    )
+
+                order_return = OrderReturn.objects.create(
+                    order=order,
+                    reason=data.get("reason", ""),
+                    refund_method=refund_method,
+                    total_refund_amount=total_refund,
+                    status=return_status,
+                    processed_by=employee,
+                )
+
+                OrderReturnItem.objects.bulk_create(
+                    [
+                        OrderReturnItem(
+                            order_return=order_return,
+                            **payload,
+                        )
+                        for payload in return_item_payloads
+                    ]
+                )
+
+                # Record a REFUND transaction
+                Transaction.objects.create(
+                    order=order,
+                    branch=order.branch,
+                    business=order.business,
+                    payment_method=refund_method,
+                    type=Transaction.TransactionType.REFUND,
+                    total_paid_amount=total_refund,
+                    total_left_amount=Decimal("0"),
+                )
+
+                # Update order status only on a full return
+                if return_status == OrderReturn.StatusChoices.FULL:
+                    order.status = Order.StatusChoices.RETURNED
+                    order.save()
+
+        except Exception as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            OrderReturnReadSerializer(order_return).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     def _get_date_range_for_filter(self, filter_type):
         """Get date range based on filter type (today, this_week, this_year)"""
