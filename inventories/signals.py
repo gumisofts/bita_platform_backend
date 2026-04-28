@@ -36,7 +36,10 @@ def on_item_variant_sold(sender, instance, **kwargs):
 
 @receiver(pre_delete, sender=SuppliedItem)
 def on_supplied_item_deleted(sender, instance, **kwargs):
-    instance.variant.quantity -= instance.quantity
+    # Use max(0, ...) to prevent going negative during cascade deletes (e.g. business
+    # deletion), where multiple SuppliedItems for the same variant are each decremented
+    # in sequence while the variant hasn't been removed from the DB yet.
+    instance.variant.quantity = max(0, instance.variant.quantity - instance.quantity)
     instance.variant.save()
     max_price = SuppliedItem.objects.filter(
         Q(variant=instance.variant, quantity__gt=0) & ~Q(variant_id=instance.variant.id)
