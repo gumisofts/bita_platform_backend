@@ -382,3 +382,45 @@ class SupplierSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "email": {"required": False, "allow_blank": True},
         }
+
+
+# ---------------------------------------------------------------------------
+# Bulk import / export
+# ---------------------------------------------------------------------------
+
+# Column order is the contract between import and export — do not reorder.
+BULK_IMPORT_COLUMNS = [
+    "name",
+    "description",
+    "inventory_unit",
+    "variant_name",
+    "selling_price",
+    "sku",
+    "quantity",
+]
+
+BULK_IMPORT_COLUMN_NOTES = {
+    "name": "Required. Product name. Repeat on multiple rows to add more variants to the same product.",
+    "description": "Optional. Product description (only read from the first row of each product).",
+    "inventory_unit": "Required. Unit of measure, e.g. piece, kg, litre.",
+    "variant_name": "Optional. Variant label, e.g. '500mg' or 'Large'. Defaults to the product name when left blank.",
+    "selling_price": "Required. Selling price — must be a positive number.",
+    "sku": "Optional. Unique SKU code for this variant. Leave blank to auto-assign none.",
+    "quantity": "Optional. Starting stock quantity (default 0).",
+}
+
+
+class BulkItemImportSerializer(serializers.Serializer):
+    """Accepts a CSV or Excel file and bulk-creates Items with one default variant each."""
+
+    file = serializers.FileField()
+
+    def validate_file(self, value):
+        name = value.name.lower()
+        if not (
+            name.endswith(".csv") or name.endswith(".xlsx") or name.endswith(".xls")
+        ):
+            raise serializers.ValidationError(
+                "Only CSV (.csv) and Excel (.xlsx / .xls) files are supported."
+            )
+        return value
