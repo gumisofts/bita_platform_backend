@@ -60,15 +60,18 @@ class OrderItemViewset(ModelViewSet):
             # Get the associated Order
             order = order_item.order
 
-            # Get the latest supply price of the item
+            # Get the latest supply price for this variant. OrderItem points at
+            # an ItemVariant (not Item directly) so we filter on `variant=` and
+            # order by `created_at` (BaseModel timestamp; SuppliedItem has no
+            # `timestamp` field).
             latest_supply = (
-                SuppliedItem.objects.filter(item=order_item.item)
-                .order_by("-timestamp")
+                SuppliedItem.objects.filter(variant=order_item.variant)
+                .order_by("-created_at")
                 .first()
             )
 
             if latest_supply:
-                item_unit_price = latest_supply.price
+                item_unit_price = latest_supply.selling_price
             else:
                 return Response(
                     {"error": "No supply record found for this item."},
@@ -76,7 +79,9 @@ class OrderItemViewset(ModelViewSet):
                 )
 
             # Update the order's total_payable field
-            order.total_payable += item_unit_price * order_item.quantity
+            order.total_payable = (order.total_payable or Decimal("0")) + (
+                item_unit_price * order_item.quantity
+            )
             order.save()
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -41,9 +41,15 @@ def on_supplied_item_deleted(sender, instance, **kwargs):
     # in sequence while the variant hasn't been removed from the DB yet.
     instance.variant.quantity = max(0, instance.variant.quantity - instance.quantity)
     instance.variant.save()
-    max_price = SuppliedItem.objects.filter(
-        Q(variant=instance.variant, quantity__gt=0) & ~Q(variant_id=instance.variant.id)
-    ).aggregate(max_selling_price=Max("selling_price"))["max_selling_price"]
+    # Recompute selling price from the *other* in-stock SuppliedItem rows for
+    # this variant. The previous version filtered by `variant=...` and then
+    # excluded `variant_id=...`, which is contradictory and always returned
+    # an empty queryset (max_price ended up None). Exclude by SuppliedItem PK.
+    max_price = (
+        SuppliedItem.objects.filter(variant=instance.variant, quantity__gt=0)
+        .exclude(pk=instance.pk)
+        .aggregate(max_selling_price=Max("selling_price"))["max_selling_price"]
+    )
     if max_price != instance.variant.selling_price:
         instance.variant.selling_price = max_price
         instance.variant.save()
