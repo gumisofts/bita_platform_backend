@@ -1,7 +1,7 @@
 import logging
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from .deep_links import deep_link_for_notification
@@ -69,16 +69,24 @@ def create_notification(
     if "deep_link" not in payload:
         payload["deep_link"] = deep_link_for_notification(event_type, payload)
 
-    notification = Notification.objects.create(
-        title=title,
-        message=message,
-        message_format="text",
-        notification_type=notification_type,
-        event_type=event_type,
-        business=business,
-        data=payload,
-        delivery_method="push",
-    )
+    try:
+        notification = Notification.objects.create(
+            title=title,
+            message=message,
+            message_format="text",
+            notification_type=notification_type,
+            event_type=event_type,
+            business=business,
+            data=payload,
+            delivery_method="push",
+        )
+    except IntegrityError:
+        logger.warning(
+            "create_notification: skipping '%s' notification — business %s no longer exists",
+            event_type,
+            business.pk if business else None,
+        )
+        return None
 
     notification.data = {
         **notification.data,
