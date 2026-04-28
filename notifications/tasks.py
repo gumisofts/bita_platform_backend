@@ -59,9 +59,18 @@ def check_low_stock_task(variant_ids, business_id):
     have dropped below their item's notify_below threshold.
     Creates a low-stock notification for each one (deduplicated over 24 h).
     """
+    from business.models import Business
     from inventories.models import ItemVariant
 
     from .service import create_notification
+
+    # The business may have been hard-deleted between when the order completed
+    # and when this async task runs. Skip silently rather than raise an FK error.
+    if not Business.objects.filter(pk=business_id).exists():
+        logger.warning(
+            "check_low_stock_task: business %s no longer exists, skipping", business_id
+        )
+        return
 
     variants = ItemVariant.objects.filter(id__in=variant_ids).select_related(
         "item", "item__business"
