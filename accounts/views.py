@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -24,7 +27,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -33,6 +36,7 @@ from rest_framework_simplejwt.views import (
 
 from accounts.models import *
 from accounts.serializers import *
+from accounts.utils import generate_secure_six_digits
 
 User = get_user_model()
 
@@ -304,18 +308,19 @@ class ConfirmDeleteUserDeleteView(GenericViewSet):
     def get_user_detail(self, request):
         phone_number = request.query_params.get("phone_number")
         email = request.query_params.get("email")
-        if email:
-            user = User.objects.filter(email=email).first()
-        if phone_number:
-            user = User.objects.filter(phone_number=phone_number).first()
         if not email and not phone_number:
             return Response(
                 {
                     "success": False,
-                    "message": "Email and phone number cannot be used together",
+                    "message": "Either email or phone_number is required.",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        user = None
+        if email:
+            user = User.objects.filter(email=email).first()
+        if not user and phone_number:
+            user = User.objects.filter(phone_number=phone_number).first()
         if not user:
             return Response(
                 {"success": False, "message": "User not found"},
@@ -359,18 +364,34 @@ class ConfirmDeleteUserDeleteView(GenericViewSet):
         code = request.data.get("code")
         phone_number = request.data.get("phone_number")
         email = request.data.get("email")
+        if not code:
+            return Response(
+                {"success": False, "message": "code is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not email and not phone_number:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Either email or phone_number is required.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user = None
         if email:
             user = User.objects.filter(email=email).first()
-        if phone_number:
+        if not user and phone_number:
             user = User.objects.filter(phone_number=phone_number).first()
         if not user:
             return Response(
                 {"success": False, "message": "User not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        verification_code = VerificationCode.objects.filter(
-            user=user, is_used=False
-        ).first()
+        verification_code = (
+            VerificationCode.objects.filter(user=user, is_used=False)
+            .order_by("-created_at")
+            .first()
+        )
         if not verification_code or not check_password(code, verification_code.code):
             return Response(
                 {"success": False, "message": "Invalid code"},
@@ -394,23 +415,34 @@ class ConfirmDeleteUserDeleteView(GenericViewSet):
     def send_delete_user_code(self, request):
         phone_number = request.data.get("phone_number")
         email = request.data.get("email")
+        if not email and not phone_number:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Either email or phone_number is required.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user = None
         if email:
             user = User.objects.filter(email=email).first()
-        if phone_number:
+        if not user and phone_number:
             user = User.objects.filter(phone_number=phone_number).first()
         if not user:
             return Response(
                 {"success": False, "message": "User not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        # NOTE: store the hashed code so it can never be replayed by reading the DB.
+        raw_code = generate_secure_six_digits()
         VerificationCode.objects.create(
             user=user,
-            code="123456",
+            code=make_password(raw_code),
             phone_number=phone_number,
             email=email,
             expires_at=timezone.now() + timedelta(minutes=5),
         )
-        # send_verification_code.send(self, phone_number=phone_number, email=email)
+        # TODO: dispatch the SMS/email containing `raw_code` via the notification service.
         return Response(
             {"success": True, "message": "Code sent"}, status=status.HTTP_200_OK
         )

@@ -53,22 +53,20 @@ class OrderSerializer(ModelSerializer):
     def validate(self, attrs):
         business = self.context["request"].business
         branch = self.context["request"].branch
-        print(attrs)
         if not business:
             raise serializers.ValidationError({"detail": "Business is required"})
         if not branch:
             raise serializers.ValidationError({"detail": "Branch is required"})
 
-        variants = map(lambda x: x.get("variant"), attrs.get("item_variants", []))
-
-        for variant in variants:
-            if variant.item.branch != branch:
+        for entry in attrs.get("item_variants", []):
+            variant = entry.get("variant")
+            if variant is None:
+                continue
+            if variant.item.branch_id != branch.id:
                 raise serializers.ValidationError(
                     {"detail": "One or more variants are not in the branch"}
                 )
         return super().validate(attrs)
-
-        return attrs
 
     def create(self, validated_data):
         item_variants = validated_data.pop("item_variants", [])

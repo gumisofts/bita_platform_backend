@@ -56,8 +56,9 @@ class BusinessModelObjectPermission(BasePermission):
             request, view.queryset.model, request.query_params.get("business_id")
         )
 
-    def has_object_permission(self, request, view):
-
+    def has_object_permission(self, request, view, obj):
+        # DRF passes the object as the third positional argument; the previous
+        # signature was missing it which raised TypeError on every detail call.
         return has_business_object_permission(
             request,
             view.queryset.model,

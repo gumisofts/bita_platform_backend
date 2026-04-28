@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
-DEBUG = os.getenv("DJANGO_DEBUG", False) == "True"
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
@@ -83,14 +83,10 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "core.urls"
 
-CORS_ALLOWED_ORIGINS = os.getenv(
-    "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"
-).split(",")
-
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": ["notification.templates"],
+        "DIRS": [BASE_DIR / "notifications" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -108,20 +104,30 @@ WSGI_APPLICATION = "core.wsgi.app"
 ASGI_APPLICATION = "core.asgi.app"
 
 
-tmpPostgres = urlparse(os.getenv("DJANGO_POSTGRES_URL"))
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": tmpPostgres.path[1:],
-        "USER": tmpPostgres.username,
-        "PASSWORD": tmpPostgres.password,
-        "HOST": tmpPostgres.hostname,
-        "PORT": tmpPostgres.port,
-        "CONN_MAX_AGE": None,
-        "OPTIONS": dict(parse_qsl(tmpPostgres.query)),
-    },
-}
+_postgres_url = os.getenv("DJANGO_POSTGRES_URL")
+if _postgres_url:
+    tmpPostgres = urlparse(_postgres_url)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": tmpPostgres.path[1:] if tmpPostgres.path else "",
+            "USER": tmpPostgres.username,
+            "PASSWORD": tmpPostgres.password,
+            "HOST": tmpPostgres.hostname,
+            "PORT": tmpPostgres.port,
+            "CONN_MAX_AGE": 60,
+            "OPTIONS": dict(parse_qsl(tmpPostgres.query)),
+        },
+    }
+else:
+    # Fallback to SQLite for local development / management commands when no
+    # DJANGO_POSTGRES_URL is set. Production must always provide the env var.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -211,8 +217,16 @@ CELERY_BACKEND_URL = os.getenv("DJANGO_CELERY_BACKEND_URL")
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=90),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=90),
+    # Defaults match common DRF SimpleJWT recommendations. Override per-environment
+    # via DJANGO_JWT_ACCESS_MINUTES / DJANGO_JWT_REFRESH_DAYS env vars when needed.
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=int(os.getenv("DJANGO_JWT_ACCESS_MINUTES", "60"))
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=int(os.getenv("DJANGO_JWT_REFRESH_DAYS", "30"))
+    ),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,

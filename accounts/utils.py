@@ -1,8 +1,11 @@
+import logging
 import secrets
 
 from django.conf import settings
 from google.auth.transport import requests
 from google.oauth2 import id_token
+
+logger = logging.getLogger(__name__)
 
 
 def get_required_user_actions(user):
@@ -17,24 +20,36 @@ def get_required_user_actions(user):
 
 
 def verify_google_id_token(token):
+    """Verify a Google ID token and return the decoded payload, or ``None``.
+
+    The audience is validated against ``settings.GOOGLE_WEB_CLIENT_ID`` when
+    configured. Without an audience check Google's library will accept tokens
+    issued for *any* OAuth client, which is a critical security gap for the
+    /auth/google/login endpoint.
+    """
+    audience = getattr(settings, "GOOGLE_WEB_CLIENT_ID", None) or None
     try:
-        # Specify the WEB_CLIENT_ID of the app that accesses the backend:
-        idinfo = id_token.verify_oauth2_token(token, requests.Request())
-        # Or, if multiple clients access the backend server:
-        # idinfo = id_token.verify_oauth2_token(token, requests.Request())
-        # if idinfo['aud'] not in [WEB_CLIENT_ID_1, WEB_CLIENT_ID_2, WEB_CLIENT_ID_3]:
-        #     raise ValueError('Could not verify audience.')
+        if audience:
+            idinfo = id_token.verify_oauth2_token(token, requests.Request(), audience)
+        else:
+            logger.warning(
+                "GOOGLE_WEB_CLIENT_ID not configured; verifying Google ID token "
+                "without audience validation."
+            )
+            idinfo = id_token.verify_oauth2_token(token, requests.Request())
 
-        # If the request specified a Google Workspace domain
-        # if idinfo['hd'] != DOMAIN_NAME:
-        #     raise ValueError('Wrong domain name.')
-
-        # ID token is valid. Get the user's Google Account ID from the decoded token.
+        # Reject tokens not issued by Google.
+        if idinfo.get("iss") not in (
+            "accounts.google.com",
+            "https://accounts.google.com",
+        ):
+            logger.warning("Rejected Google ID token with invalid issuer")
+            return None
 
         return idinfo
-    except ValueError:
-        # Invalid token
-        pass
+    except ValueError as exc:
+        logger.info("Google ID token verification failed: %s", exc)
+        return None
 
 
 def generate_secure_six_digits():

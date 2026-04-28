@@ -708,7 +708,7 @@ class InventoryMovementViewSet(ModelViewSet):
         if branch_id:
             # Show movements where user's branch is either source or destination
             queryset = queryset.filter(
-                models.Q(from_branch_id=branch_id) | models.Q(to_branch_id=branch_id)
+                Q(from_branch_id=branch_id) | Q(to_branch_id=branch_id)
             )
 
         if status_filter:
