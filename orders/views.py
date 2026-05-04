@@ -252,7 +252,7 @@ class OrderViewset(ModelViewSet):
         }
 
         # Resolve refund method
-        refund_method = None
+        refund_method = order.payment_method
         if data["refund_method"]:
             try:
                 refund_method = BusinessPaymentMethod.objects.get(
