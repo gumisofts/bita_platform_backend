@@ -71,7 +71,7 @@ class BusinessPaymentMethod(BaseModel):
         blank=True,
     )
     label = models.CharField(max_length=255, null=True, blank=True)
-    identifier = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    identifier = models.CharField(max_length=255, null=True, blank=True)
 
     def _same_scope_filter(self):
         """Filter for same business + branch scope (for counter)."""
@@ -105,3 +105,6 @@ class BusinessPaymentMethod(BaseModel):
 
     def __str__(self):
         return f"{self.display_name or 'Unnamed'} - {self.business.name}"
+
+    class Meta:
+        unique_together = ("business", "branch", "identifier")
