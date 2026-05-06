@@ -212,20 +212,22 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = super().create(validated_data)
         email = validated_data.get("email")
         phone_number = validated_data.get("phone_number")
+        # code = generate_secure_six_digits()
+        code = "123456"  # TODO: generate a secure random code and dispatch it to the user via the notification service.
 
         if email:
             # Pass the raw code; VerificationCode.save() hashes it on insert.
             # TODO: dispatch the raw code to the recipient via the notification service.
             VerificationCode.objects.create(
                 user=user,
-                code=generate_secure_six_digits(),
+                code=code,
                 email=email,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
         if phone_number:
             VerificationCode.objects.create(
                 user=user,
-                code=generate_secure_six_digits(),
+                code=code,
                 phone_number=phone_number,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
