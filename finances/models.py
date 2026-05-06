@@ -12,6 +12,28 @@ class PaymentMethod(BaseModel):
     name = models.CharField(max_length=255)
     short_name = models.CharField(max_length=255)
 
+    def get_or_create_cash_payment_method():
+        id_uuid = uuid.UUID("00000000-0000-0000-0000-000000000001")
+        payment_method, created = PaymentMethod.objects.get_or_create(
+            name="CASH",
+            defaults={
+                "id": id_uuid,
+                "short_name": "Cash",
+            },
+        )
+        return payment_method
+
+    def get_or_create_credit_payment_method():
+        id_uuid = uuid.UUID("00000000-0000-0000-0000-000000000000")
+        payment_method, created = PaymentMethod.objects.get_or_create(
+            name="CREDIT",
+            defaults={
+                "id": id_uuid,
+                "short_name": "Credit",
+            },
+        )
+        return payment_method
+
 
 class Transaction(BaseModel):
     class TransactionType(models.TextChoices):
@@ -71,7 +93,7 @@ class BusinessPaymentMethod(BaseModel):
         blank=True,
     )
     label = models.CharField(max_length=255, null=True, blank=True)
-    identifier = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    identifier = models.CharField(max_length=255, null=True, blank=True)
 
     def _same_scope_filter(self):
         """Filter for same business + branch scope (for counter)."""
@@ -105,3 +127,6 @@ class BusinessPaymentMethod(BaseModel):
 
     def __str__(self):
         return f"{self.display_name or 'Unnamed'} - {self.business.name}"
+
+    class Meta:
+        unique_together = ("business", "branch", "identifier")
