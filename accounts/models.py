@@ -124,7 +124,7 @@ class VerificationCode(models.Model):
         # `is_password_usable` returns False for empty/raw values, so we only
         # hash when the stored value isn't already a password hash. This makes
         # the call idempotent across QuerySet.create() and explicit save() calls.
-        if self._state.adding and self.code and not is_password_usable(self.code):
+        if self._state.adding and self.code and is_password_usable(self.code):
             self.code = make_password(self.code)
         return super().save(*args, **kwargs)
 
