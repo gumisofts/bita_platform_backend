@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 
 import openpyxl
 from django.contrib.postgres.search import TrigramSimilarity
@@ -420,16 +421,20 @@ class ItemViewset(ModelViewSet):
             GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
         ],
     )
-    def export(self, request):
+    def export(self, request, *args, **kwargs):
         """
         Export all products for the current branch as CSV or Excel.
 
         One row per variant. Importing the exported file reproduces the same data.
 
         Query params:
-          format : 'csv' | 'xlsx'  (default: xlsx)
+          export_format : 'csv' | 'xlsx'  (default: xlsx)
+
+        Do not use the query name ``format`` — DRF reserves it for content
+        negotiation (``?format=json`` / ``api``); ``?format=xlsx`` is handled
+        before this view and returns 404 when no xlsx renderer exists.
         """
-        fmt = request.query_params.get("format", "xlsx").lower()
+        fmt = request.query_params.get("export_format", "xlsx").lower()
 
         items = self.get_queryset().prefetch_related("variants").order_by("name")
 
