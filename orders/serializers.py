@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
@@ -40,6 +42,10 @@ class OrderSerializer(ModelSerializer):
     branch = serializers.HiddenField(default=CurrentBranchDefault())
 
     class InternalOrderItemSerializer(ModelSerializer):
+        price = serializers.DecimalField(
+            max_digits=12, decimal_places=2, required=False, allow_null=True
+        )
+
         class Meta:
             model = OrderItem
             exclude = ["order"]
@@ -72,15 +78,30 @@ class OrderSerializer(ModelSerializer):
         item_variants = validated_data.pop("item_variants", [])
 
         order = Order.objects.create(**validated_data)
+        total_payable = Decimal("0")
         for item_variant in item_variants:
+            if item_variant.get("price") is None:
+                item_variant["price"] = item_variant["variant"].selling_price
             OrderItem.objects.create(order=order, **item_variant)
+            total_payable += (item_variant.get("price") or Decimal("0")) * item_variant[
+                "quantity"
+            ]
+        order.total_payable = total_payable
+        order.save(update_fields=["total_payable"])
         return order
 
     def update(self, instance, validated_data):
         item_variants = validated_data.pop("item_variants", [])
         instance = super().update(instance, validated_data)
         for item_variant in item_variants:
+            if item_variant.get("price") is None:
+                item_variant["price"] = item_variant["variant"].selling_price
             OrderItem.objects.create(order=instance, **item_variant)
+            instance.total_payable = (instance.total_payable or Decimal("0")) + (
+                (item_variant.get("price") or Decimal("0")) * item_variant["quantity"]
+            )
+        if item_variants:
+            instance.save(update_fields=["total_payable"])
         return instance
 
 
@@ -100,6 +121,10 @@ class OrderListSerializer(ModelSerializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    price = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, allow_null=True
+    )
+
     class Meta:
         model = OrderItem
         fields = "__all__"

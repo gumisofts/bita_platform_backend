@@ -60,23 +60,17 @@ class OrderItemViewset(ModelViewSet):
             # Get the associated Order
             order = order_item.order
 
-            # Get the latest supply price for this variant. OrderItem points at
-            # an ItemVariant (not Item directly) so we filter on `variant=` and
-            # order by `created_at` (BaseModel timestamp; SuppliedItem has no
-            # `timestamp` field).
-            latest_supply = (
-                SuppliedItem.objects.filter(variant=order_item.variant)
-                .order_by("-created_at")
-                .first()
-            )
-
-            if latest_supply:
-                item_unit_price = latest_supply.selling_price
-            else:
+            item_unit_price = order_item.price or order_item.variant.selling_price
+            if item_unit_price is None:
                 return Response(
-                    {"error": "No supply record found for this item."},
+                    {
+                        "error": "Unable to resolve item price. Submit price or set variant selling price."
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if order_item.price is None:
+                order_item.price = item_unit_price
+                order_item.save(update_fields=["price"])
 
             # Update the order's total_payable field
             order.total_payable = (order.total_payable or Decimal("0")) + (
@@ -345,8 +339,7 @@ class OrderViewset(ModelViewSet):
                 for line in validated_lines:
                     order_item = line["order_item"]
                     qty = line["quantity_returned"]
-                    selling_price = order_item.variant.selling_price or Decimal("0")
-                    line_refund = selling_price * qty
+                    line_refund = (order_item.price or Decimal("0")) * qty
                     total_refund += line_refund
 
                     is_restocked = False
@@ -536,8 +529,7 @@ class OrderViewset(ModelViewSet):
             .annotate(
                 total_quantity_sold=Sum("quantity"),
                 total_revenue=Sum(
-                    F("quantity")
-                    * Coalesce(F("variant__selling_price"), Value(Decimal("0")))
+                    F("quantity") * Coalesce(F("price"), Value(Decimal("0")))
                 ),
             )
             .order_by("-total_revenue", "-total_quantity_sold")[:limit]
@@ -717,8 +709,7 @@ class HomeStatsViewSet(GenericViewSet):
             .values("variant__item__id", "variant__item__name")
             .annotate(
                 total_sales=Sum(
-                    F("quantity")
-                    * Coalesce(F("variant__selling_price"), Value(Decimal("0")))
+                    F("quantity") * Coalesce(F("price"), Value(Decimal("0")))
                 )
             )
             .order_by("-total_sales")
@@ -741,8 +732,7 @@ class HomeStatsViewSet(GenericViewSet):
             .values("variant__item__id")
             .annotate(
                 total_sales=Sum(
-                    F("quantity")
-                    * Coalesce(F("variant__selling_price"), Value(Decimal("0")))
+                    F("quantity") * Coalesce(F("price"), Value(Decimal("0")))
                 )
             )
             .order_by("-total_sales")

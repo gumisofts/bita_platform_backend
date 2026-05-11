@@ -56,6 +56,7 @@ class OrderItem(BaseModel):
     )
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
         return f"Item {self.variant_id} in Order {self.order.id}"
