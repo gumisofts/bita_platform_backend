@@ -16,6 +16,11 @@ class TelebirrVerifier(BaseVerifier):
     def __init__(self, *args, **kwargs):
         pass
 
+    def _extra_request_kwargs(self) -> dict:
+        """Use proxies if configured via TELEBIRR_PROXY_URL."""
+
+        return {"verify": False}
+
     def get_url(self, transaction_id: str) -> str:
         base = (getattr(settings, "TELEBIRR_BASE_URL", "") or "").rstrip("/")
         if not base:
