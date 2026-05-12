@@ -6,6 +6,9 @@ from .views import *
 router = DefaultRouter()
 router.register(r"transactions", TransactionViewset)
 router.register(r"payment_methods", PaymentMethodViewset, basename="payment-methods")
+router.register(
+    r"payments/verifications", PaymentVerifyViewset, basename="payment-verifications"
+)
 
 router.register(
     r"business_payment_methods",

@@ -10,7 +10,7 @@ from guardian.shortcuts import get_objects_for_user
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
-from rest_framework.mixins import ListModelMixin
+from rest_framework.mixins import CreateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -32,6 +32,7 @@ from .serializers import (
     BusinessPaymentMethodSerializer,
     FinanceSummarySerializer,
     PaymentMethodSerializer,
+    PaymentVerificationSerializer,
     ReportsSerializer,
     TransactionSerializer,
 )
@@ -605,3 +606,8 @@ def reports(request):
 
     serializer = ReportsSerializer(report_data)
     return Response(serializer.data)
+
+
+class PaymentVerifyViewset(CreateModelMixin, GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PaymentVerificationSerializer
