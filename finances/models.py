@@ -1,9 +1,17 @@
+import enum
 import uuid
 
 from django.db import models
 from django.db.models import Q
 
 from core.models import BaseModel
+
+
+class AvailableVerifier(enum.Enum):
+    CBE = "CBE", "Commercial Bank of Ethiopia"
+    TELEBIRR = "TELEBIRR", "Telebirr"
+    BOA = "BOA", "Bank of Abyssinia"
+    CBEBIRR = "CBEBIRR", "CBE Birr"
 
 
 class PaymentMethod(BaseModel):

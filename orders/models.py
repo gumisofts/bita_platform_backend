@@ -41,10 +41,16 @@ class Order(BaseModel):
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
 
+    transaction_id = models.CharField(max_length=100, null=True, blank=True)
+
     additional_info = models.JSONField(default=dict, blank=True, null=True)
 
     def __str__(self):
         return f"Order {self.id} - {self.status}"
+
+    class Meta:
+        ordering = ["-created_at"]
+        unique_together = ("payment_method", "transaction_id")
 
 
 class OrderItem(BaseModel):
@@ -56,6 +62,7 @@ class OrderItem(BaseModel):
     )
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
         return f"Item {self.variant_id} in Order {self.order.id}"

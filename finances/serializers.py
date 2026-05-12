@@ -5,6 +5,8 @@ from rest_framework import serializers
 
 from finances.models import BusinessPaymentMethod, PaymentMethod, Transaction
 
+from .payments import PaymentVerifier
+
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -169,3 +171,39 @@ class FinanceSummarySerializer(serializers.Serializer):
     completed_orders = serializers.IntegerField()
     pending_orders = serializers.IntegerField()
     last_updated = serializers.DateTimeField()
+
+
+class PaymentVerificationSerializer(serializers.Serializer):
+    transaction_id = serializers.CharField(write_only=True)
+
+    business_payment_method = serializers.PrimaryKeyRelatedField(
+        queryset=BusinessPaymentMethod.objects.all(), write_only=True
+    )
+    receiver_name = serializers.CharField(
+        required=False, allow_blank=True, write_only=True
+    )
+    expected_amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, write_only=True
+    )
+
+    message = serializers.CharField(read_only=True)
+    is_valid = serializers.BooleanField(read_only=True)
+    validation_message = serializers.CharField(read_only=True, allow_blank=True)
+    data = serializers.JSONField(read_only=True, allow_null=True)
+
+    def create(self, validated_data):
+
+        business_payment_method = validated_data["business_payment_method"]
+        payment_method = validated_data["business_payment_method"].payment
+        account_number = validated_data["business_payment_method"].identifier
+        receiver_name = validated_data.get("receiver_name")
+        expected_amount = validated_data.get("expected_amount")
+
+        return PaymentVerifier(
+            transaction_id=validated_data["transaction_id"],
+            provider=payment_method.short_name if payment_method else "",
+            account=account_number if account_number else "",
+            expected_receiver_name=receiver_name,
+            expected_amount=expected_amount,
+            receiver_account=business_payment_method.identifier,
+        ).verify_transaction()
