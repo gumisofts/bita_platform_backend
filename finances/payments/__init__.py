@@ -1,6 +1,9 @@
+import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from decimal import Decimal
+
+import requests
 
 from .base import BaseVerifier, TransactionData
 from .cbe import CBEVerifier
@@ -93,9 +96,24 @@ class PaymentVerifier:
                 data=asdict(data),
             )
 
-        except Exception as e:
+        except requests.exceptions.HTTPError as http_error:
             return VerificationResult(
                 is_valid=False,
-                validation_message=f"Error during verification: {str(e)}",
+                validation_message="Transaction is not valid for the given payment method",
+                data=None,
+            )
+
+        except requests.exceptions.ConnectTimeout:
+            return VerificationResult(
+                is_valid=False,
+                validation_message="Unable to verify the transaction retry again",
+                data=None,
+            )
+
+        except Exception as e:
+            logging.exception(e)
+            return VerificationResult(
+                is_valid=False,
+                validation_message="Unable to verify the transaction at the moment.",
                 data=None,
             )
