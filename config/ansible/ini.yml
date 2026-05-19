@@ -44,5 +44,3 @@ myhosts:
 
     flower_domains:
       - name: flower.bita.et
-        ssl_cert: /etc/ssl/certs/flower.bita.et.crt
-        ssl_key: /etc/ssl/certs/flower.bita.et.pem
