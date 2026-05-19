@@ -8,8 +8,8 @@ from finances.models import *
 class BusinessPaymentMethodInline(admin.TabularInline):
     model = BusinessPaymentMethod
     extra = 0
-    fields = ("payment", "label", "identifier")
-    raw_id_fields = ("payment",)
+    fields = ("payment", "label", "branch", "identifier")
+    raw_id_fields = ("payment", "branch")
 
 
 @admin.register(PaymentMethod)
@@ -60,15 +60,16 @@ class BusinessPaymentMethodAdmin(admin.ModelAdmin):
         "payment_name",
         "display_name",
         "identifier",
+        "branch",
         "created_at",
     ]
     list_filter = ["business", "payment", "created_at"]
     search_fields = ["business__name", "payment__name", "label", "identifier"]
     readonly_fields = ["id", "created_at", "updated_at"]
-    raw_id_fields = ["business", "payment"]
+    raw_id_fields = ["business", "payment", "branch"]
 
     fieldsets = (
-        (None, {"fields": ("id", "business", "payment")}),
+        (None, {"fields": ("id", "business", "payment", "branch")}),
         (_("Configuration"), {"fields": ("label", "identifier")}),
         (
             _("Timestamps"),

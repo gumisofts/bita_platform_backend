@@ -20,13 +20,8 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 import inventories.models as inventories_models
-from business.models import Branch, Business, Employee
-from business.permissions import (
-    AdditionalBusinessPermissionNames,
-    BranchLevelPermission,
-    BusinessLevelPermission,
-    GuardianObjectPermissions,
-)
+from business.models import Branch, Business, Employee, biz_perm
+from business.permissions import BranchLevelPermission
 from core.utils import is_valid_uuid
 from finances.models import BusinessPaymentMethod, Transaction
 from inventories.models import Item, ItemVariant, SuppliedItem
@@ -46,9 +41,7 @@ class OrderItemViewset(ModelViewSet):
     queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
     http_method_names = ["post"]
-    permission_classes = [
-        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
 
     def create(self, request, *args, **kwargs):
         with db_transaction.atomic():
@@ -91,9 +84,7 @@ class OrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     http_method_names = ["get", "post", "patch"]
-    permission_classes = [
-        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_class = OrderFilter
     search_fields = [
@@ -114,12 +105,7 @@ class OrderViewset(ModelViewSet):
             raise ValidationError({"detail": "Empty or invalid business"})
 
         if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_ORDER.value[0] + "_business",
-            self.request.business,
-        ):
-            queryset = queryset.filter(business=self.request.business)
-        elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_ORDER.value[0] + "_branch",
+            biz_perm("order", "view", "branch"),
             self.request.branch,
         ):
             queryset = queryset.filter(branch=self.request.branch)
@@ -564,9 +550,7 @@ class HomeStatsViewSet(GenericViewSet):
     Home dashboard statistics endpoint
     """
 
-    permission_classes = [
-        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
     queryset = Order.objects.all()
 
     def _get_business_and_branch(self):
@@ -640,14 +624,11 @@ class HomeStatsViewSet(GenericViewSet):
         if branch:
             # If branch is specified, filter by branch
             if self.request.user.has_perm(
-                AdditionalBusinessPermissionNames.CAN_VIEW_ORDER.value[0] + "_branch",
+                biz_perm("order", "view", "branch"),
                 branch,
             ):
                 base_filter = Q(branch=branch)
-            elif not self.request.user.has_perm(
-                AdditionalBusinessPermissionNames.CAN_VIEW_ORDER.value[0] + "_business",
-                business,
-            ):
+            else:
                 base_filter = Q(pk__in=[])  # No access
 
         # Store for use in other methods

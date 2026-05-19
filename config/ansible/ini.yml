@@ -14,7 +14,7 @@ myhosts:
     pgbouncer_db_host: "localhost"
     pgbouncer_db_port: 5432
     pgbouncer_db_user: "postgres"
-    pgbouncer_db_password: "'HiddenAmbitions546!"
+    pgbouncer_db_password: "HiddenAmbitions546!"
 
     ##########################################################################
     # Domain Configuration

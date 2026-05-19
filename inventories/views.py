@@ -23,11 +23,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from business.models import AdditionalBusinessPermissionNames, Business
+from business.models import Business, biz_perm
 from business.permissions import (
     BranchLevelPermission,
     BusinessLevelPermission,
-    GuardianObjectPermissions,
+    accessible_branches,
+    filter_queryset_by_branch,
 )
 
 from .filters import GroupFilter, ItemFilter, ItemVariantFilter, SupplierFilter
@@ -38,10 +39,7 @@ from .serializers import *
 class ItemViewset(ModelViewSet):
     queryset = Item.objects.all()
     serializer_class = ItemSerializer
-    permission_classes = [
-        IsAuthenticated,
-        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
     filterset_class = ItemFilter
 
     def get_serializer_class(self):
@@ -51,20 +49,7 @@ class ItemViewset(ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-
-        if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0] + "_business",
-            self.request.business,
-        ):
-            queryset = queryset.filter(business=self.request.business)
-        elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM.value[0] + "_branch",
-            self.request.branch,
-        ):
-            queryset = queryset.filter(branch=self.request.branch)
-        else:
-            queryset = queryset.none()
-        return queryset
+        return filter_queryset_by_branch(queryset, self.request, "item")
 
     # ------------------------------------------------------------------
     # Import / export shared helpers
@@ -232,10 +217,7 @@ class ItemViewset(ModelViewSet):
         detail=False,
         methods=["post"],
         url_path="bulk-import",
-        permission_classes=[
-            IsAuthenticated,
-            GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
-        ],
+        permission_classes=[IsAuthenticated, BranchLevelPermission],
     )
     def bulk_import(self, request):
         """
@@ -416,10 +398,7 @@ class ItemViewset(ModelViewSet):
         detail=False,
         methods=["get"],
         url_path="export",
-        permission_classes=[
-            IsAuthenticated,
-            GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
-        ],
+        permission_classes=[IsAuthenticated, BranchLevelPermission],
     )
     def export(self, request, *args, **kwargs):
         """
@@ -509,26 +488,11 @@ class SupplyViewset(
     ListModelMixin, CreateModelMixin, RetrieveModelMixin, GenericViewSet
 ):
     serializer_class = SupplySerializer
-    permission_classes = [
-        IsAuthenticated,
-        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
     queryset = Supply.objects.all()
 
     def get_queryset(self):
-        queryset = self.queryset
-        if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLY.value[0] + "_business",
-            self.request.business,
-        ):
-            queryset = queryset.filter(business=self.request.business)
-        elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLY.value[0] + "_branch",
-            self.request.branch,
-        ):
-            queryset = queryset.filter(branch=self.request.branch)
-        else:
-            queryset = queryset.none()
+        queryset = filter_queryset_by_branch(self.queryset, self.request, "supply")
         return queryset.order_by("-updated_at")
 
     def get_serializer_class(self):
@@ -539,25 +503,40 @@ class SupplyViewset(
 
 class SupplierViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
     serializer_class = SupplierSerializer
-    permission_classes = [
-        IsAuthenticated,
-        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
     queryset = Supplier.objects.all()
     filterset_class = SupplierFilter
 
     def get_queryset(self):
-        queryset = self.queryset
-        return queryset.filter(business=self.request.business)
+        # Supplier has no branch FK (shared across a business), but access is
+        # still gated by whether the user has a branch-level view perm on at
+        # least one branch in the targeted business.
+        if not accessible_branches(self.request, "supplier").exists():
+            return self.queryset.none()
+        business = self.request.business
+        if not business:
+            return self.queryset.none()
+        return self.queryset.filter(business=business)
 
 
 class SupplyItemViewset(CreateModelMixin, GenericViewSet):
+    """SuppliedItem lives under a Supply; there is no dedicated branch-scoped
+    permission for it yet, so access is gated on the parent supply's branch
+    perms instead of an ``add_supplieditem_branch`` codename that doesn't exist.
+    """
+
     serializer_class = SuppliedItemSerializer
-    permission_classes = [
-        IsAuthenticated,
-        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated]
     queryset = SuppliedItem.objects.all()
+
+    def _resolve_supply_branch(self):
+        supply_id = self.request.data.get("supply") or self.request.query_params.get(
+            "supply_id"
+        )
+        if not supply_id:
+            return None
+        supply = Supply.objects.filter(id=supply_id).select_related("branch").first()
+        return supply.branch if supply else None
 
     def get_queryset(self):
         queryset = self.queryset
@@ -566,18 +545,24 @@ class SupplyItemViewset(CreateModelMixin, GenericViewSet):
             queryset = queryset.filter(supply=supply_id)
         return queryset
 
+    def create(self, request, *args, **kwargs):
+        branch = self._resolve_supply_branch()
+        if branch and not request.user.has_perm(
+            biz_perm("supply", "change", "branch"), branch
+        ):
+            return Response(
+                {"detail": "You do not have permission to add items to this supply."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().create(request, *args, **kwargs)
+
 
 class PricingViewset(
     CreateModelMixin, DestroyModelMixin, UpdateModelMixin, GenericViewSet
 ):
-    queryset = (
-        ItemVariant.objects.all()
-    )  # Leave here to check for variant permission checks on business and branch level
+    queryset = ItemVariant.objects.all()
     serializer_class = PricingSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
 
     def get_queryset(self):
         return Pricing.objects.all()
@@ -586,36 +571,23 @@ class PricingViewset(
 class GroupViewset(ModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
-    permission_classes = [
-        IsAuthenticated,
-        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BusinessLevelPermission]
     filterset_class = GroupFilter
 
     def get_queryset(self):
         queryset = self.queryset
-        if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_GROUP.value[0] + "_business",
-            self.request.business,
-        ):
-            queryset = queryset.filter(business=self.request.business)
-        elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_GROUP.value[0] + "_branch",
-            self.request.branch,
-        ):
-            queryset = queryset.filter(branch=self.request.branch)
-        else:
-            queryset = queryset.none()
-        return queryset
+        business = self.request.business
+        if not business:
+            return queryset.none()
+        if self.request.user.has_perm("can_view_group_business", business):
+            return queryset.filter(business=business)
+        return queryset.none()
 
 
 class ItemVariantViewset(ModelViewSet):
     queryset = ItemVariant.objects.all()
     serializer_class = ItemVariantSerializer
-    permission_classes = [
-        IsAuthenticated,
-        GuardianObjectPermissions | BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
     filterset_class = ItemVariantFilter
 
     def get_serializer_class(self):
@@ -631,21 +603,9 @@ class ItemVariantViewset(ModelViewSet):
         if item:
             queryset = queryset.filter(item=item)
 
-        if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]
-            + "_business",
-            self.request.business,
-        ):
-            queryset = queryset.filter(item__business=self.request.business)
-        elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT.value[0]
-            + "_branch",
-            self.request.branch,
-        ):
-            queryset = queryset.filter(item__branch=self.request.branch)
-        else:
-            queryset = queryset.none()
-
+        queryset = filter_queryset_by_branch(
+            queryset, self.request, "itemvariant", branch_field="item__branch"
+        )
         return queryset.order_by(Lower("name"), "id")
 
     def create(self, request, *args, **kwargs):
@@ -673,14 +633,9 @@ class ItemVariantViewset(ModelViewSet):
 class PropertyViewset(
     CreateModelMixin, DestroyModelMixin, UpdateModelMixin, GenericViewSet
 ):
-    queryset = (
-        ItemVariant.objects.all()
-    )  # Leave here to check for variant permission checks on business and branch level
+    queryset = ItemVariant.objects.all()
     serializer_class = PropertySerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
 
     def get_queryset(self):
         return Property.objects.all()
@@ -690,7 +645,7 @@ class InventoryMovementViewSet(ModelViewSet):
     """ViewSet for managing inventory movements between branches"""
 
     queryset = InventoryMovement.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -702,19 +657,17 @@ class InventoryMovementViewSet(ModelViewSet):
             "from_branch", "to_branch", "business", "requested_by"
         ).prefetch_related("movement_items__supplied_item__item")
 
-        user = self.request.user
-        business_id = self.request.query_params.get("business_id")
-        branch_id = self.request.query_params.get("branch_id")
         status_filter = self.request.query_params.get("status")
 
-        if business_id:
-            queryset = queryset.filter(business_id=business_id)
+        # Branches where the caller can ``view`` inventory movements. Any
+        # movement whose source OR destination is in that set is visible.
+        branches = accessible_branches(self.request, "inventorymovement")
+        if not branches.exists():
+            return queryset.none()
 
-        if branch_id:
-            # Show movements where user's branch is either source or destination
-            queryset = queryset.filter(
-                Q(from_branch_id=branch_id) | Q(to_branch_id=branch_id)
-            )
+        queryset = queryset.filter(
+            Q(from_branch__in=branches) | Q(to_branch__in=branches)
+        )
 
         if status_filter:
             queryset = queryset.filter(status=status_filter)

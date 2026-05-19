@@ -1,41 +1,22 @@
 from django.db.models import Q
 from django.http import Http404
-from guardian.backends import ObjectPermissionBackend, check_support
-from guardian.shortcuts import ObjectPermissionChecker, assign_perm, get_content_type
+from guardian.shortcuts import assign_perm, get_objects_for_user
 from rest_framework import exceptions
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from accounts.models import User
 from business.models import (
-    AdditionalBusinessPermissionNames,
+    BRANCH_SCOPED_MODELS,
+    BUSINESS_SCOPED_MODELS,
+    CRUD_ACTIONS,
+    ROLES,
     Address,
     Branch,
     Business,
     Employee,
     EmployeeInvitation,
+    biz_perm,
 )
-
-# class BusinessPermissionBackend(ObjectPermissionBackend):
-#     def has_perm(self, user, perm, obj=None):
-#         support, user_obj = check_support(user, obj)
-#         if not support:
-#             return False
-
-#         if '.' in perm:
-#             app_label, _ = perm.split('.', 1)
-#             # TODO (David Graham): Check if obj is None or change the method signature
-#             if app_label != obj._meta.app_label:  # type: ignore[union-attr]
-#                 # Check the content_type app_label when permission
-#                 # and obj app labels don't match.
-#                 ctype = get_content_type(obj)
-#                 if app_label != ctype.app_label:
-#                     raise WrongAppError("Passed perm has app label of '%s' while "
-#                                         "given obj has app label '%s' and given obj"
-#                                         "content_type has app label '%s'" %
-#                                         (app_label, obj._meta.app_label, ctype.app_label))   # type: ignore[union-attr]
-
-#         check = ObjectPermissionChecker(user_obj)
-#         return check.has_perm(perm, obj)
 
 
 class BusinessModelObjectPermission(BasePermission):
@@ -121,14 +102,39 @@ def has_business_object_permission(request, model, business, generic_action="cha
     ).exists()
 
 
-class hasBusinessAddressPermission(BasePermission):
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-        return True
+def make_business_permission(model_cls, *, get_business=None):
+    """
+    Factory that returns a DRF permission class scoped to *model_cls*.
 
-    def has_object_permission(self, request, view, obj):
-        return has_business_object_permission(request, Address, obj.business)
+    ``get_business(obj)`` is an optional callable that extracts the Business
+    from a view object.  When omitted the default tries ``obj.business`` and
+    then ``obj`` itself (for cases where the view object *is* the business).
+    """
+
+    def _default_get_business(obj):
+        return getattr(obj, "business", obj)
+
+    resolve_business = get_business or _default_get_business
+
+    class _BusinessPermission(BasePermission):
+        def has_permission(self, request, view):
+            return bool(request.user and request.user.is_authenticated)
+
+        def has_object_permission(self, request, view, obj):
+            return has_business_object_permission(
+                request, model_cls, resolve_business(obj)
+            )
+
+    _BusinessPermission.__name__ = f"{model_cls.__name__}Permission"
+    _BusinessPermission.__qualname__ = f"{model_cls.__name__}Permission"
+    return _BusinessPermission
+
+
+# Concrete permission classes produced by the factory.
+hasBusinessPermission = make_business_permission(Business)
+hasBranchPermission = make_business_permission(Branch)
+hasBusinessAddressPermission = make_business_permission(Address)
+EmployeeInvitationPermission = make_business_permission(EmployeeInvitation)
 
 
 class hasUserPermission(BasePermission):
@@ -146,195 +152,277 @@ class hasUserPermission(BasePermission):
             return obj == request.user or request.user.is_superuser
 
 
-class hasBusinessPermission(BasePermission):
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-
-        return True
-
-    def has_object_permission(self, request, view, obj):
-
-        if view.action in ["partial_update", "update", "destroy", "retrieve"]:
-            return has_business_object_permission(request, Business, obj)
-        return False
-
-
-class hasBranchPermission(BasePermission):
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-
-        return True
-
-    def has_object_permission(self, request, view, obj):
-        return has_business_object_permission(request, Branch, obj.business)
-
-
 class BusinessAddressPermission(BasePermission):
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
+    """
+    Address objects can be linked to a business directly (obj.business) or
+    indirectly through a branch (obj.branches.first().business).
+    """
 
-        return True
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
-        # Address can be related to business in two ways:
-        # 1. As the main address of a business (obj.business)
-        # 2. As an address used by branches (obj.branches.first().business)
-        business = None
         if hasattr(obj, "business") and obj.business:
             business = obj.business
         elif obj.branches.exists():
             business = obj.branches.first().business
-
-        if not business:
+        else:
             return False
-
         return has_business_object_permission(request, Address, business)
 
 
-class EmployeeInvitationPermission(BasePermission):
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
+# ---------------------------------------------------------------------------
+# Role → model → allowed actions mapping.
+# Each key is a model name (matching PERMISSIONED_MODELS), each value is a
+# list of CRUD actions that role is permitted to perform at branch scope.
+# Business-wide roles (owner / admin) receive all permissions on the business
+# object itself, derived from PERMISSIONED_MODELS + CRUD_ACTIONS.
+# ---------------------------------------------------------------------------
 
+_BRANCH_MANAGER_PERMS: dict[str, list[str]] = {
+    "group": ["view", "add", "change"],
+    "customer": ["view", "add", "change"],
+    "item": ["view", "add", "change"],
+    "itemvariant": ["view", "add", "change"],
+    "supplier": ["view", "add", "change"],
+    "inventory": ["view", "add"],
+    "inventorymovement": ["view", "add"],
+    "order": ["view", "add", "change"],
+    "transaction": ["view", "add"],
+    "businesspaymentmethod": ["view", "change"],
+    "property": ["view", "add", "change"],
+    "supply": ["view", "add"],
+    "employee": ["view"],
+    "employeeinvitation": ["view", "add"],
+}
+
+_EMPLOYEE_PERMS: dict[str, list[str]] = {
+    "group": ["view"],
+    "customer": ["view", "add"],
+    "item": ["view", "add"],
+    "itemvariant": ["view", "add"],
+    "supplier": ["view"],
+    "inventory": ["view"],
+    "inventorymovement": ["view", "add"],
+    "order": ["view", "add", "change"],
+    "transaction": ["view", "add"],
+    "businesspaymentmethod": ["view"],
+    "property": ["view"],
+    "supply": ["view"],
+}
+
+_BUSINESS_ADMIN_PERMS: dict[str, list[str]] = {
+    # business-scoped — full CRUD on staff/org models; view-only on branch itself
+    "branch": ["view", "add", "change"],
+    "employee": ["view", "add", "change", "delete"],
+    "address": ["view", "add", "change", "delete"],
+    "employeeinvitation": ["view", "add", "change", "delete"],
+    "group": ["view", "add", "change", "delete"],
+    "customer": ["view", "add", "change", "delete"],
+    # branch-scoped — full CRUD on core inventory/sales; limited on financial/read-only
+    "order": ["view", "add", "change", "delete"],
+    "item": ["view", "add", "change", "delete"],
+    "itemvariant": ["view", "add", "change", "delete"],
+    "inventorymovement": ["view", "add", "change"],
+    "inventory": ["view", "add"],
+    "property": ["view", "add", "change", "delete"],
+    "supplier": ["view", "add", "change", "delete"],
+    "businesspaymentmethod": ["view", "change"],
+    "transaction": ["view", "add"],
+    "giftcard": ["view"],
+    "supply": ["view", "add"],
+}
+
+# Owner receives full CRUD on every permissioned model.
+_OWNER_PERMS: dict[str, list[str]] = {
+    model: list(CRUD_ACTIONS) for model in BUSINESS_SCOPED_MODELS + BRANCH_SCOPED_MODELS
+}
+
+# Permissions on the business object — only for truly business-wide models.
+_BUSINESS_OBJECT_PERMS: list[str] = [
+    biz_perm(model, action, "business")
+    for model in BUSINESS_SCOPED_MODELS
+    for action in CRUD_ACTIONS
+]
+
+# Permissions granted on every branch for branch-scoped models.
+_BRANCH_OBJECT_PERMS: list[str] = [
+    biz_perm(model, action, "branch")
+    for model in BRANCH_SCOPED_MODELS
+    for action in CRUD_ACTIONS
+]
+
+
+def _split_perms_by_scope(
+    model_actions: dict[str, list[str]],
+) -> tuple[list[str], list[str]]:
+    """Return ``(branch_perms, business_perms)`` from a model→actions mapping.
+
+    The scope is decided per-model: any model in ``BRANCH_SCOPED_MODELS`` gets
+    branch-scoped permission codenames; anything else falls back to the
+    business scope. This avoids generating perms such as ``can_view_group_branch``
+    that are never declared on the ``Branch`` model.
+    """
+    branch_perms: list[str] = []
+    business_perms: list[str] = []
+    for model, actions in model_actions.items():
+        scope = "branch" if model in BRANCH_SCOPED_MODELS else "business"
+        bucket = branch_perms if scope == "branch" else business_perms
+        for action in actions:
+            bucket.append(biz_perm(model, action, scope))
+    return branch_perms, business_perms
+
+
+def _filter_was_requested(request) -> bool:
+    """True when the caller passed a business/branch identifier in the
+    query string or in a request header, even if it resolved to nothing.
+
+    Used to distinguish "the caller asked about a specific business that does
+    not exist (return empty)" from "the caller didn't filter at all (use
+    everything the user can reach)".
+    """
+    query_keys = ("business", "business_id", "branch", "branch_id")
+    if any(request.GET.get(key) for key in query_keys):
         return True
+    header_keys = ("X-Business-Id", "X-Branch-Id")
+    return any(request.headers.get(key) for key in header_keys)
 
-    def has_object_permission(self, request, view, obj):
-        return has_business_object_permission(request, EmployeeInvitation, obj.business)
+
+def accessible_branches(request, model_name: str, action: str = "view"):
+    """Return the queryset of branches where ``request.user`` holds a
+    branch-scoped permission for ``model_name``.
+
+    Resolution order:
+      * ``request.branch`` is set → narrow to just that branch (subject to perm).
+      * ``request.business`` is set → look across that business's branches.
+      * Neither is set and the caller didn't request a specific business/branch
+        → consider every branch the user can reach. This makes detail
+        endpoints usable for owners/managers who hit a URL without filters.
+      * Caller asked for a specific (but unresolved) business/branch → empty.
+    """
+    perm = biz_perm(model_name, action, "branch")
+    user = request.user
+    branch = getattr(request, "branch", None)
+    business = getattr(request, "business", None)
+
+    if branch:
+        base = Branch.objects.filter(pk=branch.pk)
+    elif business:
+        base = business.branches.all()
+    elif _filter_was_requested(request):
+        # User explicitly asked for a business/branch that doesn't resolve.
+        return Branch.objects.none()
+    else:
+        base = Branch.objects.all()
+
+    return get_objects_for_user(user, perm, base, accept_global_perms=False)
+
+
+def filter_queryset_by_branch(
+    queryset,
+    request,
+    model_name: str,
+    branch_field: str = "branch",
+    action: str = "view",
+):
+    """Filter ``queryset`` to objects living in branches the user can ``action``.
+
+    ``branch_field`` is the lookup path from the model to a ``Branch`` (e.g.
+    ``"branch"``, ``"item__branch"``). Returns an empty queryset when no branch
+    context is available or the user has no relevant perms.
+    """
+    branches = accessible_branches(request, model_name, action)
+    if not branches.exists():
+        return queryset.none()
+    return queryset.filter(**{f"{branch_field}__in": branches})
 
 
 class PermissionManager:
+    """
+    Translates Role.permissions (Django Permission M2M) into guardian
+    object-level permission grants on the business / branch objects.
 
-    def assign_business_admin_permissions(self, user, business):
-        perms = [
-            perm.value[0] + "_business" for perm in AdditionalBusinessPermissionNames
-        ] + ["view_business", "change_business"]
-        for perm in perms:
-            assign_perm(perm, user, business)
+    Role.permissions is the single source of truth — this manager only
+    reads from it and applies the appropriate guardian grants.  No
+    hardcoded role-name logic lives here, so custom roles work for free.
+    """
 
-    def assign_owner_permissions(self, user, business):
-        perms = [
-            perm.value[0] + "_business" for perm in AdditionalBusinessPermissionNames
-        ] + ["change_business", "delete_business", "view_business"]
-        for perm in perms:
-            assign_perm(perm, user, business)
+    def assign_branch_scoped_perms_for_branch(self, user, branch):
+        """Grant every branch-scoped permission the user's role declares
+        on a specific branch.  Called when a new branch is created so that
+        existing owners / admins get access automatically.
 
-    def assign_manager_permissions(self, user, business, branch):
-        branch_manager_perms = [
-            # Groups
-            AdditionalBusinessPermissionNames.CAN_VIEW_GROUP,
-            AdditionalBusinessPermissionNames.CAN_ADD_GROUP,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_GROUP,
-            # Customers
-            AdditionalBusinessPermissionNames.CAN_VIEW_CUSTOMER,
-            AdditionalBusinessPermissionNames.CAN_ADD_CUSTOMER,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_CUSTOMER,
-            # Items
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM,
-            AdditionalBusinessPermissionNames.CAN_ADD_ITEM,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_ITEM,
-            # Item variants
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT,
-            AdditionalBusinessPermissionNames.CAN_ADD_ITEM_VARIANT,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_ITEM_VARIANT,
-            # Suppliers
-            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLIER,
-            AdditionalBusinessPermissionNames.CAN_ADD_SUPPLIER,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_SUPPLIER,
-            # Inventory
-            AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY,
-            AdditionalBusinessPermissionNames.CAN_ADD_INVENTORY,
-            AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY_MOVEMENT,
-            AdditionalBusinessPermissionNames.CAN_ADD_INVENTORY_MOVEMENT,
-            # Orders
-            AdditionalBusinessPermissionNames.CAN_VIEW_ORDER,
-            AdditionalBusinessPermissionNames.CAN_ADD_ORDER,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_ORDER,
-            # Transactions
-            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION,
-            AdditionalBusinessPermissionNames.CAN_ADD_TRANSACTION,
-            # Payment methods
-            AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_BUSINESS_PAYMENT_METHOD,
-            # Properties
-            AdditionalBusinessPermissionNames.CAN_VIEW_PROPERTY,
-            AdditionalBusinessPermissionNames.CAN_ADD_PROPERTY,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_PROPERTY,
-            # Supply
-            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLY,
-            AdditionalBusinessPermissionNames.CAN_ADD_SUPPLY,
-            # Employees
-            AdditionalBusinessPermissionNames.CAN_VIEW_EMPLOYEE,
-            AdditionalBusinessPermissionNames.CAN_VIEW_EMPLOYEE_INVITATION,
-            AdditionalBusinessPermissionNames.CAN_ADD_EMPLOYEE_INVITATION,
-        ]
-        perms = [perm.value[0] + "_branch" for perm in branch_manager_perms]
+        Falls back to the full _BRANCH_OBJECT_PERMS list when no employee
+        record exists yet (e.g. during business creation before the owner
+        employee row has been saved).
+        """
+        employee = (
+            Employee.objects.filter(user=user, business=branch.business)
+            .select_related("role")
+            .first()
+        )
 
-        for perm in perms:
-            assign_perm(perm, user, branch)
+        if employee and employee.role:
+            codenames = list(
+                employee.role.permissions.select_related("content_type")
+                .filter(
+                    Q(codename__endswith="_branch") | Q(content_type__model="branch")
+                )
+                .values_list("codename", flat=True)
+            )
+        else:
+            codenames = _BRANCH_OBJECT_PERMS
 
-        branch_perms = [
-            "view_branch",
-            "add_branch",
-            "change_branch",
-        ]
-        business_perms = [
-            "view_business",
-        ]
+        for codename in codenames:
+            assign_perm(codename, user, branch)
 
-        for perm in branch_perms:
-            assign_perm(perm, user, branch)
+    def assign_permissions_for_employee(self, employee):
+        """Assign guardian object-level permissions to a user from their
+        role's permissions.
 
-        for perm in business_perms:
-            assign_perm(perm, user, business)
+        Split rules:
+        - codename ends with ``_business`` **or** content_type is ``business``
+          → granted on the business object.
+        - codename ends with ``_branch`` **or** content_type is ``branch``
+          → granted on the employee's branch (skipped when branch is None).
+        - anything else (standard model perms like ``view_employee``) is only
+          kept on Role.permissions for direct role-perm checks; no guardian
+          object grant is needed.
 
-    def assign_employee_permissions(self, user, business, branch):
-        employee_branch_perms = [
-            # Groups
-            AdditionalBusinessPermissionNames.CAN_VIEW_GROUP,
-            # Customers
-            AdditionalBusinessPermissionNames.CAN_VIEW_CUSTOMER,
-            AdditionalBusinessPermissionNames.CAN_ADD_CUSTOMER,
-            # Items
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM,
-            # Item variants
-            AdditionalBusinessPermissionNames.CAN_VIEW_ITEM_VARIANT,
-            AdditionalBusinessPermissionNames.CAN_ADD_ITEM_VARIANT,
-            # Suppliers
-            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLIER,
-            # Inventory
-            AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY,
-            AdditionalBusinessPermissionNames.CAN_VIEW_INVENTORY_MOVEMENT,
-            AdditionalBusinessPermissionNames.CAN_ADD_INVENTORY_MOVEMENT,
-            # Orders
-            AdditionalBusinessPermissionNames.CAN_VIEW_ORDER,
-            AdditionalBusinessPermissionNames.CAN_ADD_ORDER,
-            AdditionalBusinessPermissionNames.CAN_CHANGE_ORDER,
-            # Transactions
-            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION,
-            AdditionalBusinessPermissionNames.CAN_ADD_TRANSACTION,
-            # Payment methods
-            AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD,
-            # Properties
-            AdditionalBusinessPermissionNames.CAN_VIEW_PROPERTY,
-            # Supply
-            AdditionalBusinessPermissionNames.CAN_VIEW_SUPPLY,
-        ]
-        perms = [perm.value[0] + "_branch" for perm in employee_branch_perms]
+        Call this whenever an employee is created or their role/branch changes.
+        """
+        if not employee.user or not employee.role:
+            return
 
-        for perm in perms:
-            assign_perm(perm, user, branch)
+        user = employee.user
+        business = employee.business
+        branch = employee.branch
 
-        branch_perms = ["view_branch"]
-        business_perms = ["view_business"]
+        business_codenames = []
+        branch_codenames = []
 
-        for perm in branch_perms:
-            assign_perm(perm, user, branch)
+        for perm in employee.role.permissions.select_related("content_type").all():
+            codename = perm.codename
+            model = perm.content_type.model
 
-        for perm in business_perms:
-            assign_perm(perm, user, business)
+            if codename.endswith("_business") or model == "business":
+                business_codenames.append(codename)
+            elif codename.endswith("_branch") or model == "branch":
+                branch_codenames.append(codename)
+
+        for codename in business_codenames:
+            assign_perm(codename, user, business)
+
+        if branch:
+            # Branch-specific employee or manager — grant perms on their branch only.
+            for codename in branch_codenames:
+                assign_perm(codename, user, branch)
+        elif branch_codenames:
+            # Business-wide role (owner, admin) with no assigned branch — grant
+            # branch perms on every branch so they can access all of them.
+            for b in business.branches.all():
+                for codename in branch_codenames:
+                    assign_perm(codename, user, b)
 
 
 class BusinessLevelPermission(BasePermission):
@@ -472,6 +560,124 @@ class BranchLevelPermission(BusinessLevelPermission):
         It can be overridden in subclasses to provide custom logic.
         """
         return request.branch if hasattr(request, "branch") else None
+
+    def _resolve_branch(self, request):
+        """Try to identify the target Branch for a POST request.
+
+        Looks in (in order): existing ``request.branch`` from middleware, then
+        ``branch`` / ``branch_id`` in the body. Returns ``None`` if no branch
+        can be located.
+        """
+        branch = getattr(request, "branch", None)
+        if branch:
+            return branch
+
+        branch_id = request.data.get("branch") or request.data.get("branch_id")
+        if not branch_id:
+            return None
+        branch = Branch.objects.filter(id=branch_id).first()
+        if branch:
+            # Backfill so downstream view code can rely on it
+            request.branch = branch
+            if not getattr(request, "business", None):
+                request.business = branch.business
+        return branch
+
+    def _resolve_business(self, request):
+        """Locate the target business from request context or body."""
+        business = getattr(request, "business", None)
+        if business:
+            return business
+        business_id = request.data.get("business") or request.data.get("business_id")
+        if not business_id:
+            return None
+        business = Business.objects.filter(id=business_id).first()
+        if business:
+            request.business = business
+        return business
+
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+
+        if request.method != "POST":
+            # GET / list and detail mutations are handled by get_queryset and
+            # has_object_permission respectively.
+            return True
+
+        model_cls = view.queryset.model
+        perms = self.get_required_object_permissions(request.method, model_cls)
+
+        # Prefer the explicit branch when supplied; this is the strongest signal
+        # of where the new object will live.
+        branch = self._resolve_branch(request)
+        if branch:
+            return request.user.has_perms(perms, branch)
+
+        # Fall back to "user must hold the branch perm on at least one branch
+        # within the targeted business". This makes endpoints usable when the
+        # caller only supplies ``business_id`` and the serializer infers the
+        # branch later (e.g. inventory movements).
+        business = self._resolve_business(request)
+        if not business:
+            # No branch and no business context: defer to object-level checks /
+            # view's own validation logic.
+            return True
+        return any(
+            request.user.has_perms(perms, branch_obj)
+            for branch_obj in business.branches.all()
+        )
+
+    def _branches_for_obj(self, obj):
+        """Return the ``Branch`` instances tied to ``obj`` for perm checks.
+
+        Looks at common attributes used across this codebase:
+        ``branch`` (most models), ``from_branch`` / ``to_branch``
+        (inventory movements), or the branch on a related supply / item.
+        """
+        branches = []
+        for attr in ("branch", "from_branch", "to_branch"):
+            value = getattr(obj, attr, None)
+            if value is not None:
+                branches.append(value)
+        if not branches:
+            for related_attr in ("supply", "item"):
+                related = getattr(obj, related_attr, None)
+                related_branch = getattr(related, "branch", None) if related else None
+                if related_branch is not None:
+                    branches.append(related_branch)
+        return branches
+
+    def has_object_permission(self, request, view, obj):
+        queryset = self._queryset(view)
+        model_cls = queryset.model
+        user = request.user
+        perms = self.get_required_object_permissions(request.method, model_cls)
+
+        # Prefer the branch from the middleware when the caller supplied one,
+        # otherwise look at the object itself. Custom actions (e.g.
+        # ``/movements/{id}/approve/``) typically arrive without query params.
+        targets = []
+        binding = self.get_binding_object(request)
+        if binding is not None:
+            targets.append(binding)
+        targets.extend(self._branches_for_obj(obj))
+
+        if any(user.has_perms(perms, target) for target in targets if target):
+            return True
+
+        if request.method in SAFE_METHODS:
+            raise Http404
+
+        # Determine if the user has read access to the object — if not, mask
+        # the existence of the resource by raising 404 instead of 403.
+        read_perms = self.get_required_object_permissions("GET", model_cls)
+        if read_perms and not any(
+            user.has_perms(read_perms, target) for target in targets if target
+        ):
+            raise Http404
+
+        return False
 
 
 class GuardianObjectPermissions(BasePermission):
