@@ -17,8 +17,8 @@ Environment="DJANGO_SETTINGS_MODULE=core.settings"
 EnvironmentFile=/home/ubuntu/app/.env
 ExecStart=/home/ubuntu/app/env/bin/celery -A core.celery.celery worker \
     --loglevel=INFO \
-    -Q default \
-    --hostname=default_%i@%%h \
+    -Q payment-processing,order-fulfillment,inventory-alerts,real-time-notifications,chat-messaging,user-verification,financial-reporting,inventory-sync,crm-operations,file-processing,email-notifications,analytics-processing,logging,system-maintenance,beats,default,celery \
+    --hostname=worker_%i@%%h \
     --concurrency=8 \
     --max-tasks-per-child=1000 \
     --without-heartbeat \
