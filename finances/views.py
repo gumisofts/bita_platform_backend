@@ -22,7 +22,7 @@ from business.permissions import (
     filter_queryset_by_branch,
 )
 from core.utils import is_valid_uuid
-from finances.filters import BusinPaymentMethodFilter
+from finances.filters import BusinessPaymentMethodFilter
 from inventories.models import SuppliedItem
 from orders.models import Order, OrderItem
 
@@ -53,7 +53,7 @@ class BusinessPaymentMethodViewset(ModelViewSet):
     queryset = BusinessPaymentMethod.objects.all()
     serializer_class = BusinessPaymentMethodSerializer
     permission_classes = [IsAuthenticated, BranchLevelPermission]
-    filterset_class = BusinPaymentMethodFilter
+    filterset_class = BusinessPaymentMethodFilter
 
     def get_queryset(self):
         return filter_queryset_by_branch(
