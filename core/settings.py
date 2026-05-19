@@ -215,6 +215,12 @@ ADMIN = ("Murad", "nuradhussen082@gmail.com")
 CELERY_BROKER_URL = os.getenv("DJANGO_CELERY_BROKER_URL")
 CELERY_RESULT_BACKEND = os.getenv("DJANGO_CELERY_BACKEND_URL")
 
+from core.celery.queues import CeleryQueue  # noqa: E402
+
+CELERY_TASK_QUEUES = CeleryQueue.queues()
+CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_TASK_CREATE_MISSING_QUEUES = True
+
 
 SIMPLE_JWT = {
     # Defaults match common DRF SimpleJWT recommendations. Override per-environment
