@@ -57,6 +57,6 @@ jobs:
       - name: Install Poetry
         run: pip install poetry
       - name: Install Dependencies
-        run: poetry install --no-interaction --no-ansi
+        run: poetry install --no-interaction --no-ansi --no-root
       - name: Run Tests
         run: poetry run python manage.py test

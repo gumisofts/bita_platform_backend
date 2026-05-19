@@ -19,7 +19,7 @@ jobs:
       - name: Install Poetry
         run: pip install poetry
       - name: Install Dependencies
-        run: poetry install --no-interaction --no-ansi --with dev
+        run: poetry install --no-interaction --no-ansi --no-root --with dev
       - name: Copy Environment Variables and Secrets
         run: |
           echo "DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}" >> .env
