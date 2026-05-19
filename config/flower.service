@@ -1,6 +1,7 @@
 [Unit]
-Description=Celery Flower monitoring dashboard
-After=network.target
+Description=Flower - Celery monitoring tool
+After=network.target celery@1.service
+Wants=celery@1.service
 
 [Service]
 Type=simple
@@ -10,13 +11,17 @@ Group=www-data
 
 RuntimeDirectory=/home/ubuntu/app
 WorkingDirectory=/home/ubuntu/app
+ExecStartPre=/bin/mkdir -p /home/ubuntu/app/logs
+ExecStartPre=/bin/chown ubuntu:www-data /home/ubuntu/app/logs
+ExecStartPre=/bin/chmod 755 /home/ubuntu/app/logs
+ExecStartPre=/bin/chmod +x /home/ubuntu/app/config/flower_start.sh
+Environment="DJANGO_SETTINGS_MODULE=core.settings"
 EnvironmentFile=/home/ubuntu/app/.env
-ExecStart=/home/ubuntu/app/env/bin/celery -A core.celery.celery flower \
-    --port=5555 \
-    --basic_auth=${FLOWER_BASIC_AUTH}
+# Flower will automatically use CELERY_BROKER_URL from Django settings
+ExecStart=/home/ubuntu/app/config/flower_start.sh
 ExecReload=/bin/kill -s HUP $MAINPID
 KillMode=mixed
-TimeoutStopSec=10
+TimeoutStopSec=5
 PrivateTmp=true
 Restart=always
 RestartSec=10

@@ -325,7 +325,7 @@
         force: true
         src: "../{{ item.name }}.crt"
         dest: "{{ item.ssl_cert }}"
-      loop: "{{ api_domains + (flower_domains | default([])) }}"
+      loop: "{{ api_domains }}"
 
     - name: Upload SSL private keys
       become: true
@@ -334,7 +334,7 @@
         force: true
         src: "../{{ item.name }}.pem"
         dest: "{{ item.ssl_key }}"
-      loop: "{{ api_domains + (flower_domains | default([])) }}"
+      loop: "{{ api_domains }}"
 
     - name: Upload nginx configuration
       become: true
