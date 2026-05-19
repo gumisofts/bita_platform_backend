@@ -3,6 +3,8 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from business.models import *
+from business.permissions import PermissionManager
+from business.signals import assign_default_permissions_to_role
 
 
 class CategoryInline(admin.TabularInline):
@@ -185,6 +187,7 @@ class RoleAdmin(admin.ModelAdmin):
     readonly_fields = ["id", "created_at", "updated_at"]
     raw_id_fields = ["business"]
     filter_horizontal = ["permissions"]
+    actions = ["reapply_role_permissions", "reapply_user_permissions"]
 
     fieldsets = (
         (None, {"fields": ("id", "role_name", "business")}),
@@ -211,6 +214,32 @@ class RoleAdmin(admin.ModelAdmin):
         return f"{count} employees"
 
     employee_count.short_description = "Employees"
+
+    @admin.action(description="Reapply default permissions to selected roles")
+    def reapply_role_permissions(self, request, queryset):
+        updated = 0
+        for role in queryset:
+            assign_default_permissions_to_role(role)
+            updated += 1
+        self.message_user(
+            request,
+            f"Successfully reapplied default permissions to {updated} role(s).",
+        )
+
+    @admin.action(description="Reapply role permissions to users of selected roles")
+    def reapply_user_permissions(self, request, queryset):
+        manager = PermissionManager()
+        user_count = 0
+
+        for role in queryset.prefetch_related("employees__user", "employees__branch"):
+            for employee in role.employees.select_related("user", "business", "branch"):
+                manager.assign_permissions_for_employee(employee)
+                user_count += 1
+
+        self.message_user(
+            request,
+            f"Successfully reapplied guardian permissions to {user_count} user(s).",
+        )
 
 
 @admin.register(Employee)

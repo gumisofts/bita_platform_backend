@@ -15,14 +15,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from business.models import Branch, Business
+from business.models import Branch, Business, biz_perm
 from business.permissions import (
-    AdditionalBusinessPermissionNames,
     BranchLevelPermission,
-    BusinessLevelPermission,
-    GuardianObjectPermissions,
+    accessible_branches,
+    filter_queryset_by_branch,
 )
 from core.utils import is_valid_uuid
+from finances.filters import BusinPaymentMethodFilter
 from inventories.models import SuppliedItem
 from orders.models import Order, OrderItem
 
@@ -42,60 +42,23 @@ class TransactionViewset(ListModelMixin, GenericViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     http_method_names = ["get", "post"]
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
 
     def get_queryset(self):
-        queryset = self.queryset
-        user = self.request.user
-
-        if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION.value[0]
-            + "_business",
-            self.request.business,
-        ):
-            queryset = queryset.filter(business=self.request.business)
-        elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION.value[0] + "_branch",
-            self.request.branch,
-        ):
-            queryset = queryset.filter(branch=self.request.branch)
-        else:
-            queryset = queryset.none()
-        return queryset
+        return filter_queryset_by_branch(self.queryset, self.request, "transaction")
 
 
 # CRUD for Business Payment Methods
 class BusinessPaymentMethodViewset(ModelViewSet):
     queryset = BusinessPaymentMethod.objects.all()
     serializer_class = BusinessPaymentMethodSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
+    filterset_class = BusinPaymentMethodFilter
 
     def get_queryset(self):
-
-        queryset = self.queryset
-
-        if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD.value[0]
-            + "_business",
-            self.request.business,
-        ):
-            queryset = queryset.filter(business=self.request.business)
-        elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD.value[0]
-            + "_branch",
-            self.request.branch,
-        ):
-            queryset = queryset.filter(branch=self.request.branch)
-        else:
-            queryset = queryset.none()
-
-        return queryset
+        return filter_queryset_by_branch(
+            self.queryset, self.request, "businesspaymentmethod"
+        )
 
 
 class PaymentMethodViewset(ListModelMixin, GenericViewSet):
@@ -109,35 +72,12 @@ class AccountViewset(ListModelMixin, GenericViewSet):
 
     queryset = BusinessPaymentMethod.objects.all()
     serializer_class = AccountSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions,
-    ]
+    permission_classes = [IsAuthenticated, BranchLevelPermission]
 
     def get_queryset(self):
-        queryset = self.queryset
-        business = self.request.business
-        branch = self.request.branch
-
-        print(business, branch)
-
-        if self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD.value[0]
-            + "_business",
-            business,
-        ):
-            queryset = queryset.filter(business=business)
-
-        elif self.request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_BUSINESS_PAYMENT_METHOD.value[0]
-            + "_branch",
-            branch,
-        ):
-            queryset = queryset.filter(branch=branch)
-        else:
-            queryset = queryset.none()
-
-        return queryset
+        return filter_queryset_by_branch(
+            self.queryset, self.request, "businesspaymentmethod"
+        )
 
 
 @api_view(["GET"])
@@ -201,15 +141,9 @@ def summary(request):
         )
 
     # Check permissions
-    if not request.user.has_perm(
-        AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION.value[0] + "_business",
-        business,
-    ) and not (
-        branch
-        and request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION.value[0] + "_branch",
-            branch,
-        )
+    if not branch or not request.user.has_perm(
+        biz_perm("transaction", "view", "branch"),
+        branch,
     ):
         return Response(
             {"detail": "You do not have permission to view financial summary."},
@@ -476,15 +410,9 @@ def reports(request):
     business, branch = _resolve_business_branch(request)
 
     # Permission check
-    if not request.user.has_perm(
-        AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION.value[0] + "_business",
-        business,
-    ) and not (
-        branch
-        and request.user.has_perm(
-            AdditionalBusinessPermissionNames.CAN_VIEW_TRANSACTION.value[0] + "_branch",
-            branch,
-        )
+    if not branch or not request.user.has_perm(
+        biz_perm("transaction", "view", "branch"),
+        branch,
     ):
         return Response(
             {"detail": "You do not have permission to view financial reports."},

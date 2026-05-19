@@ -120,10 +120,7 @@ class CategoryViewset(ListModelMixin, RetrieveModelMixin, GenericViewSet):
 class BusinessRoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BusinessLevelPermission]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -136,10 +133,7 @@ class BusinessRoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
 class BranchViewset(ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BusinessLevelPermission]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -191,10 +185,7 @@ class BusinessImageViewset(ListModelMixin, GenericViewSet):
 class EmployeeViewset(ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission,
-    ]  # TODO: Handle permissions
+    permission_classes = [IsAuthenticated, BusinessLevelPermission]
     lookup_field = "id"
 
     def get_queryset(self):
@@ -232,24 +223,15 @@ class EmployeeInvitationViewset(ModelViewSet):
             "business", "business__address", "role", "branch"
         )
         user = self.request.user
-        business_id = self.request.query_params.get("business_id")
+        business = self.request.business
 
-        if business_id and is_valid_uuid(business_id):
-            try:
-                user_business = Business.objects.filter(
-                    Q(owner=user) | Q(employees__user=user), id=business_id
-                ).first()
+        if not business:
+            return queryset.none()
 
-                if user_business:
-                    queryset = queryset.filter(business=business_id)
-                else:
-                    queryset = queryset.none()
-            except ValueError:
-                queryset = queryset.none()
-        else:
-            queryset = queryset.none()
+        if not user.has_perm("can_view_employeeinvitation_business", business):
+            return queryset.none()
 
-        return queryset
+        return queryset.filter(business=business)
 
     def get_permissions(self):
         """
@@ -381,36 +363,29 @@ class EmployeeInvitationViewset(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = request.user
         try:
-            # Check if user has access to the business
-            user_business = Business.objects.filter(
-                Q(owner=user) | Q(employees__user=user), id=business_id
-            ).first()
-
-            if not user_business:
-                return Response(
-                    {"error": "You don't have access to this business"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            # Get invitation statistics
-            invitations = EmployeeInvitation.objects.filter(business=business_id)
-            stats = {
-                "total": invitations.count(),
-                "pending": invitations.filter(status="pending").count(),
-                "accepted": invitations.filter(status="accepted").count(),
-                "rejected": invitations.filter(status="rejected").count(),
-                "expired": invitations.filter(status="expired").count(),
-                "revoked": invitations.filter(status="revoked").count(),
-            }
-
-            return Response(stats)
-
-        except ValueError:
+            business = Business.objects.get(id=business_id)
+        except Business.DoesNotExist:
             return Response(
-                {"error": "Invalid business_id"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Business not found"}, status=status.HTTP_404_NOT_FOUND
             )
+
+        if not request.user.has_perm("can_view_employeeinvitation_business", business):
+            return Response(
+                {"error": "You don't have access to this business"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        invitations = EmployeeInvitation.objects.filter(business=business)
+        stats = {
+            "total": invitations.count(),
+            "pending": invitations.filter(status="pending").count(),
+            "accepted": invitations.filter(status="accepted").count(),
+            "rejected": invitations.filter(status="rejected").count(),
+            "expired": invitations.filter(status="expired").count(),
+            "revoked": invitations.filter(status="revoked").count(),
+        }
+        return Response(stats)
 
     def create(self, request, *args, **kwargs):
         """
@@ -420,12 +395,9 @@ class EmployeeInvitationViewset(ModelViewSet):
         if serializer.is_valid():
             business = serializer.validated_data.get("business")
             if business:
-                user = request.user
-                user_business = Business.objects.filter(
-                    Q(owner=user) | Q(employees__user=user), id=business.id
-                ).first()
-
-                if not user_business:
+                if not request.user.has_perm(
+                    "can_add_employeeinvitation_business", business
+                ):
                     return Response(
                         {
                             "error": "You don't have permission to invite to this business"

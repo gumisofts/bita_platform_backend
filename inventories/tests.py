@@ -9,7 +9,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from business.models import (
-    AdditionalBusinessPermissionNames,
     Branch,
     Business,
     Category,
