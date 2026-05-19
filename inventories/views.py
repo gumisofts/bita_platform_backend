@@ -485,7 +485,11 @@ class ItemViewset(ModelViewSet):
 
 
 class SupplyViewset(
-    ListModelMixin, CreateModelMixin, RetrieveModelMixin, GenericViewSet
+    ListModelMixin,
+    CreateModelMixin,
+    RetrieveModelMixin,
+    UpdateModelMixin,
+    GenericViewSet,
 ):
     serializer_class = SupplySerializer
     permission_classes = [IsAuthenticated, BranchLevelPermission]
@@ -496,9 +500,22 @@ class SupplyViewset(
         return queryset.order_by("-updated_at")
 
     def get_serializer_class(self):
-        if self.action == "retrieve":
+        if self.action in ("retrieve", "update", "partial_update"):
             return SupplyDetailsSerializer
         return self.serializer_class
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        # Always respond with the full detail view (depth=1 nested objects)
+        return Response(
+            SupplyDetailsSerializer(
+                instance, context=self.get_serializer_context()
+            ).data
+        )
 
 
 class SupplierViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
@@ -606,7 +623,9 @@ class ItemVariantViewset(ModelViewSet):
         queryset = filter_queryset_by_branch(
             queryset, self.request, "itemvariant", branch_field="item__branch"
         )
-        return queryset.order_by(Lower("name"), "id")
+        return queryset.prefetch_related("supplied_items__supply").order_by(
+            Lower("name"), "id"
+        )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

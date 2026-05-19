@@ -11,12 +11,12 @@ order_completed = Signal()
 
 @receiver(order_completed)
 def on_order_completed(sender, instance, **kwargs):
-    from inventories.models import ItemVariant
+    from inventories.models import ItemVariant, SuppliedItem
 
     items = list(instance.items.select_related("variant").all())
     variant_ids = [item.variant_id for item in items]
 
-    # Lock the rows to prevent concurrent checkouts from over-selling
+    # Lock variant rows to prevent concurrent checkouts from over-selling
     locked_variants = {
         v.pk: v
         for v in ItemVariant.objects.select_for_update().filter(pk__in=variant_ids)
@@ -34,11 +34,26 @@ def on_order_completed(sender, instance, **kwargs):
     if insufficient:
         raise ValidationError("Insufficient stock for: " + "; ".join(insufficient))
 
-    # All checks passed — decrement inventory
+    # All checks passed — decrement variant totals and drain supplied batches FIFO
     for item in items:
         variant = locked_variants[item.variant_id]
         variant.quantity -= item.quantity
         variant.save()
+
+        # Drain SuppliedItem batches oldest-first so per-batch quantity stays accurate
+        remaining = item.quantity
+        batches = (
+            SuppliedItem.objects.select_for_update()
+            .filter(variant=variant, quantity__gt=0)
+            .order_by("created_at")
+        )
+        for batch in batches:
+            if remaining <= 0:
+                break
+            deduct = min(batch.quantity, remaining)
+            batch.quantity -= deduct
+            batch.save(update_fields=["quantity", "updated_at"])
+            remaining -= deduct
 
 
 @receiver(pre_save, sender=Order)
