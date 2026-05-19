@@ -123,7 +123,7 @@
         force: true
         src: "../{{ item.name }}.crt"
         dest: "{{ item.ssl_cert }}"
-      loop: "{{ api_domains }}"
+      loop: "{{ api_domains + (flower_domains | default([])) }}"
 
     - name: Sync SSL private keys
       become: true
@@ -132,7 +132,7 @@
         force: true
         src: "../{{ item.name }}.pem"
         dest: "{{ item.ssl_key }}"
-      loop: "{{ api_domains }}"
+      loop: "{{ api_domains + (flower_domains | default([])) }}"
 
     - name: Sync nginx configuration from template
       become: true
@@ -218,12 +218,21 @@
         dest: /etc/systemd/system/celery_beat.service
       register: celery_beat_service_file
 
+    - name: Copy flower.service
+      become: true
+      tags: [restart]
+      ansible.builtin.copy:
+        force: true
+        src: ../flower.service
+        dest: /etc/systemd/system/flower.service
+      register: flower_service_file
+
     - name: Reload systemd if any service file changed
       become: true
       tags: [restart]
       ansible.builtin.systemd_service:
         daemon_reload: true
-      when: celery_service_file.changed or celery_beat_service_file.changed
+      when: celery_service_file.changed or celery_beat_service_file.changed or flower_service_file.changed
 
     ##########################################################################
     # Restart services
@@ -250,5 +259,13 @@
       tags: [restart]
       ansible.builtin.systemd_service:
         name: celery_beat
+        state: restarted
+        daemon_reload: true
+
+    - name: Restart flower service
+      become: true
+      tags: [restart]
+      ansible.builtin.systemd_service:
+        name: flower
         state: restarted
         daemon_reload: true

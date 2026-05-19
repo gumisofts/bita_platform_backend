@@ -33,3 +33,16 @@ myhosts:
       - name: api.bita.et
         ssl_cert: /etc/ssl/certs/api.bita.et.crt
         ssl_key: /etc/ssl/certs/api.bita.et.pem
+
+    ##########################################################################
+    # Flower monitoring domains
+    # Each entry requires:
+    #   name      — the bare domain
+    #   ssl_cert  — absolute path to the PEM certificate on the server
+    #   ssl_key   — absolute path to the PEM private key on the server
+    ##########################################################################
+
+    flower_domains:
+      - name: flower.bita.et
+        ssl_cert: /etc/ssl/certs/flower.bita.et.crt
+        ssl_key: /etc/ssl/certs/flower.bita.et.pem

@@ -16,6 +16,7 @@ build==1.2.2.post1
 CacheControl==0.14.3
 cachetools==5.5.2
 celery==5.5.3
+flower==2.0.1
 certifi==2025.7.9
 cffi==1.17.1
 cfgv==3.4.0
