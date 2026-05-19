@@ -1,5 +1,5 @@
 from django.db.models import Max, Q
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_save, pre_delete, pre_save
 from django.dispatch import Signal, receiver
 from django.utils import timezone
 
@@ -9,23 +9,33 @@ item_variant_price_changed = Signal()
 item_variant_sold = Signal()
 
 
+@receiver(pre_save, sender=SuppliedItem)
+def capture_supplied_item_old_price(sender, instance, **kwargs):
+    """Store the pre-update selling_price so post_save can detect changes."""
+    if instance.pk:
+        instance._old_selling_price = (
+            SuppliedItem.objects.filter(pk=instance.pk)
+            .values_list("selling_price", flat=True)
+            .first()
+        )
+    else:
+        instance._old_selling_price = None
+
+
 @receiver(post_save, sender=SuppliedItem)
-def on_supplied_item_created(sender, instance, created, **kwargs):
+def on_supplied_item_saved(sender, instance, created, **kwargs):
     if created:
         instance.supply.no_of_items += 1
         instance.supply.total_cost += instance.quantity * instance.selling_price
         instance.supply.save()
         instance.variant.quantity += instance.quantity
         instance.variant.save()
-        max_price = SuppliedItem.objects.filter(
-            variant=instance.variant, quantity__gt=0
-        ).aggregate(max_selling_price=Max("selling_price"))["max_selling_price"]
-        if max_price != instance.variant.selling_price:
-            instance.variant.selling_price = max_price
-            instance.variant.save()
-            item_variant_price_changed.send(
-                sender=instance.variant.__class__, instance=instance.variant
-            )
+        return
+
+    # Fire price change notification when selling_price is updated on an existing supply.
+    old_price = getattr(instance, "_old_selling_price", None)
+    if old_price is not None and old_price != instance.selling_price:
+        item_variant_price_changed.send(sender=instance.__class__, instance=instance)
 
 
 @receiver(item_variant_sold)
@@ -41,18 +51,3 @@ def on_supplied_item_deleted(sender, instance, **kwargs):
     # in sequence while the variant hasn't been removed from the DB yet.
     instance.variant.quantity = max(0, instance.variant.quantity - instance.quantity)
     instance.variant.save()
-    # Recompute selling price from the *other* in-stock SuppliedItem rows for
-    # this variant. The previous version filtered by `variant=...` and then
-    # excluded `variant_id=...`, which is contradictory and always returned
-    # an empty queryset (max_price ended up None). Exclude by SuppliedItem PK.
-    max_price = (
-        SuppliedItem.objects.filter(variant=instance.variant, quantity__gt=0)
-        .exclude(pk=instance.pk)
-        .aggregate(max_selling_price=Max("selling_price"))["max_selling_price"]
-    )
-    if max_price != instance.variant.selling_price:
-        instance.variant.selling_price = max_price
-        instance.variant.save()
-        item_variant_price_changed.send(
-            sender=instance.variant.__class__, instance=instance.variant
-        )
