@@ -29,6 +29,43 @@ services:
       - config/app.env
     ports:
       - 8880:8000
+  celery:
+    build:
+      context: .
+    command: celery -A core.celery worker --loglevel=info
+    depends_on:
+      - pg
+      - redis
+    volumes:
+      - .:/app
+    env_file:
+      - config/app.env
+  celery-beat:
+    build:
+      context: .
+    command: celery -A core.celery beat --loglevel=info
+    depends_on:
+      - pg
+      - redis
+    volumes:
+      - .:/app
+    env_file:
+      - config/app.env
+  flower:
+    build:
+      context: .
+    command: celery -A core.celery flower --port=5555
+    depends_on:
+      - redis
+      - celery
+    volumes:
+      - .:/app
+    env_file:
+      - config/app.env
+    environment:
+      - FLOWER_BASIC_AUTH=${FLOWER_BASIC_AUTH:-admin:admin}
+    ports:
+      - 5556:5555
 volumes:
   medias:
   static:

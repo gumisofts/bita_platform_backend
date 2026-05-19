@@ -117,6 +117,14 @@
         src: ../celery_beat.service
         dest: /etc/systemd/system/celery_beat.service
 
+    - name: Copy flower.service
+      become: true
+      tags: [app]
+      ansible.builtin.copy:
+        force: true
+        src: ../flower.service
+        dest: /etc/systemd/system/flower.service
+
     ##########################################################################
     # Environment + initial data setup
     ##########################################################################
@@ -248,6 +256,15 @@
         state: started
         daemon_reload: true
 
+    - name: Enable flower service
+      become: true
+      tags: [app]
+      ansible.builtin.systemd_service:
+        name: flower
+        enabled: true
+        state: started
+        daemon_reload: true
+
     ##########################################################################
     # PgBouncer
     ##########################################################################
@@ -308,7 +325,7 @@
         force: true
         src: "../{{ item.name }}.crt"
         dest: "{{ item.ssl_cert }}"
-      loop: "{{ api_domains }}"
+      loop: "{{ api_domains + (flower_domains | default([])) }}"
 
     - name: Upload SSL private keys
       become: true
@@ -317,7 +334,7 @@
         force: true
         src: "../{{ item.name }}.pem"
         dest: "{{ item.ssl_key }}"
-      loop: "{{ api_domains }}"
+      loop: "{{ api_domains + (flower_domains | default([])) }}"
 
     - name: Upload nginx configuration
       become: true

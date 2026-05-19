@@ -1,0 +1,25 @@
+[Unit]
+Description=Celery Flower monitoring dashboard
+After=network.target
+
+[Service]
+Type=simple
+
+User=ubuntu
+Group=www-data
+
+RuntimeDirectory=/home/ubuntu/app
+WorkingDirectory=/home/ubuntu/app
+EnvironmentFile=/home/ubuntu/app/.env
+ExecStart=/home/ubuntu/app/env/bin/celery -A core.celery.celery flower \
+    --port=5555 \
+    --basic_auth=${FLOWER_BASIC_AUTH}
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=10
+PrivateTmp=true
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
