@@ -52,7 +52,8 @@ class PasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_email(self, value):
-        if not User.objects.filter(email=value).exists():
+        value = value.lower()
+        if not User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError(
                 "User with this email does not exist.",
             )
@@ -60,7 +61,7 @@ class PasswordResetSerializer(serializers.Serializer):
 
     def save(self):
         request = self.context.get("request")
-        user = User.objects.get(email=self.validated_data["email"])
+        user = User.objects.get(email__iexact=self.validated_data["email"])
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         reset_url = f"""
@@ -194,6 +195,12 @@ class RegisterSerializer(serializers.ModelSerializer):
             "is_email_verified",
             "is_phone_verified",
         )
+
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -335,10 +342,10 @@ class LoginWithGoogleIdTokenSerializer(serializers.Serializer):
         return userInfo
 
     def create(self, validated_data):
-        email = validated_data.pop("email")
+        email = validated_data.pop("email").lower()
         first_name = validated_data.pop("given_name")
         last_name = validated_data.pop("family_name")
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email__iexact=email).first()
 
         if not user:
 
@@ -621,6 +628,20 @@ class UserDeviceSerializer(serializers.ModelSerializer):
         exclude = []
         read_only_fields = ["is_active"]
 
+    def create(self, validated_data):
+        user = validated_data.pop("user")
+        device_id = validated_data.get("device_id", "unknown")
+        device, created = UserDevice.objects.get_or_create(
+            user=user,
+            device_id=device_id,
+            defaults=validated_data,
+        )
+        if not created:
+            for attr, value in validated_data.items():
+                setattr(device, attr, value)
+            device.save()
+        return device
+
 
 class PhoneChangeRequestSerializer(serializers.Serializer):
     new_phone = serializers.CharField(write_only=True)
@@ -696,10 +717,10 @@ class EmailChangeRequestSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        new_email = attrs.get("new_email")
+        new_email = attrs.get("new_email").lower()
         if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", new_email):
             raise serializers.ValidationError({"new_email": ["Invalid email"]})
-        if User.objects.filter(email=new_email).exists():
+        if User.objects.filter(email__iexact=new_email).exists():
             raise serializers.ValidationError({"new_email": ["Email already exists"]})
         attrs["new_email"] = new_email
         attrs["user"] = self.context.get("request").user

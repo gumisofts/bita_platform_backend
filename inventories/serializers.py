@@ -37,6 +37,8 @@ class PropertySerializer(serializers.ModelSerializer):
 
 
 class SuppliedItemSerializer(serializers.ModelSerializer):
+    supply_label = serializers.CharField(source="supply.label", read_only=True)
+
     class Meta:
         model = SuppliedItem
         exclude = []
@@ -44,13 +46,77 @@ class SuppliedItemSerializer(serializers.ModelSerializer):
 
 
 class SupplyDetailsSerializer(serializers.ModelSerializer):
-    supplied_items = SuppliedItemSerializer(many=True, read_only=True)
+    """Used for retrieve (read) and update (write) of a Supply with its items.
+
+    On write, pass ``supplied_items`` as a list of objects each containing the
+    ``id`` of an existing SuppliedItem (that belongs to this supply) plus any
+    fields you want to change.  Any supplied item not listed is left untouched.
+    When ``quantity`` changes the owning variant's total is adjusted by the delta.
+    """
+
+    class SuppliedItemUpdateSerializer(serializers.ModelSerializer):
+        id = serializers.UUIDField()
+
+        class Meta:
+            model = SuppliedItem
+            fields = [
+                "id",
+                "purchase_price",
+                "selling_price",
+                "expire_date",
+                "man_date",
+                "batch_number",
+                "product_number",
+                "is_returnable",
+                "is_visible_online",
+                "notify_below",
+                "quantity",
+            ]
+            # All fields are optional on update — only supplied ones are changed
+            extra_kwargs = {f: {"required": False} for f in fields if f != "id"}
+
+    supplied_items = SuppliedItemUpdateSerializer(many=True, required=False)
 
     class Meta:
         model = Supply
         exclude = []
         depth = 1
-        read_only_fields = ["id", "created_at", "updated_at", "supplied_items"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def to_representation(self, instance):
+        """On reads, replace the write-scoped supplied_items with the full serializer."""
+        data = super().to_representation(instance)
+        data["supplied_items"] = SuppliedItemSerializer(
+            instance.supplied_items.all(), many=True
+        ).data
+        return data
+
+    def update(self, instance, validated_data):
+        supplied_items_data = validated_data.pop("supplied_items", [])
+        instance = super().update(instance, validated_data)
+
+        for item_data in supplied_items_data:
+            item_id = item_data.pop("id")
+            try:
+                supplied_item = SuppliedItem.objects.select_related("variant").get(
+                    id=item_id, supply=instance
+                )
+            except SuppliedItem.DoesNotExist:
+                continue
+
+            # Keep ItemVariant.quantity in sync when a batch quantity is adjusted
+            if "quantity" in item_data:
+                delta = item_data["quantity"] - supplied_item.quantity
+                if delta != 0:
+                    variant = supplied_item.variant
+                    variant.quantity = max(0, variant.quantity + delta)
+                    variant.save(update_fields=["quantity", "updated_at"])
+
+            for field, value in item_data.items():
+                setattr(supplied_item, field, value)
+            supplied_item.save()
+
+        return instance
 
 
 class SupplySerializer(serializers.ModelSerializer):
@@ -168,8 +234,37 @@ class ItemVariantReadSerializer(serializers.ModelSerializer):
             exclude = ["item_variant"]
             read_only_fields = ["id", "created_at", "updated_at"]
 
+    class InnerSuppliedItemSerializer(serializers.ModelSerializer):
+        """Exposes per-supply-batch values so callers can track how price,
+        expiry, and quantity have changed across supply runs."""
+
+        supply_label = serializers.CharField(source="supply.label", read_only=True)
+        supply_date = serializers.DateTimeField(
+            source="supply.created_at", read_only=True
+        )
+
+        class Meta:
+            model = SuppliedItem
+            fields = [
+                "id",
+                "supply",
+                "supply_label",
+                "supply_date",
+                "purchase_price",
+                "selling_price",
+                "expire_date",
+                "man_date",
+                "batch_number",
+                "product_number",
+                "quantity",
+                "initial_quantity",
+                "created_at",
+            ]
+            read_only_fields = fields
+
     properties = InnerPropertySerializer(many=True, read_only=True)
     pricings = InnerPricingSerializer(many=True, read_only=True)
+    supplied_items = InnerSuppliedItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = ItemVariant

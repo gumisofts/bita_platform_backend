@@ -48,25 +48,27 @@ def on_restocked(sender, instance, created, **kwargs):
 # ── Price Change ─────────────────────────────────────────────────────────────
 @receiver(item_variant_price_changed)
 def on_price_changed(sender, instance, **kwargs):
-    """Notify when a variant's selling price changes."""
-    variant = instance
-    item = variant.item
+    """Notify when a supplied item's selling price is updated."""
+    supplied_item = instance
+    item = supplied_item.item
+    variant = supplied_item.variant
 
     create_notification(
         title="Price Change",
         message=(
             f"The price for {item.name} ({variant.name}) "
-            f"has been updated to {variant.selling_price}."
+            f"has been updated to {supplied_item.selling_price}."
         ),
         event_type="price_change",
-        business=item.business,
+        business=supplied_item.business,
         notification_type="info",
         data={
             "item_id": str(item.id),
             "variant_id": str(variant.id),
             "item_name": item.name,
             "variant_name": variant.name,
-            "new_price": str(variant.selling_price),
+            "new_price": str(supplied_item.selling_price),
+            "supply_id": str(supplied_item.supply_id),
         },
     )
 
