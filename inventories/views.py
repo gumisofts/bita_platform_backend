@@ -36,6 +36,7 @@ from .filters import (
     GroupFilter,
     ItemFilter,
     ItemVariantFilter,
+    SuppliedItemFilter,
     SupplierFilter,
     SupplyFilter,
 )
@@ -544,17 +545,46 @@ class SupplierViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
         return self.queryset.filter(business=business)
 
 
-class SupplyItemViewset(CreateModelMixin, GenericViewSet):
-    """SuppliedItem lives under a Supply; there is no dedicated branch-scoped
-    permission for it yet, so access is gated on the parent supply's branch
-    perms instead of an ``add_supplieditem_branch`` codename that doesn't exist.
+class SupplyItemViewset(
+    ListModelMixin,
+    CreateModelMixin,
+    RetrieveModelMixin,
+    UpdateModelMixin,
+    DestroyModelMixin,
+    GenericViewSet,
+):
+    """Dedicated CRUD endpoints for SuppliedItem (supply batches).
+
+    Access is gated on the parent Supply's branch permissions:
+      - list / retrieve  → ``can_view_supply_branch``
+      - create / update / delete → ``can_change_supply_branch``
+
+    Quantity changes on update and delete are automatically synced to the
+    owning ItemVariant so that total stock always stays consistent.
     """
 
     serializer_class = SuppliedItemSerializer
     permission_classes = [IsAuthenticated]
     queryset = SuppliedItem.objects.all()
+    filterset_class = SuppliedItemFilter
 
-    def _resolve_supply_branch(self):
+    def get_serializer_class(self):
+        if self.action in ("update", "partial_update"):
+            return SuppliedItemUpdateSerializer
+        return SuppliedItemSerializer
+
+    def get_queryset(self):
+        queryset = self.queryset.select_related("supply__branch", "variant", "item")
+        branches = accessible_branches(self.request, "supply")
+        queryset = queryset.filter(supply__branch__in=branches)
+        return queryset
+
+    # ------------------------------------------------------------------
+    # Permission helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_supply_branch_from_request(self):
+        """Resolve branch from the ``supply`` field in request body/params (for create)."""
         supply_id = self.request.data.get("supply") or self.request.query_params.get(
             "supply_id"
         )
@@ -563,23 +593,69 @@ class SupplyItemViewset(CreateModelMixin, GenericViewSet):
         supply = Supply.objects.filter(id=supply_id).select_related("branch").first()
         return supply.branch if supply else None
 
-    def get_queryset(self):
-        queryset = self.queryset
-        supply_id = self.request.query_params.get("supply_id")
-        if supply_id:
-            queryset = queryset.filter(supply=supply_id)
-        return queryset
+    def _check_change_perm(self, branch):
+        return self.request.user.has_perm(
+            biz_perm("supply", "change", "branch"), branch
+        )
+
+    # ------------------------------------------------------------------
+    # Actions
+    # ------------------------------------------------------------------
 
     def create(self, request, *args, **kwargs):
-        branch = self._resolve_supply_branch()
-        if branch and not request.user.has_perm(
-            biz_perm("supply", "change", "branch"), branch
-        ):
+        branch = self._resolve_supply_branch_from_request()
+        if branch and not self._check_change_perm(branch):
             return Response(
                 {"detail": "You do not have permission to add items to this supply."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+
+        branch = instance.supply.branch
+        if not self._check_change_perm(branch):
+            return Response(
+                {"detail": "You do not have permission to update this supplied item."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        old_quantity = instance.quantity
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+
+        new_quantity = serializer.validated_data.get("quantity", old_quantity)
+        delta = new_quantity - old_quantity
+
+        with transaction.atomic():
+            serializer.save()
+            if delta != 0:
+                variant = instance.variant
+                variant.quantity = max(0, variant.quantity + delta)
+                variant.save(update_fields=["quantity", "updated_at"])
+
+        return Response(SuppliedItemSerializer(instance).data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        branch = instance.supply.branch
+        if not self._check_change_perm(branch):
+            return Response(
+                {"detail": "You do not have permission to delete this supplied item."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        with transaction.atomic():
+            if instance.quantity > 0:
+                variant = instance.variant
+                variant.quantity = max(0, variant.quantity - instance.quantity)
+                variant.save(update_fields=["quantity", "updated_at"])
+            instance.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class PricingViewset(

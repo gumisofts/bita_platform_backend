@@ -123,3 +123,22 @@ class SupplyFilter(FilterSet):
     class Meta:
         model = Supply
         fields = ["label"]
+
+
+class SuppliedItemFilter(FilterSet):
+    supply = CharFilter(field_name="supply_id", lookup_expr="exact")
+    supply_id = CharFilter(field_name="supply_id", lookup_expr="exact")
+    branch = CharFilter(field_name="supply__branch_id", lookup_expr="exact")
+    branch_id = CharFilter(field_name="supply__branch_id", lookup_expr="exact")
+    business = CharFilter(field_name="business_id", lookup_expr="exact")
+    business_id = CharFilter(field_name="business_id", lookup_expr="exact")
+    variant = CharFilter(field_name="variant_id", lookup_expr="exact")
+    item = CharFilter(field_name="item_id", lookup_expr="exact")
+    expire_date = CharFilter(field_name="expire_date", lookup_expr="exact")
+    expire_date_before = CharFilter(field_name="expire_date", lookup_expr="lte")
+    expire_date_after = CharFilter(field_name="expire_date", lookup_expr="gte")
+    batch_number = CharFilter(field_name="batch_number", lookup_expr="icontains")
+
+    class Meta:
+        model = SuppliedItem
+        fields = ["supply", "variant", "item", "business"]

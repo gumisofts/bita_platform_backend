@@ -45,78 +45,46 @@ class SuppliedItemSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-class SupplyDetailsSerializer(serializers.ModelSerializer):
-    """Used for retrieve (read) and update (write) of a Supply with its items.
+class SuppliedItemUpdateSerializer(serializers.ModelSerializer):
+    """Used for PUT / PATCH on the dedicated supplied-items endpoint.
 
-    On write, pass ``supplied_items`` as a list of objects each containing the
-    ``id`` of an existing SuppliedItem (that belongs to this supply) plus any
-    fields you want to change.  Any supplied item not listed is left untouched.
-    When ``quantity`` changes the owning variant's total is adjusted by the delta.
+    Structural FK fields (supply, variant, item, business) are read-only to
+    prevent accidentally re-pointing a batch to a different supply or variant.
+    Quantity changes are synced to the owning ItemVariant by the viewset.
     """
 
-    class SuppliedItemUpdateSerializer(serializers.ModelSerializer):
-        id = serializers.UUIDField()
+    supply_label = serializers.CharField(source="supply.label", read_only=True)
 
-        class Meta:
-            model = SuppliedItem
-            fields = [
-                "id",
-                "purchase_price",
-                "selling_price",
-                "expire_date",
-                "man_date",
-                "batch_number",
-                "product_number",
-                "is_returnable",
-                "is_visible_online",
-                "notify_below",
-                "quantity",
-            ]
-            # All fields are optional on update — only supplied ones are changed
-            extra_kwargs = {f: {"required": False} for f in fields if f != "id"}
+    class Meta:
+        model = SuppliedItem
+        exclude = []
+        read_only_fields = [
+            "id",
+            "supply",
+            "variant",
+            "item",
+            "business",
+            "initial_quantity",
+            "created_at",
+            "updated_at",
+        ]
 
-    supplied_items = SuppliedItemUpdateSerializer(many=True, required=False)
+
+class SupplyDetailsSerializer(serializers.ModelSerializer):
+    """Used for retrieve and update of a Supply.
+
+    ``supplied_items`` is read-only here; use the dedicated
+    ``/inventories/supplied_items/`` endpoints to create, update or delete
+    individual batches.
+    """
+
+    supplied_items = SuppliedItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = Supply
         exclude = []
         depth = 1
         read_only_fields = ["id", "created_at", "updated_at"]
-
-    def to_representation(self, instance):
-        """On reads, replace the write-scoped supplied_items with the full serializer."""
-        data = super().to_representation(instance)
-        data["supplied_items"] = SuppliedItemSerializer(
-            instance.supplied_items.all(), many=True
-        ).data
-        return data
-
-    def update(self, instance, validated_data):
-        supplied_items_data = validated_data.pop("supplied_items", [])
-        instance = super().update(instance, validated_data)
-
-        for item_data in supplied_items_data:
-            item_id = item_data.pop("id")
-            try:
-                supplied_item = SuppliedItem.objects.select_related("variant").get(
-                    id=item_id, supply=instance
-                )
-            except SuppliedItem.DoesNotExist:
-                continue
-
-            # Keep ItemVariant.quantity in sync when a batch quantity is adjusted
-            if "quantity" in item_data:
-                delta = item_data["quantity"] - supplied_item.quantity
-                if delta != 0:
-                    variant = supplied_item.variant
-                    variant.quantity = max(0, variant.quantity + delta)
-                    variant.save(update_fields=["quantity", "updated_at"])
-
-            for field, value in item_data.items():
-                setattr(supplied_item, field, value)
-            supplied_item.save()
-
-        return instance
 
 
 class SupplySerializer(serializers.ModelSerializer):
