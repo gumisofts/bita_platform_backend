@@ -47,9 +47,7 @@ class OrderSerializer(ModelSerializer):
         return ", ".join([item.variant.item.name for item in obj.items.all()])
 
     def get_items_display_price(self, obj):
-        return sum(
-            [item.variant.selling_price * item.quantity for item in obj.items.all()]
-        )
+        return sum([item.price * item.quantity for item in obj.items.all()])
 
     class InternalOrderItemSerializer(ModelSerializer):
         price = serializers.DecimalField(
