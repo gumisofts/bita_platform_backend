@@ -103,9 +103,10 @@ class AccountViewset(ListModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated, BranchLevelPermission]
 
     def get_queryset(self):
-        return filter_queryset_by_branch(
+        queryset = filter_queryset_by_branch(
             self.queryset, self.request, "businesspaymentmethod"
         )
+        return queryset.filter(business=self.request.business)
 
 
 @api_view(["GET"])
@@ -713,7 +714,9 @@ def finance_report(request):
     }
 
     # --- By payment method breakdown ------------------------------------
-    pm_filter = Q(business=business, branch=branch)
+    pm_filter = Q(business=business, branch=branch) | Q(
+        business=business, branch__isnull=True
+    )
     if payment_method_ids:
         pm_filter &= Q(id__in=payment_method_ids)
 
