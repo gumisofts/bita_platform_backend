@@ -31,7 +31,13 @@ from business.permissions import (
     filter_queryset_by_branch,
 )
 
-from .filters import GroupFilter, ItemFilter, ItemVariantFilter, SupplierFilter
+from .filters import (
+    GroupFilter,
+    ItemFilter,
+    ItemVariantFilter,
+    SupplierFilter,
+    SupplyFilter,
+)
 from .models import *
 from .serializers import *
 
@@ -494,6 +500,7 @@ class SupplyViewset(
     serializer_class = SupplySerializer
     permission_classes = [IsAuthenticated, BranchLevelPermission]
     queryset = Supply.objects.all()
+    filterset_class = SupplyFilter
 
     def get_queryset(self):
         queryset = filter_queryset_by_branch(self.queryset, self.request, "supply")
