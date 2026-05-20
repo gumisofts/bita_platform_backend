@@ -63,6 +63,22 @@ class Transaction(BaseModel):
         DEBT = "DEBT", "Debt"
         REFUND = "REFUND", "Refund"
 
+    # Canonical sets used for income/expense aggregations across reports.
+    INCOME_TYPES = [
+        TransactionType.SALE,
+        TransactionType.SERVICE_REVENUE,
+        TransactionType.OTHER_INCOME,
+    ]
+    EXPENSE_TYPES = [
+        TransactionType.EXPENSE,
+        TransactionType.RENT,
+        TransactionType.SALARY,
+        TransactionType.UTILITY,
+        TransactionType.PURCHASE,
+        TransactionType.MAINTENANCE,
+        TransactionType.OTHER_EXPENSE,
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(
         "orders.Order",

@@ -210,19 +210,19 @@ def summary(request):
     total_assets = Decimal("0.00")
     for pm in payment_methods:
         pm_transactions = transactions.filter(payment_method=pm)
-        sale_refund_total = pm_transactions.filter(
+        income_refund_total = pm_transactions.filter(
             type__in=[
-                Transaction.TransactionType.SALE,
+                *Transaction.INCOME_TYPES,
                 Transaction.TransactionType.REFUND,
             ]
         ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
         expense_debt_total = pm_transactions.filter(
             type__in=[
-                Transaction.TransactionType.EXPENSE,
+                *Transaction.EXPENSE_TYPES,
                 Transaction.TransactionType.DEBT,
             ]
         ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
-        total_assets += sale_refund_total - expense_debt_total
+        total_assets += income_refund_total - expense_debt_total
 
     # Calculate total liabilities (sum of DEBT transactions' total_left_amount)
     total_liabilities = transactions.filter(
@@ -237,10 +237,10 @@ def summary(request):
         created_at__gte=current_month_start
     )
     monthly_income = current_month_transactions.filter(
-        type=Transaction.TransactionType.SALE
+        type__in=Transaction.INCOME_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     monthly_expense = current_month_transactions.filter(
-        type=Transaction.TransactionType.EXPENSE
+        type__in=Transaction.EXPENSE_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     monthly_cash_flow = monthly_income - monthly_expense
     monthly_profit = monthly_cash_flow  # Assuming profit = cash flow for now
@@ -255,34 +255,31 @@ def summary(request):
         created_at__gte=previous_month_start, created_at__lte=previous_month_end
     )
     previous_month_income = previous_month_transactions.filter(
-        type=Transaction.TransactionType.SALE
+        type__in=Transaction.INCOME_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     previous_month_expense = previous_month_transactions.filter(
-        type=Transaction.TransactionType.EXPENSE
+        type__in=Transaction.EXPENSE_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     previous_month_profit = previous_month_income - previous_month_expense
 
     # Year to date calculations
     ytd_transactions = transactions.filter(created_at__gte=year_start)
     year_to_date_income = ytd_transactions.filter(
-        type=Transaction.TransactionType.SALE
+        type__in=Transaction.INCOME_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     year_to_date_expense = ytd_transactions.filter(
-        type=Transaction.TransactionType.EXPENSE
+        type__in=Transaction.EXPENSE_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     year_to_date_profit = year_to_date_income - year_to_date_expense
 
-    # Pending receivables (SALE transactions with total_left_amount > 0)
+    # Pending receivables (income transactions with total_left_amount > 0)
     pending_receivables = transactions.filter(
-        type=Transaction.TransactionType.SALE, total_left_amount__gt=0
+        type__in=Transaction.INCOME_TYPES, total_left_amount__gt=0
     ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0.00")
 
-    # Pending payables (EXPENSE and DEBT transactions with total_left_amount > 0)
+    # Pending payables (all expense types and DEBT transactions with total_left_amount > 0)
     pending_payables = transactions.filter(
-        type__in=[
-            Transaction.TransactionType.EXPENSE,
-            Transaction.TransactionType.DEBT,
-        ],
+        type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT],
         total_left_amount__gt=0,
     ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0.00")
 
@@ -399,10 +396,10 @@ def _get_income_by_category(order_filter):
 def _get_expense_by_category(transaction_filter):
     """
     Aggregate expense transactions by their category field.
-    Transactions with no category are grouped under 'Other'.
+    All EXPENSE_TYPES are included; transactions with no category are grouped under 'Other'.
     """
     expense_transactions = Transaction.objects.filter(
-        transaction_filter, type=Transaction.TransactionType.EXPENSE
+        transaction_filter, type__in=Transaction.EXPENSE_TYPES
     ).values("category", "total_paid_amount")
 
     expense_by_category = defaultdict(Decimal)
@@ -673,9 +670,11 @@ def finance_report(request):
     )
     totals_by_type = {row["type"]: row["total"] or Decimal("0") for row in type_totals}
 
-    total_income = totals_by_type.get(Transaction.TransactionType.SALE, Decimal("0"))
-    total_expense = totals_by_type.get(
-        Transaction.TransactionType.EXPENSE, Decimal("0")
+    total_income = sum(
+        totals_by_type.get(t, Decimal("0")) for t in Transaction.INCOME_TYPES
+    )
+    total_expense = sum(
+        totals_by_type.get(t, Decimal("0")) for t in Transaction.EXPENSE_TYPES
     )
     total_refunds = totals_by_type.get(Transaction.TransactionType.REFUND, Decimal("0"))
     total_debt_issued = totals_by_type.get(
@@ -699,25 +698,20 @@ def finance_report(request):
         else Decimal("0.00")
     )
 
-    # Pending receivables (SALE with outstanding balance)
+    # Pending receivables (income transactions with outstanding balance)
     pending_receivables = transactions.filter(
-        type=Transaction.TransactionType.SALE, total_left_amount__gt=0
+        type__in=Transaction.INCOME_TYPES, total_left_amount__gt=0
     ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0")
-    # Pending payables (EXPENSE/DEBT with outstanding balance)
+    # Pending payables (all expense types and DEBT with outstanding balance)
     pending_payables = transactions.filter(
-        type__in=[
-            Transaction.TransactionType.EXPENSE,
-            Transaction.TransactionType.DEBT,
-        ],
+        type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT],
         total_left_amount__gt=0,
     ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0")
 
     # --- By transaction type breakdown ----------------------------------
     by_transaction_type = {
-        Transaction.TransactionType.SALE: total_income,
-        Transaction.TransactionType.EXPENSE: total_expense,
-        Transaction.TransactionType.REFUND: total_refunds,
-        Transaction.TransactionType.DEBT: total_debt_issued,
+        t: totals_by_type.get(t, Decimal("0"))
+        for t in Transaction.TransactionType.values
     }
 
     # --- By payment method breakdown ------------------------------------
@@ -731,10 +725,10 @@ def finance_report(request):
     by_payment_method = []
     for pm in payment_methods:
         pm_txs = transactions.filter(payment_method=pm)
-        pm_income = pm_txs.filter(type=Transaction.TransactionType.SALE).aggregate(
+        pm_income = pm_txs.filter(type__in=Transaction.INCOME_TYPES).aggregate(
             total=Sum("total_paid_amount")
         )["total"] or Decimal("0")
-        pm_expense = pm_txs.filter(type=Transaction.TransactionType.EXPENSE).aggregate(
+        pm_expense = pm_txs.filter(type__in=Transaction.EXPENSE_TYPES).aggregate(
             total=Sum("total_paid_amount")
         )["total"] or Decimal("0")
         pm_refunds = pm_txs.filter(type=Transaction.TransactionType.REFUND).aggregate(
@@ -816,9 +810,9 @@ def finance_report(request):
         d = row["day"]
         tx_type = row["type"]
         amount = row["total"] or Decimal("0")
-        if tx_type == Transaction.TransactionType.SALE:
+        if tx_type in Transaction.INCOME_TYPES:
             daily_map[d]["income"] += amount
-        elif tx_type == Transaction.TransactionType.EXPENSE:
+        elif tx_type in Transaction.EXPENSE_TYPES:
             daily_map[d]["expense"] += amount
         daily_map[d]["transaction_count"] += row["count"]
 
@@ -852,11 +846,11 @@ def finance_report(request):
     prev_totals_by_type = {
         row["type"]: row["total"] or Decimal("0") for row in prev_type_totals
     }
-    previous_income = prev_totals_by_type.get(
-        Transaction.TransactionType.SALE, Decimal("0")
+    previous_income = sum(
+        prev_totals_by_type.get(t, Decimal("0")) for t in Transaction.INCOME_TYPES
     )
-    previous_expense = prev_totals_by_type.get(
-        Transaction.TransactionType.EXPENSE, Decimal("0")
+    previous_expense = sum(
+        prev_totals_by_type.get(t, Decimal("0")) for t in Transaction.EXPENSE_TYPES
     )
     previous_net_profit = previous_income - previous_expense
 

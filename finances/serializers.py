@@ -111,26 +111,24 @@ class AccountSerializer(serializers.ModelSerializer):
             return 0  # Bank
 
     def get_balance(self, obj):
-        """Calculate balance from transactions."""
+        """Calculate balance: all income types + REFUND add; all expense types + DEBT subtract."""
         transactions = Transaction.objects.filter(payment_method=obj)
 
-        # Calculate balance: SALE and REFUND add, EXPENSE and DEBT subtract
-        sale_refund_total = transactions.filter(
+        income_refund_total = transactions.filter(
             type__in=[
-                Transaction.TransactionType.SALE,
+                *Transaction.INCOME_TYPES,
                 Transaction.TransactionType.REFUND,
             ]
         ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
 
         expense_debt_total = transactions.filter(
             type__in=[
-                Transaction.TransactionType.EXPENSE,
+                *Transaction.EXPENSE_TYPES,
                 Transaction.TransactionType.DEBT,
             ]
         ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
 
-        balance = sale_refund_total - expense_debt_total
-        return float(balance)
+        return float(income_refund_total - expense_debt_total)
 
     def get_account_number(self, obj):
         """Return identifier as account number."""
