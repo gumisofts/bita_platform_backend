@@ -334,7 +334,9 @@ def filter_queryset_by_branch(
     branches = accessible_branches(request, model_name, action)
     if not branches.exists():
         return queryset.none()
-    return queryset.filter(**{f"{branch_field}__in": branches})
+    return queryset.filter(
+        Q(**{f"{branch_field}__in": branches}) | Q(**{f"{branch_field}__isnull": True})
+    )
 
 
 class PermissionManager:
