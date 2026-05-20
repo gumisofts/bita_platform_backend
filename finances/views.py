@@ -4,7 +4,8 @@ from datetime import timezone as dt_timezone
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Avg, Count, Q, Sum
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework import status, viewsets
@@ -30,6 +31,7 @@ from .models import BusinessPaymentMethod, PaymentMethod, Transaction
 from .serializers import (
     AccountSerializer,
     BusinessPaymentMethodSerializer,
+    FinanceReportSerializer,
     FinanceSummarySerializer,
     PaymentMethodSerializer,
     PaymentVerificationSerializer,
@@ -533,6 +535,348 @@ def reports(request):
     }
 
     serializer = ReportsSerializer(report_data)
+    return Response(serializer.data)
+
+
+@api_view(["GET"])
+def finance_report(request):
+    """
+    GET /finances/finance-report/
+
+    Comprehensive financial report with flexible date-range and dimension filters.
+
+    Query params:
+      - business / business_id  (required)
+      - branch / branch_id      (optional)
+      - start_date              YYYY-MM-DD (required)
+      - end_date                YYYY-MM-DD, not inclusive (required)
+      - payment_method          Comma-separated BusinessPaymentMethod UUID(s) (optional)
+      - transaction_type        Comma-separated: SALE,EXPENSE,DEBT,REFUND (optional)
+
+    Response includes:
+      - Core metrics: income, expense, refunds, debt, net profit, margin
+      - Transaction counts and averages
+      - Pending receivables / payables
+      - Breakdowns by transaction type, payment method, category
+      - Order summary
+      - Daily trend data for charts
+      - Comparison against the previous equivalent period
+    """
+    business, branch = _resolve_business_branch(request)
+
+    if not branch or not request.user.has_perm(
+        biz_perm("transaction", "view", "branch"), branch
+    ):
+        return Response(
+            {"detail": "You do not have permission to view financial reports."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # --- Parse date range -----------------------------------------------
+    start_date_param = request.query_params.get("start_date")
+    end_date_param = request.query_params.get("end_date")
+
+    if not start_date_param or not end_date_param:
+        raise ValidationError(
+            {"detail": "Both start_date and end_date are required (YYYY-MM-DD)."}
+        )
+
+    try:
+        start_date = datetime.strptime(start_date_param, "%Y-%m-%d").replace(
+            tzinfo=dt_timezone.utc
+        )
+    except ValueError:
+        raise ValidationError({"detail": "Invalid start_date format. Use YYYY-MM-DD."})
+
+    try:
+        end_date = datetime.strptime(end_date_param, "%Y-%m-%d").replace(
+            tzinfo=dt_timezone.utc
+        )
+    except ValueError:
+        raise ValidationError({"detail": "Invalid end_date format. Use YYYY-MM-DD."})
+
+    if end_date <= start_date:
+        raise ValidationError({"detail": "end_date must be after start_date."})
+
+    # --- Parse optional filters -----------------------------------------
+    # payment_method: comma-separated BusinessPaymentMethod UUIDs
+    payment_method_param = request.query_params.get("payment_method")
+    payment_method_ids = None
+    if payment_method_param:
+        raw_ids = [
+            pid.strip() for pid in payment_method_param.split(",") if pid.strip()
+        ]
+        valid_ids = [pid for pid in raw_ids if is_valid_uuid(pid)]
+        if valid_ids:
+            payment_method_ids = valid_ids
+
+    # transaction_type: comma-separated SALE|EXPENSE|DEBT|REFUND
+    transaction_type_param = request.query_params.get("transaction_type")
+    transaction_types = None
+    if transaction_type_param:
+        valid_tx_types = {c[0] for c in Transaction.TransactionType.choices}
+        transaction_types = [
+            t.strip().upper()
+            for t in transaction_type_param.split(",")
+            if t.strip().upper() in valid_tx_types
+        ] or None
+
+    # --- Build base queryset filter -------------------------------------
+    # end_date is NOT inclusive → use __lt
+    base_filter = Q(business=business, branch=branch) & Q(
+        created_at__gte=start_date, created_at__lt=end_date
+    )
+    if payment_method_ids:
+        base_filter &= Q(payment_method__in=payment_method_ids)
+    if transaction_types:
+        base_filter &= Q(type__in=transaction_types)
+
+    transactions = Transaction.objects.filter(base_filter)
+
+    # --- Core summary metrics -------------------------------------------
+    type_totals = (
+        Transaction.objects.filter(
+            Q(business=business, branch=branch)
+            & Q(created_at__gte=start_date, created_at__lt=end_date)
+            & (Q(payment_method__in=payment_method_ids) if payment_method_ids else Q())
+        )
+        .values("type")
+        .annotate(total=Sum("total_paid_amount"))
+    )
+    totals_by_type = {row["type"]: row["total"] or Decimal("0") for row in type_totals}
+
+    total_income = totals_by_type.get(Transaction.TransactionType.SALE, Decimal("0"))
+    total_expense = totals_by_type.get(
+        Transaction.TransactionType.EXPENSE, Decimal("0")
+    )
+    total_refunds = totals_by_type.get(Transaction.TransactionType.REFUND, Decimal("0"))
+    total_debt_issued = totals_by_type.get(
+        Transaction.TransactionType.DEBT, Decimal("0")
+    )
+
+    net_profit = total_income - total_expense
+    profit_margin = (
+        (net_profit / total_income * 100).quantize(Decimal("0.01"))
+        if total_income > 0
+        else Decimal("0.00")
+    )
+
+    transaction_count = transactions.count()
+    total_amount = transactions.aggregate(total=Sum("total_paid_amount"))[
+        "total"
+    ] or Decimal("0")
+    avg_transaction_value = (
+        (total_amount / transaction_count).quantize(Decimal("0.01"))
+        if transaction_count > 0
+        else Decimal("0.00")
+    )
+
+    # Pending receivables (SALE with outstanding balance)
+    pending_receivables = transactions.filter(
+        type=Transaction.TransactionType.SALE, total_left_amount__gt=0
+    ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0")
+    # Pending payables (EXPENSE/DEBT with outstanding balance)
+    pending_payables = transactions.filter(
+        type__in=[
+            Transaction.TransactionType.EXPENSE,
+            Transaction.TransactionType.DEBT,
+        ],
+        total_left_amount__gt=0,
+    ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0")
+
+    # --- By transaction type breakdown ----------------------------------
+    by_transaction_type = {
+        Transaction.TransactionType.SALE: total_income,
+        Transaction.TransactionType.EXPENSE: total_expense,
+        Transaction.TransactionType.REFUND: total_refunds,
+        Transaction.TransactionType.DEBT: total_debt_issued,
+    }
+
+    # --- By payment method breakdown ------------------------------------
+    pm_filter = Q(business=business, branch=branch)
+    if payment_method_ids:
+        pm_filter &= Q(id__in=payment_method_ids)
+
+    payment_methods = BusinessPaymentMethod.objects.filter(pm_filter).select_related(
+        "payment"
+    )
+    by_payment_method = []
+    for pm in payment_methods:
+        pm_txs = transactions.filter(payment_method=pm)
+        pm_income = pm_txs.filter(type=Transaction.TransactionType.SALE).aggregate(
+            total=Sum("total_paid_amount")
+        )["total"] or Decimal("0")
+        pm_expense = pm_txs.filter(type=Transaction.TransactionType.EXPENSE).aggregate(
+            total=Sum("total_paid_amount")
+        )["total"] or Decimal("0")
+        pm_refunds = pm_txs.filter(type=Transaction.TransactionType.REFUND).aggregate(
+            total=Sum("total_paid_amount")
+        )["total"] or Decimal("0")
+        by_payment_method.append(
+            {
+                "payment_method_id": pm.id,
+                "payment_method_name": pm.display_name,
+                "total_income": pm_income,
+                "total_expense": pm_expense,
+                "total_refunds": pm_refunds,
+                "net_balance": pm_income - pm_expense,
+                "transaction_count": pm_txs.count(),
+            }
+        )
+
+    # --- Income by category (from completed order items) ----------------
+    order_filter = Q(
+        order__business=business,
+        order__branch=branch,
+        order__status__in=[
+            Order.StatusChoices.COMPLETED,
+            Order.StatusChoices.PAID,
+            Order.StatusChoices.PARTIALLY_PAID,
+            Order.StatusChoices.DELIVERED,
+        ],
+        order__created_at__gte=start_date,
+        order__created_at__lt=end_date,
+    )
+    if payment_method_ids:
+        order_filter &= Q(order__payment_method__in=payment_method_ids)
+
+    income_by_category = _get_income_by_category(order_filter)
+    income_by_category = dict(
+        sorted(income_by_category.items(), key=lambda x: x[1], reverse=True)
+    )
+
+    # --- Expense by category (from expense transactions) ----------------
+    expense_cat_filter = Q(business=business, branch=branch) & Q(
+        created_at__gte=start_date, created_at__lt=end_date
+    )
+    if payment_method_ids:
+        expense_cat_filter &= Q(payment_method__in=payment_method_ids)
+
+    expense_by_category = _get_expense_by_category(expense_cat_filter)
+    expense_by_category = dict(
+        sorted(expense_by_category.items(), key=lambda x: x[1], reverse=True)
+    )
+
+    # --- Order summary --------------------------------------------------
+    order_qs_filter = Q(business=business, branch=branch) & Q(
+        created_at__gte=start_date, created_at__lt=end_date
+    )
+    if payment_method_ids:
+        order_qs_filter &= Q(payment_method__in=payment_method_ids)
+
+    orders = Order.objects.filter(order_qs_filter)
+    total_orders = orders.count()
+    completed_orders = orders.filter(status=Order.StatusChoices.COMPLETED).count()
+    pending_orders = orders.filter(status=Order.StatusChoices.PENDING).count()
+    cancelled_orders = orders.filter(status=Order.StatusChoices.CANCELLED).count()
+
+    # --- Daily breakdown ------------------------------------------------
+    daily_qs = (
+        transactions.annotate(day=TruncDate("created_at"))
+        .values("day", "type")
+        .annotate(total=Sum("total_paid_amount"), count=Count("id"))
+        .order_by("day")
+    )
+    daily_map = defaultdict(
+        lambda: {
+            "income": Decimal("0"),
+            "expense": Decimal("0"),
+            "transaction_count": 0,
+        }
+    )
+    for row in daily_qs:
+        d = row["day"]
+        tx_type = row["type"]
+        amount = row["total"] or Decimal("0")
+        if tx_type == Transaction.TransactionType.SALE:
+            daily_map[d]["income"] += amount
+        elif tx_type == Transaction.TransactionType.EXPENSE:
+            daily_map[d]["expense"] += amount
+        daily_map[d]["transaction_count"] += row["count"]
+
+    daily_breakdown = [
+        {
+            "date": d,
+            "income": data["income"],
+            "expense": data["expense"],
+            "net": data["income"] - data["expense"],
+            "transaction_count": data["transaction_count"],
+        }
+        for d, data in sorted(daily_map.items())
+    ]
+
+    # --- Period comparison (previous equivalent period) -----------------
+    period_duration = end_date - start_date
+    prev_end = start_date
+    prev_start = start_date - period_duration
+
+    prev_filter = Q(business=business, branch=branch) & Q(
+        created_at__gte=prev_start, created_at__lt=prev_end
+    )
+    if payment_method_ids:
+        prev_filter &= Q(payment_method__in=payment_method_ids)
+
+    prev_type_totals = (
+        Transaction.objects.filter(prev_filter)
+        .values("type")
+        .annotate(total=Sum("total_paid_amount"))
+    )
+    prev_totals_by_type = {
+        row["type"]: row["total"] or Decimal("0") for row in prev_type_totals
+    }
+    previous_income = prev_totals_by_type.get(
+        Transaction.TransactionType.SALE, Decimal("0")
+    )
+    previous_expense = prev_totals_by_type.get(
+        Transaction.TransactionType.EXPENSE, Decimal("0")
+    )
+    previous_net_profit = previous_income - previous_expense
+
+    def _pct_change(current, previous):
+        if previous > 0:
+            return ((current - previous) / previous * 100).quantize(Decimal("0.01"))
+        return Decimal("0.00")
+
+    period_comparison = {
+        "previous_start": prev_start,
+        "previous_end": prev_end,
+        "previous_income": previous_income,
+        "previous_expense": previous_expense,
+        "previous_net_profit": previous_net_profit,
+        "income_change": total_income - previous_income,
+        "expense_change": total_expense - previous_expense,
+        "profit_change": net_profit - previous_net_profit,
+        "income_change_pct": _pct_change(total_income, previous_income),
+        "expense_change_pct": _pct_change(total_expense, previous_expense),
+        "profit_change_pct": _pct_change(net_profit, previous_net_profit),
+    }
+
+    report_data = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "total_refunds": total_refunds,
+        "total_debt_issued": total_debt_issued,
+        "net_profit": net_profit,
+        "profit_margin": profit_margin,
+        "transaction_count": transaction_count,
+        "avg_transaction_value": avg_transaction_value,
+        "pending_receivables": pending_receivables,
+        "pending_payables": pending_payables,
+        "by_transaction_type": by_transaction_type,
+        "by_payment_method": by_payment_method,
+        "income_by_category": income_by_category,
+        "expense_by_category": expense_by_category,
+        "total_orders": total_orders,
+        "completed_orders": completed_orders,
+        "pending_orders": pending_orders,
+        "cancelled_orders": cancelled_orders,
+        "daily_breakdown": daily_breakdown,
+        "period_comparison": period_comparison,
+    }
+
+    serializer = FinanceReportSerializer(report_data)
     return Response(serializer.data)
 
 

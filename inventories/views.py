@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
 from rest_framework import status
 from rest_framework.decorators import action
@@ -608,11 +609,50 @@ class GroupViewset(ModelViewSet):
         return queryset.none()
 
 
+_VARIANT_LIST_SCHEMA = extend_schema(
+    summary="List item variants",
+    description=(
+        "Returns a paginated list of item variants. Supports filtering by branch, "
+        "business, item, name, SKU, selling price range, and inventory status."
+    ),
+    parameters=[
+        OpenApiParameter(
+            name="low_stock",
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            description=(
+                "Filter by low-stock status. Pass `true` to return only variants "
+                "whose total supplied quantity (sum of all SuppliedItem.quantity) "
+                "is at or below the parent item's `notify_below` threshold, or "
+                "variants with no supplied items at all. Pass `false` to return "
+                "only well-stocked variants."
+            ),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="expiring",
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            description=(
+                "Filter by expiry status. Pass `true` to return only variants "
+                "that have at least one SuppliedItem with a non-null `expire_date` "
+                "and remaining `quantity > 0`. Pass `false` to exclude such variants."
+            ),
+            required=False,
+        ),
+    ],
+)
+
+
 class ItemVariantViewset(ModelViewSet):
     queryset = ItemVariant.objects.all()
     serializer_class = ItemVariantSerializer
     permission_classes = [IsAuthenticated, BranchLevelPermission]
     filterset_class = ItemVariantFilter
+
+    @_VARIANT_LIST_SCHEMA
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def get_serializer_class(self):
         if self.action == "retrieve":

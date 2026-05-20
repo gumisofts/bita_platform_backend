@@ -1,4 +1,6 @@
+from django.db.models import F, Q, Sum
 from django_filters import (
+    BooleanFilter,
     CharFilter,
     FilterSet,
     ModelChoiceFilter,
@@ -50,10 +52,42 @@ class ItemVariantFilter(FilterSet):
     branch_id = CharFilter(field_name="item__branch_id", lookup_expr="exact")
     business = CharFilter(field_name="item__business_id", lookup_expr="exact")
     business_id = CharFilter(field_name="item__business_id", lookup_expr="exact")
+    low_stock = BooleanFilter(method="filter_low_stock")
+    expiring = BooleanFilter(method="filter_expiring")
 
     class Meta:
         model = ItemVariant
         fields = ["name", "item", "selling_price", "sku"]
+
+    def filter_low_stock(self, queryset, name, value):
+        """
+        When value=True: variants whose total supplied quantity (sum of all
+        SuppliedItem.quantity for that variant) is <= item.notify_below.
+        When value=False: exclude those variants.
+        """
+        annotated = queryset.annotate(
+            total_supplied_qty=Sum("supplied_items__quantity")
+        )
+        condition = Q(total_supplied_qty__lte=F("item__notify_below")) | Q(
+            total_supplied_qty__isnull=True
+        )
+        if value:
+            return annotated.filter(condition)
+        return annotated.exclude(condition)
+
+    def filter_expiring(self, queryset, name, value):
+        """
+        When value=True: variants that have at least one SuppliedItem with a
+        non-null expire_date and quantity > 0.
+        When value=False: exclude those variants.
+        """
+        has_expiring = Q(
+            supplied_items__expire_date__isnull=False,
+            supplied_items__quantity__gt=0,
+        )
+        if value:
+            return queryset.filter(has_expiring).distinct()
+        return queryset.exclude(id__in=queryset.filter(has_expiring).values("id"))
 
 
 class GroupFilter(FilterSet):
