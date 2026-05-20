@@ -39,15 +39,11 @@ class OrderSerializer(ModelSerializer):
     customer_name = serializers.CharField(read_only=True, source="customer.full_name")
     employee_name = serializers.CharField(read_only=True, source="employee.full_name")
     items_display_name = serializers.SerializerMethodField()
-    items_display_price = serializers.SerializerMethodField()
     business = serializers.HiddenField(default=CurrentBusinessDefault())
     branch = serializers.HiddenField(default=CurrentBranchDefault())
 
     def get_items_display_name(self, obj):
         return ", ".join([item.variant.item.name for item in obj.items.all()])
-
-    def get_items_display_price(self, obj):
-        return sum([item.price * item.quantity for item in obj.items.all()])
 
     class InternalOrderItemSerializer(ModelSerializer):
         price = serializers.DecimalField(
