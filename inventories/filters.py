@@ -12,10 +12,10 @@ from .models import *
 
 
 class ItemFilter(FilterSet):
-    branch = CharFilter(field_name="branch_id", lookup_expr="iexact")
-    branch_id = CharFilter(field_name="branch_id", lookup_expr="iexact")
-    business = CharFilter(field_name="business_id", lookup_expr="iexact")
-    business_id = CharFilter(field_name="business_id", lookup_expr="iexact")
+    branch = CharFilter(field_name="branch_id", lookup_expr="exact")
+    branch_id = CharFilter(field_name="branch_id", lookup_expr="exact")
+    business = CharFilter(field_name="business_id", lookup_expr="exact")
+    business_id = CharFilter(field_name="business_id", lookup_expr="exact")
 
     class Meta:
         model = Item
@@ -46,10 +46,10 @@ class ItemVariantFilter(FilterSet):
     item__categories = ModelChoiceFilter(
         field_name="item__categories", queryset=Category.objects.all()
     )
-    branch = CharFilter(field_name="item__branch_id", lookup_expr="iexact")
-    branch_id = CharFilter(field_name="item__branch_id", lookup_expr="iexact")
-    business = CharFilter(field_name="item__business_id", lookup_expr="iexact")
-    business_id = CharFilter(field_name="item__business_id", lookup_expr="iexact")
+    branch = CharFilter(field_name="item__branch_id", lookup_expr="exact")
+    branch_id = CharFilter(field_name="item__branch_id", lookup_expr="exact")
+    business = CharFilter(field_name="item__business_id", lookup_expr="exact")
+    business_id = CharFilter(field_name="item__business_id", lookup_expr="exact")
 
     class Meta:
         model = ItemVariant
@@ -59,8 +59,8 @@ class ItemVariantFilter(FilterSet):
 class GroupFilter(FilterSet):
     name = CharFilter(field_name="name", lookup_expr="icontains")
     description = CharFilter(field_name="description", lookup_expr="icontains")
-    business = CharFilter(field_name="business_id", lookup_expr="iexact")
-    business_id = CharFilter(field_name="business_id", lookup_expr="iexact")
+    business = CharFilter(field_name="business_id", lookup_expr="exact")
+    business_id = CharFilter(field_name="business_id", lookup_expr="exact")
 
     class Meta:
         model = Group
@@ -71,8 +71,8 @@ class SupplierFilter(FilterSet):
     email = CharFilter(field_name="email", lookup_expr="icontains")
     phone_number = CharFilter(field_name="phone_number", lookup_expr="icontains")
     name = CharFilter(field_name="name", lookup_expr="icontains")
-    business = CharFilter(field_name="business_id", lookup_expr="iexact")
-    business_id = CharFilter(field_name="business_id", lookup_expr="iexact")
+    business = CharFilter(field_name="business_id", lookup_expr="exact")
+    business_id = CharFilter(field_name="business_id", lookup_expr="exact")
 
     class Meta:
         model = Supplier
@@ -81,10 +81,10 @@ class SupplierFilter(FilterSet):
 
 class SupplyFilter(FilterSet):
     label = CharFilter(field_name="label", lookup_expr="icontains")
-    branch = CharFilter(field_name="branch_id", lookup_expr="iexact")
-    branch_id = CharFilter(field_name="branch_id", lookup_expr="iexact")
-    business = CharFilter(field_name="business_id", lookup_expr="iexact")
-    business_id = CharFilter(field_name="business_id", lookup_expr="iexact")
+    branch = CharFilter(field_name="branch_id", lookup_expr="exact")
+    branch_id = CharFilter(field_name="branch_id", lookup_expr="exact")
+    business = CharFilter(field_name="business_id", lookup_expr="exact")
+    business_id = CharFilter(field_name="business_id", lookup_expr="exact")
 
     class Meta:
         model = Supply
