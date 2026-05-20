@@ -23,7 +23,6 @@ from business.permissions import (
     filter_queryset_by_branch,
 )
 from core.utils import is_valid_uuid
-from finances.filters import BusinessPaymentMethodFilter
 from inventories.models import SuppliedItem
 from orders.models import Order, OrderItem
 
@@ -60,9 +59,6 @@ class TransactionViewset(
     def perform_create(self, serializer):
         branch = serializer.validated_data.get("branch")
         business = serializer.validated_data.get("business")
-
-        print(branch, business)
-
         # Infer business from branch when not supplied explicitly.
         if branch and not business:
             business = branch.business
@@ -83,7 +79,6 @@ class BusinessPaymentMethodViewset(ModelViewSet):
     queryset = BusinessPaymentMethod.objects.all()
     serializer_class = BusinessPaymentMethodSerializer
     permission_classes = [IsAuthenticated, BranchLevelPermission]
-    filterset_class = BusinessPaymentMethodFilter
 
     def get_queryset(self):
         return filter_queryset_by_branch(
