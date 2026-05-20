@@ -60,6 +60,13 @@ class OrderItem(BaseModel):
         on_delete=models.CASCADE,
         related_name="items",
     )
+    supplied_item = models.ForeignKey(
+        "inventories.SuppliedItem",
+        on_delete=models.CASCADE,
+        related_name="items",
+        null=True,
+        blank=True,
+    )
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
