@@ -45,8 +45,21 @@ class PaymentMethod(BaseModel):
 
 class Transaction(BaseModel):
     class TransactionType(models.TextChoices):
+        # Income types
         SALE = "SALE", "Sale"
+        SERVICE_REVENUE = "SERVICE_REVENUE", "Service Revenue"
+        OTHER_INCOME = "OTHER_INCOME", "Other Income"
+
+        # Expense types
         EXPENSE = "EXPENSE", "Expense"
+        RENT = "RENT", "Rent"
+        SALARY = "SALARY", "Salary"
+        UTILITY = "UTILITY", "Utility"
+        PURCHASE = "PURCHASE", "Purchase"
+        MAINTENANCE = "MAINTENANCE", "Maintenance"
+        OTHER_EXPENSE = "OTHER_EXPENSE", "Other Expense"
+
+        # Other
         DEBT = "DEBT", "Debt"
         REFUND = "REFUND", "Refund"
 

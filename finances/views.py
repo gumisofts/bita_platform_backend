@@ -61,6 +61,8 @@ class TransactionViewset(
         branch = serializer.validated_data.get("branch")
         business = serializer.validated_data.get("business")
 
+        print(branch, business)
+
         # Infer business from branch when not supplied explicitly.
         if branch and not business:
             business = branch.business
