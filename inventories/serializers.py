@@ -233,6 +233,12 @@ class ItemVariantReadSerializer(serializers.ModelSerializer):
     properties = InnerPropertySerializer(many=True, read_only=True)
     pricings = InnerPricingSerializer(many=True, read_only=True)
     supplied_items = InnerSuppliedItemSerializer(many=True, read_only=True)
+    quantity = serializers.SerializerMethodField()
+
+    def get_quantity(self, obj):
+        return sum(
+            [supplied_item.quantity for supplied_item in obj.supplied_items.all()]
+        )
 
     class Meta:
         model = ItemVariant
