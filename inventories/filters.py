@@ -2,9 +2,11 @@ from django.db.models import F, Q, Sum
 from django_filters import (
     BooleanFilter,
     CharFilter,
+    DateFilter,
     FilterSet,
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
+    NumberFilter,
     RangeFilter,
 )
 
@@ -54,6 +56,8 @@ class ItemVariantFilter(FilterSet):
     business_id = CharFilter(field_name="item__business_id", lookup_expr="exact")
     low_stock = BooleanFilter(method="filter_low_stock")
     expiring = BooleanFilter(method="filter_expiring")
+    quantity_lte = NumberFilter(method="filter_quantity_lte")
+    expire_date_lte = DateFilter(method="filter_expire_date_lte")
 
     class Meta:
         model = ItemVariant
@@ -88,6 +92,25 @@ class ItemVariantFilter(FilterSet):
         if value:
             return queryset.filter(has_expiring).distinct()
         return queryset.exclude(id__in=queryset.filter(has_expiring).values("id"))
+
+    def filter_quantity_lte(self, queryset, name, value):
+        """
+        Variants whose total supplied quantity (sum of all SuppliedItem.quantity)
+        is <= value, including variants with no supplied items (treated as 0).
+        """
+        return queryset.annotate(
+            total_supplied_qty=Sum("supplied_items__quantity")
+        ).filter(Q(total_supplied_qty__lte=value) | Q(total_supplied_qty__isnull=True))
+
+    def filter_expire_date_lte(self, queryset, name, value):
+        """
+        Variants that have at least one SuppliedItem whose expire_date is on or
+        before the given date.
+        """
+        return queryset.filter(
+            supplied_items__expire_date__isnull=False,
+            supplied_items__expire_date__lte=value,
+        ).distinct()
 
 
 class GroupFilter(FilterSet):

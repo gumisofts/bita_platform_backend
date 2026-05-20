@@ -11,7 +11,7 @@ from guardian.shortcuts import get_objects_for_user
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
-from rest_framework.mixins import CreateModelMixin, ListModelMixin
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -36,18 +36,44 @@ from .serializers import (
     PaymentMethodSerializer,
     PaymentVerificationSerializer,
     ReportsSerializer,
+    TransactionCreateSerializer,
     TransactionSerializer,
 )
 
 
-class TransactionViewset(ListModelMixin, GenericViewSet):
+class TransactionViewset(
+    CreateModelMixin, ListModelMixin, RetrieveModelMixin, GenericViewSet
+):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     http_method_names = ["get", "post"]
     permission_classes = [IsAuthenticated, BranchLevelPermission]
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return TransactionCreateSerializer
+        return TransactionSerializer
+
     def get_queryset(self):
         return filter_queryset_by_branch(self.queryset, self.request, "transaction")
+
+    def perform_create(self, serializer):
+        branch = serializer.validated_data.get("branch")
+        business = serializer.validated_data.get("business")
+
+        # Infer business from branch when not supplied explicitly.
+        if branch and not business:
+            business = branch.business
+
+        # Fall back to request-level context set by middleware.
+        if not branch and hasattr(self.request, "branch") and self.request.branch:
+            branch = self.request.branch
+        if not business and hasattr(self.request, "business") and self.request.business:
+            business = self.request.business
+        if branch and not business:
+            business = branch.business
+
+        serializer.save(branch=branch, business=business)
 
 
 # CRUD for Business Payment Methods

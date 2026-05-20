@@ -15,6 +15,40 @@ class TransactionSerializer(serializers.ModelSerializer):
         depth = 1
 
 
+class TransactionCreateSerializer(serializers.ModelSerializer):
+    """Write serializer for creating transactions directly via the API."""
+
+    class Meta:
+        model = Transaction
+        fields = [
+            "id",
+            "order",
+            "branch",
+            "business",
+            "payment_method",
+            "type",
+            "category",
+            "total_paid_amount",
+            "total_left_amount",
+        ]
+        read_only_fields = ["id"]
+        extra_kwargs = {
+            "order": {"required": False, "allow_null": True},
+            "payment_method": {"required": False, "allow_null": True},
+            "category": {"required": False, "allow_blank": True, "allow_null": True},
+            "total_left_amount": {"required": False},
+        }
+
+    def validate(self, attrs):
+        branch = attrs.get("branch")
+        business = attrs.get("business")
+        if branch and business and branch.business_id != business.id:
+            raise serializers.ValidationError(
+                {"branch": "Branch does not belong to the specified business."}
+            )
+        return attrs
+
+
 class PaymentMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentMethod
