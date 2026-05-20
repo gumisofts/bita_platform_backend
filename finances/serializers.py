@@ -173,6 +173,81 @@ class FinanceSummarySerializer(serializers.Serializer):
     last_updated = serializers.DateTimeField()
 
 
+class PaymentMethodBreakdownSerializer(serializers.Serializer):
+    payment_method_id = serializers.UUIDField()
+    payment_method_name = serializers.CharField()
+    total_income = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_refunds = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
+    transaction_count = serializers.IntegerField()
+
+
+class DailyBreakdownSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    income = serializers.DecimalField(max_digits=12, decimal_places=2)
+    expense = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net = serializers.DecimalField(max_digits=12, decimal_places=2)
+    transaction_count = serializers.IntegerField()
+
+
+class PeriodComparisonSerializer(serializers.Serializer):
+    previous_start = serializers.DateTimeField()
+    previous_end = serializers.DateTimeField()
+    previous_income = serializers.DecimalField(max_digits=12, decimal_places=2)
+    previous_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
+    previous_net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)
+    income_change = serializers.DecimalField(max_digits=12, decimal_places=2)
+    expense_change = serializers.DecimalField(max_digits=12, decimal_places=2)
+    profit_change = serializers.DecimalField(max_digits=12, decimal_places=2)
+    income_change_pct = serializers.DecimalField(max_digits=8, decimal_places=2)
+    expense_change_pct = serializers.DecimalField(max_digits=8, decimal_places=2)
+    profit_change_pct = serializers.DecimalField(max_digits=8, decimal_places=2)
+
+
+class FinanceReportSerializer(serializers.Serializer):
+    start_date = serializers.DateTimeField()
+    end_date = serializers.DateTimeField()
+
+    # Core income / expense metrics
+    total_income = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_refunds = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_debt_issued = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)
+    profit_margin = serializers.DecimalField(max_digits=8, decimal_places=2)
+
+    # Transaction-level metrics
+    transaction_count = serializers.IntegerField()
+    avg_transaction_value = serializers.DecimalField(max_digits=12, decimal_places=2)
+    pending_receivables = serializers.DecimalField(max_digits=12, decimal_places=2)
+    pending_payables = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+    # Breakdowns
+    by_transaction_type = serializers.DictField(
+        child=serializers.DecimalField(max_digits=12, decimal_places=2)
+    )
+    by_payment_method = PaymentMethodBreakdownSerializer(many=True)
+    income_by_category = serializers.DictField(
+        child=serializers.DecimalField(max_digits=12, decimal_places=2)
+    )
+    expense_by_category = serializers.DictField(
+        child=serializers.DecimalField(max_digits=12, decimal_places=2)
+    )
+
+    # Order metrics
+    total_orders = serializers.IntegerField()
+    completed_orders = serializers.IntegerField()
+    pending_orders = serializers.IntegerField()
+    cancelled_orders = serializers.IntegerField()
+
+    # Trend data for charts
+    daily_breakdown = DailyBreakdownSerializer(many=True)
+
+    # Comparison against the previous equivalent period
+    period_comparison = PeriodComparisonSerializer()
+
+
 class PaymentVerificationSerializer(serializers.Serializer):
     transaction_id = serializers.CharField(write_only=True)
 
