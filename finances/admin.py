@@ -104,7 +104,7 @@ class TransactionAdmin(admin.ModelAdmin):
     raw_id_fields = ["order", "payment_method", "business", "branch"]
 
     fieldsets = (
-        (None, {"fields": ("id", "type", "order")}),
+        (None, {"fields": ("id", "type", "order", "branch", "business")}),
         (
             _("Financial Details"),
             {"fields": ("total_paid_amount", "payment_method", "total_left_amount")},

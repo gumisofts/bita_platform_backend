@@ -604,17 +604,17 @@ def finance_report(request):
             {"detail": "Both start_date and end_date are required (YYYY-MM-DD)."}
         )
 
+    tz_utc3 = dt_timezone(timedelta(hours=3))
+
     try:
         start_date = datetime.strptime(start_date_param, "%Y-%m-%d").replace(
-            tzinfo=dt_timezone.utc
+            tzinfo=tz_utc3
         )
     except ValueError:
         raise ValidationError({"detail": "Invalid start_date format. Use YYYY-MM-DD."})
 
     try:
-        end_date = datetime.strptime(end_date_param, "%Y-%m-%d").replace(
-            tzinfo=dt_timezone.utc
-        )
+        end_date = datetime.strptime(end_date_param, "%Y-%m-%d").replace(tzinfo=tz_utc3)
     except ValueError:
         raise ValidationError({"detail": "Invalid end_date format. Use YYYY-MM-DD."})
 
