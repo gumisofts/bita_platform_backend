@@ -83,9 +83,10 @@ class BusinessPaymentMethodViewset(ModelViewSet):
     filterset_class = BusinessPaymentMethodFilter
 
     def get_queryset(self):
-        return filter_queryset_by_branch(
+        queryset = filter_queryset_by_branch(
             self.queryset, self.request, "businesspaymentmethod"
         )
+        return queryset.filter(business=self.request.business)
 
 
 class PaymentMethodViewset(ListModelMixin, GenericViewSet):
