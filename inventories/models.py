@@ -105,13 +105,26 @@ class Supplier(BaseModel):
                     '912345678 / 712345678'. Up to 9 digits allowed.",
             )
         ],
-        unique=True,
         blank=True,
     )
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["phone_number", "business"],
+                condition=models.Q(phone_number__isnull=False),
+                name="unique_supplier_phone_number_per_business",
+            ),
+            models.UniqueConstraint(
+                fields=["name", "business"],
+                condition=models.Q(name__isnull=False),
+                name="unique_supplier_name_per_business",
+            ),
+        ]
 
 
 class Supply(BaseModel):
