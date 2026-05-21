@@ -26,7 +26,7 @@ def capture_supplied_item_old_price(sender, instance, **kwargs):
 def on_supplied_item_saved(sender, instance, created, **kwargs):
     if created:
         instance.supply.no_of_items += 1
-        instance.supply.total_cost += instance.quantity * instance.selling_price
+        instance.supply.total_cost += instance.quantity * instance.purchase_price
         instance.supply.save()
         instance.variant.quantity += instance.quantity
         instance.variant.save()
