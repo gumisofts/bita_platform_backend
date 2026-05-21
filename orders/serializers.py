@@ -78,14 +78,22 @@ class OrderSerializer(ModelSerializer):
                 )
         return super().validate(attrs)
 
+    def _resolve_item_price(self, item_variant):
+        """Resolve price: request price > supplied_item.selling_price."""
+        price = item_variant.get("price")
+        if not price:
+            supplied_item = item_variant.get("supplied_item")
+            if supplied_item:
+                price = supplied_item.selling_price
+        return price
+
     def create(self, validated_data):
         item_variants = validated_data.pop("item_variants", [])
 
         order = Order.objects.create(**validated_data)
         total_payable = Decimal("0")
         for item_variant in item_variants:
-            if item_variant.get("price") is None:
-                item_variant["price"] = item_variant["variant"].selling_price
+            item_variant["price"] = self._resolve_item_price(item_variant)
             OrderItem.objects.create(order=order, **item_variant)
             total_payable += (item_variant.get("price") or Decimal("0")) * item_variant[
                 "quantity"
@@ -98,8 +106,7 @@ class OrderSerializer(ModelSerializer):
         item_variants = validated_data.pop("item_variants", [])
         instance = super().update(instance, validated_data)
         for item_variant in item_variants:
-            if item_variant.get("price") is None:
-                item_variant["price"] = item_variant["variant"].selling_price
+            item_variant["price"] = self._resolve_item_price(item_variant)
             OrderItem.objects.create(order=instance, **item_variant)
             instance.total_payable = (instance.total_payable or Decimal("0")) + (
                 (item_variant.get("price") or Decimal("0")) * item_variant["quantity"]
