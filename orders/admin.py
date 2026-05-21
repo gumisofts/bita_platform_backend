@@ -124,8 +124,11 @@ class OrderItemAdmin(admin.ModelAdmin):
     variant_name.short_description = "Item"
 
     def item_business(self, obj):
-        if obj.variant and obj.variant.business:
-            return obj.variant.business.name
+        try:
+            if obj.variant and obj.variant.item and obj.variant.item.business:
+                return obj.variant.item.business.name
+        except Exception:
+            pass
         return "-"
 
     item_business.short_description = "Business"
