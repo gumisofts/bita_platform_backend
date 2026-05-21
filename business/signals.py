@@ -96,6 +96,9 @@ def on_business_created(sender, instance, created, **kwargs):
 
         with transaction.atomic():
             # Create Default Bussiness Branch
+            from inventories.models import Supplier
+
+            Supplier.objects.create(name="Unknown", business=instance)
 
             owner = Role.objects.create(
                 role_name=ROLES.OWNER.value,
