@@ -199,8 +199,8 @@ _BRANCH_MANAGER_PERMS: dict[str, list[str]] = {
 _EMPLOYEE_PERMS: dict[str, list[str]] = {
     "group": ["view"],
     "customer": ["view", "add"],
-    "item": ["view", "add"],
-    "itemvariant": ["view", "add"],
+    "item": ["view", "add", "change"],
+    "itemvariant": ["view", "add", "change"],
     "supplier": ["view"],
     "inventory": ["view"],
     "inventorymovement": ["view", "add"],
@@ -208,7 +208,7 @@ _EMPLOYEE_PERMS: dict[str, list[str]] = {
     "transaction": ["view", "add"],
     "businesspaymentmethod": ["view"],
     "property": ["view"],
-    "supply": ["view"],
+    "supply": ["view", "add"],
 }
 
 _BUSINESS_ADMIN_PERMS: dict[str, list[str]] = {
