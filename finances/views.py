@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from business.models import Branch, Business, biz_perm
+from business.models import Branch, Business, Employee, biz_perm
 from business.permissions import (
     BranchLevelPermission,
     accessible_branches,
@@ -371,6 +371,18 @@ def _resolve_business_branch(request):
     return business, branch
 
 
+def _report_transaction_scope(request, business, branch):
+    """Scope report data to all branch transactions or the user's own only."""
+    if request.user.has_perm(biz_perm("transaction", "view", "branch"), branch):
+        return Q(), Q()
+
+    employee = Employee.objects.filter(user=request.user, business=business).first()
+    if not employee:
+        return Q(pk__in=[]), Q(pk__in=[])
+
+    return Q(order__employee=employee), Q(employee=employee)
+
+
 def _get_income_by_category(order_filter):
     """
     Aggregate sales revenue by item category from OrderItems.
@@ -588,13 +600,12 @@ def finance_report(request):
     """
     business, branch = _resolve_business_branch(request)
 
-    if not branch or not request.user.has_perm(
-        biz_perm("transaction", "view", "branch"), branch
-    ):
-        return Response(
-            {"detail": "You do not have permission to view financial reports."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not branch:
+        raise ValidationError({"detail": "Branch is required."})
+
+    own_tx_filter, own_order_filter = _report_transaction_scope(
+        request, business, branch
+    )
 
     # --- Parse date range -----------------------------------------------
     start_date_param = request.query_params.get("start_date")
@@ -654,6 +665,7 @@ def finance_report(request):
         base_filter &= Q(payment_method__in=payment_method_ids)
     if transaction_types:
         base_filter &= Q(type__in=transaction_types)
+    base_filter &= own_tx_filter
 
     transactions = Transaction.objects.filter(base_filter)
 
@@ -663,6 +675,7 @@ def finance_report(request):
             Q(business=business, branch=branch)
             & Q(created_at__gte=start_date, created_at__lt=end_date)
             & (Q(payment_method__in=payment_method_ids) if payment_method_ids else Q())
+            & own_tx_filter
         )
         .values("type")
         .annotate(total=Sum("total_paid_amount"))
@@ -762,6 +775,7 @@ def finance_report(request):
     )
     if payment_method_ids:
         order_filter &= Q(order__payment_method__in=payment_method_ids)
+    order_filter &= own_tx_filter
 
     income_by_category = _get_income_by_category(order_filter)
     income_by_category = dict(
@@ -774,6 +788,7 @@ def finance_report(request):
     )
     if payment_method_ids:
         expense_cat_filter &= Q(payment_method__in=payment_method_ids)
+    expense_cat_filter &= own_tx_filter
 
     expense_by_category = _get_expense_by_category(expense_cat_filter)
     expense_by_category = dict(
@@ -786,6 +801,7 @@ def finance_report(request):
     )
     if payment_method_ids:
         order_qs_filter &= Q(payment_method__in=payment_method_ids)
+    order_qs_filter &= own_order_filter
 
     orders = Order.objects.filter(order_qs_filter)
     total_orders = orders.count()
@@ -838,6 +854,7 @@ def finance_report(request):
     )
     if payment_method_ids:
         prev_filter &= Q(payment_method__in=payment_method_ids)
+    prev_filter &= own_tx_filter
 
     prev_type_totals = (
         Transaction.objects.filter(prev_filter)

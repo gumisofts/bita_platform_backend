@@ -191,7 +191,7 @@ _BRANCH_MANAGER_PERMS: dict[str, list[str]] = {
     "transaction": ["view", "add"],
     "businesspaymentmethod": ["view", "change"],
     "property": ["view", "add", "change"],
-    "supply": ["view", "add"],
+    "supply": ["view", "add", "change"],
     "employee": ["view"],
     "employeeinvitation": ["view", "add"],
 }
@@ -208,7 +208,7 @@ _EMPLOYEE_PERMS: dict[str, list[str]] = {
     "transaction": ["view", "add"],
     "businesspaymentmethod": ["view"],
     "property": ["view"],
-    "supply": ["view", "add"],
+    "supply": ["view", "add", "change"],
 }
 
 _BUSINESS_ADMIN_PERMS: dict[str, list[str]] = {
@@ -230,7 +230,7 @@ _BUSINESS_ADMIN_PERMS: dict[str, list[str]] = {
     "businesspaymentmethod": ["view", "change"],
     "transaction": ["view", "add"],
     "giftcard": ["view"],
-    "supply": ["view", "add"],
+    "supply": ["view", "add", "change"],
 }
 
 # Owner receives full CRUD on every permissioned model.
