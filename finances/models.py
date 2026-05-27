@@ -130,6 +130,7 @@ class BusinessPaymentMethod(BaseModel):
         blank=True,
     )
     label = models.CharField(max_length=255, null=True, blank=True)
+    receiver_name = models.CharField(max_length=255, null=True, blank=True)
     identifier = models.CharField(max_length=255, null=True, blank=True)
 
     def _same_scope_filter(self):
