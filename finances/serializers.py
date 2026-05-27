@@ -304,7 +304,9 @@ class PaymentVerificationSerializer(serializers.Serializer):
         payment_method = validated_data["business_payment_method"].payment
         account_number = validated_data["business_payment_method"].identifier
         receiver_name = (
-            validated_data.get("receiver_name") or business_payment_method.label
+            validated_data.get("receiver_name")
+            or business_payment_method.receiver_name
+            or business_payment_method.label
         )
         expected_amount = validated_data.get("expected_amount")
 
