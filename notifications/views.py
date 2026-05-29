@@ -26,7 +26,7 @@ class NotificationViewSet(ListModelMixin, DestroyModelMixin, GenericViewSet):
         return self.queryset.filter(
             recipients__recipient=self.request.user,
             recipients__is_deleted=False,
-        )
+        ).order_by("-created_at")
 
     def perform_destroy(self, instance):
         """Soft-delete: mark the recipient record as deleted instead of removing the row."""

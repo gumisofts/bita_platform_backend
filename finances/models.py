@@ -77,6 +77,8 @@ class Transaction(BaseModel):
         TransactionType.PURCHASE,
         TransactionType.MAINTENANCE,
         TransactionType.OTHER_EXPENSE,
+        TransactionType.DEBT,
+        TransactionType.REFUND,
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -110,7 +112,6 @@ class Transaction(BaseModel):
         related_name="created_transactions",
     )
     type = models.CharField(max_length=20, choices=TransactionType.choices)
-    category = models.CharField(max_length=100, null=True, blank=True)
     total_paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):

@@ -55,7 +55,9 @@ class TransactionViewset(
         return TransactionSerializer
 
     def get_queryset(self):
-        return filter_queryset_by_branch(self.queryset, self.request, "transaction")
+        return filter_queryset_by_branch(
+            self.queryset, self.request, "transaction"
+        ).order_by("-created_at")
 
     def perform_create(self, serializer):
         branch = serializer.validated_data.get("branch")
