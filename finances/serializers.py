@@ -28,7 +28,6 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             "payment_method",
             "created_by",
             "type",
-            "category",
             "total_paid_amount",
         ]
         read_only_fields = ["id", "created_by"]
