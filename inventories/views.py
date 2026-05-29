@@ -5,14 +5,15 @@ import logging
 import openpyxl
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
 from rest_framework import status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.mixins import (
     CreateModelMixin,
     DestroyModelMixin,
@@ -24,13 +25,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from business.models import Business, biz_perm
+from business.models import Branch, Business, biz_perm
 from business.permissions import (
     BranchLevelPermission,
     BusinessLevelPermission,
     accessible_branches,
     filter_queryset_by_branch,
 )
+from core.utils import is_valid_uuid
 
 from .filters import (
     GroupFilter,
@@ -295,6 +297,14 @@ class ItemViewset(ModelViewSet):
                 )
                 continue
 
+            # Resolve groups from the first row (comma-separated names)
+            raw_groups = str(first_row.get("groups", "")).strip()
+            group_names = [g.strip() for g in raw_groups.split(",") if g.strip()]
+            resolved_groups = []
+            for gname in group_names:
+                grp, _ = Group.objects.get_or_create(name=gname, business=business)
+                resolved_groups.append(grp)
+
             # Upsert Item by name + branch
             try:
                 with transaction.atomic():
@@ -306,8 +316,12 @@ class ItemViewset(ModelViewSet):
                             or None,
                             "inventory_unit": inventory_unit,
                             "business": business,
+                            "group": resolved_groups[0] if resolved_groups else None,
                         },
                     )
+                    if not item_created and resolved_groups:
+                        item.group = resolved_groups[0]
+                        item.save(update_fields=["group"])
                     if item_created:
                         created_items.append(
                             {"row": first_row_num, "name": product_name}
@@ -423,11 +437,17 @@ class ItemViewset(ModelViewSet):
         """
         fmt = request.query_params.get("export_format", "xlsx").lower()
 
-        items = self.get_queryset().prefetch_related("variants").order_by("name")
+        items = (
+            self.get_queryset()
+            .select_related("group")
+            .prefetch_related("variants")
+            .order_by("name")
+        )
 
         # Build flat rows — one per variant
         data_rows = []
         for item in items:
+            group_value = item.group.name if item.group else ""
             variants = list(item.variants.order_by("name"))
             if not variants:
                 # Emit one placeholder row so the product is not silently lost
@@ -440,6 +460,7 @@ class ItemViewset(ModelViewSet):
                         "",  # selling_price — user must fill in
                         "",  # sku
                         item.quantity,
+                        group_value,
                     ]
                 )
             else:
@@ -453,6 +474,7 @@ class ItemViewset(ModelViewSet):
                             str(variant.selling_price) if variant.selling_price else "",
                             variant.sku or "",
                             variant.quantity,
+                            group_value,
                         ]
                     )
 
@@ -993,3 +1015,90 @@ class InventoryMovementItemViewSet(ModelViewSet):
             queryset = queryset.filter(movement_id=movement_id)
 
         return queryset
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def inventory_summary(request):
+    """
+    GET /inventories/summary/
+
+    Returns inventory summary for a business or branch:
+      - total_products: number of active items
+      - stock_in_hand:  total units across all active items
+      - low_stock_count: items whose quantity is at or below their notify_below threshold
+    """
+    business_id = request.query_params.get("business") or request.query_params.get(
+        "business_id"
+    )
+    branch_id = request.query_params.get("branch") or request.query_params.get(
+        "branch_id"
+    )
+
+    business = None
+    branch = None
+
+    if business_id:
+        if not is_valid_uuid(business_id):
+            raise ValidationError({"detail": "Invalid business ID format"})
+        try:
+            business = Business.objects.get(id=business_id)
+        except Business.DoesNotExist:
+            raise ValidationError({"detail": "Business not found"})
+    elif hasattr(request, "business") and request.business:
+        business = request.business
+
+    if branch_id:
+        if not is_valid_uuid(branch_id):
+            raise ValidationError({"detail": "Invalid branch ID format"})
+        try:
+            branch = Branch.objects.get(id=branch_id)
+            if business and branch.business != business:
+                raise ValidationError(
+                    {"detail": "Branch does not belong to the specified business"}
+                )
+            if not business:
+                business = branch.business
+        except Branch.DoesNotExist:
+            raise ValidationError({"detail": "Branch not found"})
+    elif hasattr(request, "branch") and request.branch:
+        branch = request.branch
+        if not business:
+            business = branch.business
+
+    if not business:
+        raise ValidationError(
+            {
+                "detail": (
+                    "Business is required. "
+                    "Provide 'business' or 'business_id' query parameter"
+                )
+            }
+        )
+
+    if not request.user.has_perm(
+        biz_perm("item", "view", "branch"), branch or business
+    ):
+        return Response(
+            {"detail": "You do not have permission to view inventory summary."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    items_qs = Item.objects.filter(business=business, is_active=True)
+    if branch:
+        items_qs = items_qs.filter(branch=branch)
+
+    totals = items_qs.aggregate(
+        total_products=Count("id"),
+        stock_in_hand=Sum("quantity"),
+    )
+
+    low_stock_count = items_qs.filter(quantity__lte=F("notify_below")).count()
+
+    return Response(
+        {
+            "total_products": totals["total_products"] or 0,
+            "stock_in_hand": totals["stock_in_hand"] or 0,
+            "low_stock_count": low_stock_count,
+        }
+    )

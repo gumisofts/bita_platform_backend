@@ -157,7 +157,6 @@ class OrderViewset(ModelViewSet):
                             type=Transaction.TransactionType.SALE,
                             # left 0 for lack of price value in inventory.Item object
                             total_paid_amount=0,
-                            total_left_amount=0,
                             payment_method=payment_method,
                         )
                         transaction.save()
@@ -371,7 +370,7 @@ class OrderViewset(ModelViewSet):
                     payment_method=refund_method,
                     type=Transaction.TransactionType.REFUND,
                     total_paid_amount=total_refund,
-                    total_left_amount=Decimal("0"),
+                    created_by=request.user,
                 )
 
                 # Update order status only on a full return

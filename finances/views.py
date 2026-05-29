@@ -72,7 +72,7 @@ class TransactionViewset(
         if branch and not business:
             business = branch.business
 
-        serializer.save(branch=branch, business=business)
+        serializer.save(branch=branch, business=business, created_by=self.request.user)
 
 
 # CRUD for Business Payment Methods
@@ -169,23 +169,19 @@ def summary(request):
             }
         )
 
-    # Check permissions
-    if not branch or not request.user.has_perm(
-        biz_perm("transaction", "view", "branch"),
-        branch,
-    ):
+    if not branch:
         return Response(
-            {"detail": "You do not have permission to view financial summary."},
-            status=status.HTTP_403_FORBIDDEN,
+            {"detail": "Branch is required."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Base queryset filters
-    transaction_filter = Q(business=business)
-    order_filter = Q(business=business)
+    own_tx_filter, own_order_filter, _ = _report_transaction_scope(
+        request, business, branch
+    )
 
-    if branch:
-        transaction_filter &= Q(branch=branch)
-        order_filter &= Q(branch=branch)
+    # Base queryset filters
+    transaction_filter = Q(business=business, branch=branch) & own_tx_filter
+    order_filter = Q(business=business, branch=branch) & own_order_filter
 
     # Get current date and calculate date ranges
     now = timezone.now()
@@ -223,10 +219,20 @@ def summary(request):
         ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
         total_assets += income_refund_total - expense_debt_total
 
-    # Calculate total liabilities (sum of DEBT transactions' total_left_amount)
-    total_liabilities = transactions.filter(
-        type=Transaction.TransactionType.DEBT
-    ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0.00")
+    # Pending receivables/payables: transactions recorded against the CREDIT
+    # payment method are amounts not yet physically collected / disbursed.
+    credit_pm_filter = Q(payment_method__identifier="CREDIT")
+
+    pending_receivables = transactions.filter(
+        credit_pm_filter, type__in=Transaction.INCOME_TYPES
+    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
+
+    pending_payables = transactions.filter(
+        credit_pm_filter,
+        type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT],
+    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
+
+    total_liabilities = pending_payables
 
     # Net worth
     net_worth = total_assets - total_liabilities
@@ -270,17 +276,6 @@ def summary(request):
         type__in=Transaction.EXPENSE_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     year_to_date_profit = year_to_date_income - year_to_date_expense
-
-    # Pending receivables (income transactions with total_left_amount > 0)
-    pending_receivables = transactions.filter(
-        type__in=Transaction.INCOME_TYPES, total_left_amount__gt=0
-    ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0.00")
-
-    # Pending payables (all expense types and DEBT transactions with total_left_amount > 0)
-    pending_payables = transactions.filter(
-        type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT],
-        total_left_amount__gt=0,
-    ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0.00")
 
     # Monthly transactions count
     monthly_transactions = current_month_transactions.count()
@@ -372,15 +367,33 @@ def _resolve_business_branch(request):
 
 
 def _report_transaction_scope(request, business, branch):
-    """Scope report data to all branch transactions or the user's own only."""
-    if request.user.has_perm(biz_perm("transaction", "view", "branch"), branch):
-        return Q(), Q()
+    """Return (tx_filter, order_filter) that scope data to the caller's access level.
+
+    - Full permission holders (can_view_transaction_branch): no extra filter → sees everything.
+    - Employees without that permission: sees only their own transactions (created_by)
+      and their own orders (employee field).
+    - No employee record found: empty querysets.
+
+    Returns a 3-tuple:
+      own_tx_filter        — applied to Transaction querysets
+      own_order_filter     — applied to Order querysets   (direct employee field)
+      own_order_item_filter— applied to OrderItem querysets (traverses order__employee)
+    """
+    if branch and request.user.has_perm(
+        biz_perm("transaction", "view", "branch"), branch
+    ):
+        return Q(), Q(), Q()
 
     employee = Employee.objects.filter(user=request.user, business=business).first()
     if not employee:
-        return Q(pk__in=[]), Q(pk__in=[])
+        empty = Q(pk__in=[])
+        return empty, empty, empty
 
-    return Q(order__employee=employee), Q(employee=employee)
+    return (
+        Q(created_by=request.user),
+        Q(employee=employee),
+        Q(order__employee=employee),
+    )
 
 
 def _get_income_by_category(order_filter):
@@ -447,15 +460,12 @@ def reports(request):
     """
     business, branch = _resolve_business_branch(request)
 
-    # Permission check
-    if not branch or not request.user.has_perm(
-        biz_perm("transaction", "view", "branch"),
-        branch,
-    ):
-        return Response(
-            {"detail": "You do not have permission to view financial reports."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not branch:
+        raise ValidationError({"detail": "Branch is required."})
+
+    own_tx_filter, _, own_order_item_filter = _report_transaction_scope(
+        request, business, branch
+    )
 
     # Parse report date (YYYY-MM format)
     date_param = request.query_params.get("date")
@@ -481,20 +491,21 @@ def reports(request):
     # Date range for the requested month
     period_start, period_end = _month_range(report_year, report_month)
 
-    # Base filters
-    base_tx_filter = Q(business=business)
-    base_order_filter = Q(
-        order__business=business,
-        order__status__in=[
-            Order.StatusChoices.COMPLETED,
-            Order.StatusChoices.PAID,
-            Order.StatusChoices.PARTIALLY_PAID,
-            Order.StatusChoices.DELIVERED,
-        ],
+    # Base filters (already know branch is set from the guard above)
+    base_tx_filter = Q(business=business, branch=branch) & own_tx_filter
+    base_order_filter = (
+        Q(
+            order__business=business,
+            order__branch=branch,
+            order__status__in=[
+                Order.StatusChoices.COMPLETED,
+                Order.StatusChoices.PAID,
+                Order.StatusChoices.PARTIALLY_PAID,
+                Order.StatusChoices.DELIVERED,
+            ],
+        )
+        & own_order_item_filter
     )
-    if branch:
-        base_tx_filter &= Q(branch=branch)
-        base_order_filter &= Q(order__branch=branch)
 
     # Monthly income by category (from order items)
     month_order_filter = base_order_filter & Q(
@@ -603,7 +614,7 @@ def finance_report(request):
     if not branch:
         raise ValidationError({"detail": "Branch is required."})
 
-    own_tx_filter, own_order_filter = _report_transaction_scope(
+    own_tx_filter, own_order_filter, own_order_item_filter = _report_transaction_scope(
         request, business, branch
     )
 
@@ -710,15 +721,16 @@ def finance_report(request):
         else Decimal("0.00")
     )
 
-    # Pending receivables (income transactions with outstanding balance)
+    credit_pm_filter = Q(payment_method__identifier="CREDIT")
+
     pending_receivables = transactions.filter(
-        type__in=Transaction.INCOME_TYPES, total_left_amount__gt=0
-    ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0")
-    # Pending payables (all expense types and DEBT with outstanding balance)
+        credit_pm_filter, type__in=Transaction.INCOME_TYPES
+    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+
     pending_payables = transactions.filter(
+        credit_pm_filter,
         type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT],
-        total_left_amount__gt=0,
-    ).aggregate(total=Sum("total_left_amount"))["total"] or Decimal("0")
+    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
 
     # --- By transaction type breakdown ----------------------------------
     by_transaction_type = {
@@ -748,6 +760,9 @@ def finance_report(request):
         pm_refunds = pm_txs.filter(type=Transaction.TransactionType.REFUND).aggregate(
             total=Sum("total_paid_amount")
         )["total"] or Decimal("0")
+        is_credit_pm = pm.identifier == "CREDIT"
+        pm_pending_receivables = pm_income if is_credit_pm else Decimal("0")
+        pm_pending_payables = pm_expense if is_credit_pm else Decimal("0")
         by_payment_method.append(
             {
                 "payment_method_id": pm.id,
@@ -757,6 +772,9 @@ def finance_report(request):
                 "total_refunds": pm_refunds,
                 "net_balance": pm_income - pm_expense,
                 "transaction_count": pm_txs.count(),
+                "is_credit": is_credit_pm,
+                "pending_receivables": pm_pending_receivables,
+                "pending_payables": pm_pending_payables,
             }
         )
 
@@ -775,7 +793,7 @@ def finance_report(request):
     )
     if payment_method_ids:
         order_filter &= Q(order__payment_method__in=payment_method_ids)
-    order_filter &= own_tx_filter
+    order_filter &= own_order_item_filter
 
     income_by_category = _get_income_by_category(order_filter)
     income_by_category = dict(

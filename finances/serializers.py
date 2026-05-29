@@ -26,17 +26,16 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             "branch",
             "business",
             "payment_method",
+            "created_by",
             "type",
             "category",
             "total_paid_amount",
-            "total_left_amount",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "created_by"]
         extra_kwargs = {
             "order": {"required": False, "allow_null": True},
             "payment_method": {"required": False, "allow_null": True},
             "category": {"required": False, "allow_blank": True, "allow_null": True},
-            "total_left_amount": {"required": False},
         }
 
     def validate(self, attrs):
@@ -213,6 +212,9 @@ class PaymentMethodBreakdownSerializer(serializers.Serializer):
     total_refunds = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
     transaction_count = serializers.IntegerField()
+    is_credit = serializers.BooleanField()
+    pending_receivables = serializers.DecimalField(max_digits=12, decimal_places=2)
+    pending_payables = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
 class DailyBreakdownSerializer(serializers.Serializer):
