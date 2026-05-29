@@ -466,6 +466,7 @@ BULK_IMPORT_COLUMNS = [
     "selling_price",
     "sku",
     "quantity",
+    "groups",
 ]
 
 BULK_IMPORT_COLUMN_NOTES = {
@@ -476,6 +477,7 @@ BULK_IMPORT_COLUMN_NOTES = {
     "selling_price": "Required. Selling price — must be a positive number.",
     "sku": "Optional. Unique SKU code for this variant. Leave blank to auto-assign none.",
     "quantity": "Optional. Starting stock quantity (default 0).",
+    "groups": "Optional. Comma-separated group names, e.g. 'Antibiotics, Painkillers'. Groups are created automatically if they do not exist.",
 }
 
 

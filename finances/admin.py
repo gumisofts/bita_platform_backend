@@ -107,7 +107,7 @@ class TransactionAdmin(admin.ModelAdmin):
         (None, {"fields": ("id", "type", "order", "branch", "business")}),
         (
             _("Financial Details"),
-            {"fields": ("total_paid_amount", "payment_method", "total_left_amount")},
+            {"fields": ("total_paid_amount", "payment_method")},
         ),
         (
             _("Timestamps"),
@@ -163,14 +163,6 @@ class TransactionAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("order")
 
 
-# Custom admin actions
-@admin.action(description="Mark selected transactions as fully paid")
-def mark_as_fully_paid(modeladmin, request, queryset):
-    for transaction in queryset:
-        transaction.total_left_amount = 0
-        transaction.save()
-
-
 @admin.action(description="Export financial summary")
 def export_financial_summary(modeladmin, request, queryset):
     # This would typically generate a report or CSV
@@ -187,4 +179,4 @@ def export_financial_summary(modeladmin, request, queryset):
 
 
 # Add actions to TransactionAdmin
-TransactionAdmin.actions = [mark_as_fully_paid, export_financial_summary]
+TransactionAdmin.actions = [export_financial_summary]

@@ -9,6 +9,7 @@ from .models import BusinessPaymentMethod, PaymentMethod
 
 @receiver(order_completed)
 def create_transaction(sender, instance, **kwargs):
+    created_by = instance.employee.user if instance.employee_id else None
     Transaction.objects.create(
         order=instance,
         type=Transaction.TransactionType.SALE,
@@ -16,6 +17,7 @@ def create_transaction(sender, instance, **kwargs):
         payment_method=instance.payment_method,
         business=instance.business,
         branch=instance.branch,
+        created_by=created_by,
     )
 
 
