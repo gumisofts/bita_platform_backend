@@ -253,7 +253,7 @@ def summary(request):
     monthly_cash_flow = monthly_income - monthly_expense
     monthly_profit = monthly_cash_flow  # Assuming profit = cash flow for now
     monthly_profit_margin = (
-        (monthly_profit / monthly_income * 100)
+        (monthly_profit / monthly_income * 100).quantize(Decimal("0.01"))
         if monthly_income > 0
         else Decimal("0.00")
     )
@@ -420,6 +420,66 @@ def _get_income_by_category(order_filter):
     return dict(income_by_category)
 
 
+def _get_income_by_item_category(transaction_filter):
+    """
+    Aggregate all income revenue by item category.
+
+    - SALE transactions that have an associated order: revenue is derived from
+      the order's items and grouped by each item's first category
+      (e.g. "Cosmetics"). Items with no category fall into "Other".
+    - All remaining income (SALE without an order, SERVICE_REVENUE,
+      OTHER_INCOME, etc.) is summed from total_paid_amount and added to "Other".
+    """
+    income_by_category = defaultdict(Decimal)
+
+    # --- 1. SALE transactions with order details → group by item category ---
+    order_ids = (
+        Transaction.objects.filter(
+            transaction_filter,
+            type=Transaction.TransactionType.SALE,
+            order__isnull=False,
+        )
+        .values_list("order_id", flat=True)
+        .distinct()
+    )
+
+    order_items = (
+        OrderItem.objects.filter(order_id__in=order_ids)
+        .select_related("variant__item")
+        .prefetch_related("variant__item__categories")
+    )
+
+    for oi in order_items:
+        try:
+            categories = list(oi.variant.item.categories.all())
+            category_name = categories[0].name if categories else "Other"
+        except AttributeError:
+            category_name = "Other"
+        price = oi.price or oi.variant.selling_price or Decimal("0")
+        income_by_category[category_name] += oi.quantity * price
+
+    # --- 2. All other income transactions → "Other" bucket ---
+    # Excludes SALE transactions that already have an order (counted above).
+    other_total = Transaction.objects.filter(
+        transaction_filter,
+        type__in=Transaction.INCOME_TYPES,
+    ).exclude(
+        type=Transaction.TransactionType.SALE,
+        order__isnull=False,
+    ).aggregate(
+        total=Sum("total_paid_amount")
+    )[
+        "total"
+    ] or Decimal(
+        "0.00"
+    )
+
+    if other_total:
+        income_by_category["Other"] += other_total
+
+    return dict(income_by_category)
+
+
 def _get_expense_by_category(transaction_filter):
     """
     Aggregate expense transactions by their category field.
@@ -564,9 +624,13 @@ def reports(request):
             }
         )
 
-    # Top income categories (sorted descending by amount)
+    # Top income by item category: SALE transactions with order details, grouped by category
     top_income = dict(
-        sorted(monthly_income_by_category.items(), key=lambda x: x[1], reverse=True)
+        sorted(
+            _get_income_by_item_category(month_tx_filter).items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )
     )
     top_expense = dict(
         sorted(monthly_expense_by_category.items(), key=lambda x: x[1], reverse=True)
