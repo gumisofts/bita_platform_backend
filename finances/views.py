@@ -253,7 +253,7 @@ def summary(request):
     monthly_cash_flow = monthly_income - monthly_expense
     monthly_profit = monthly_cash_flow  # Assuming profit = cash flow for now
     monthly_profit_margin = (
-        (monthly_profit / monthly_income * 100)
+        (monthly_profit / monthly_income * 100).quantize(Decimal("0.01"))
         if monthly_income > 0
         else Decimal("0.00")
     )
