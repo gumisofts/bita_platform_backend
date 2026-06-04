@@ -9,7 +9,7 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import IsAuthenticated
@@ -112,6 +112,7 @@ class AccountViewset(ListModelMixin, GenericViewSet):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def summary(request):
     """
     GET /finances/summary/
@@ -413,7 +414,7 @@ def _get_income_by_category(order_filter):
     for item in items:
         categories = list(item.variant.item.categories.all())
         category_name = categories[0].name if categories else "Other"
-        price = item.variant.selling_price or Decimal("0")
+        price = item.price or item.variant.selling_price or Decimal("0")
         income_by_category[category_name] += item.quantity * price
 
     return dict(income_by_category)
@@ -447,6 +448,7 @@ def _month_range(year, month):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def reports(request):
     """
     GET /finances/reports/
@@ -588,6 +590,7 @@ def reports(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def finance_report(request):
     """
     GET /finances/finance-report/
