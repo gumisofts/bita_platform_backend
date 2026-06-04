@@ -113,6 +113,7 @@ class Transaction(BaseModel):
     )
     type = models.CharField(max_length=20, choices=TransactionType.choices)
     total_paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    category = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return f"Transaction {self.id} - {self.type} ({self.total_paid_amount})"
