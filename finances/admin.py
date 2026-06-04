@@ -8,7 +8,13 @@ from finances.models import *
 class BusinessPaymentMethodInline(admin.TabularInline):
     model = BusinessPaymentMethod
     extra = 0
-    fields = ("payment", "label", "branch", "identifier")
+    fields = (
+        "payment",
+        "label",
+        "branch",
+        "identifier",
+        "receiver_name",
+    )
     raw_id_fields = ("payment", "branch")
 
 
@@ -59,6 +65,7 @@ class BusinessPaymentMethodAdmin(admin.ModelAdmin):
         "business_name",
         "payment_name",
         "display_name",
+        "receiver_name",
         "identifier",
         "branch",
         "created_at",
@@ -70,7 +77,7 @@ class BusinessPaymentMethodAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (None, {"fields": ("id", "business", "payment", "branch")}),
-        (_("Configuration"), {"fields": ("label", "identifier")}),
+        (_("Configuration"), {"fields": ("label", "identifier", "receiver_name")}),
         (
             _("Timestamps"),
             {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
