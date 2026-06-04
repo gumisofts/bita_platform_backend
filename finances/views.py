@@ -414,7 +414,7 @@ def _get_income_by_category(order_filter):
     for item in items:
         categories = list(item.variant.item.categories.all())
         category_name = categories[0].name if categories else "Other"
-        price = item.variant.selling_price or Decimal("0")
+        price = item.price or item.variant.selling_price or Decimal("0")
         income_by_category[category_name] += item.quantity * price
 
     return dict(income_by_category)

@@ -127,14 +127,14 @@ class OrderViewset(ModelViewSet):
         try:
             new_status = response.data.get("status")
 
-            payment_method = request.data.get("payment_method")
+            payment_method_id = request.data.get("payment_method")
 
             # If the status is changing to COMPLETED or PARTIALLY_PAID, ensure payment method is provided
             if new_status in [
                 Order.StatusChoices.COMPLETED,
                 Order.StatusChoices.PARTIALLY_PAID,
             ]:
-                if not payment_method:
+                if not payment_method_id:
                     return Response(
                         {
                             "error": "Payment method is required when completing or partially paying an order."
@@ -142,8 +142,12 @@ class OrderViewset(ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                # Validate payment method against allowed choices
-                if payment_method not in dict(Transaction.PaymentMethod.choices):
+                try:
+                    payment_method = BusinessPaymentMethod.objects.get(
+                        id=payment_method_id,
+                        business=order.business,
+                    )
+                except BusinessPaymentMethod.DoesNotExist:
                     return Response(
                         {"error": "Invalid payment method."},
                         status=status.HTTP_400_BAD_REQUEST,
@@ -152,14 +156,15 @@ class OrderViewset(ModelViewSet):
                 # Create a transaction if the status changed
                 if previous_status != new_status:
                     with db_transaction.atomic():
-                        transaction = Transaction.objects.create(
+                        Transaction.objects.create(
                             order=order,
                             type=Transaction.TransactionType.SALE,
-                            # left 0 for lack of price value in inventory.Item object
-                            total_paid_amount=0,
+                            total_paid_amount=order.total_payable,
                             payment_method=payment_method,
+                            branch=order.branch,
+                            business=order.business,
+                            created_by=request.user,
                         )
-                        transaction.save()
 
         except Exception as e:
             return Response(
@@ -185,6 +190,17 @@ class OrderViewset(ModelViewSet):
                 order.status = Order.StatusChoices.COMPLETED
                 order.save()
                 order_completed.send(sender=Order, instance=order)
+
+                if order.payment_method:
+                    Transaction.objects.create(
+                        order=order,
+                        type=Transaction.TransactionType.SALE,
+                        total_paid_amount=order.total_payable,
+                        payment_method=order.payment_method,
+                        branch=order.branch,
+                        business=order.business,
+                        created_by=request.user,
+                    )
         except DjangoValidationError as e:
             return Response(
                 {"error": e.message},
