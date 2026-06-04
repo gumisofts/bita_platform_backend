@@ -1088,17 +1088,23 @@ def inventory_summary(request):
     if branch:
         items_qs = items_qs.filter(branch=branch)
 
-    totals = items_qs.aggregate(
-        total_products=Count("id"),
-        stock_in_hand=Sum("quantity"),
+    total_products = items_qs.count()
+    stock_in_hand = (
+        ItemVariant.objects.filter(item__in=items_qs).aggregate(total=Sum("quantity"))[
+            "total"
+        ]
+        or 0
     )
-
-    low_stock_count = items_qs.filter(quantity__lte=F("notify_below")).count()
+    low_stock_count = (
+        items_qs.annotate(total_stock=Sum("variants__quantity"))
+        .filter(Q(total_stock__lte=F("notify_below")) | Q(total_stock__isnull=True))
+        .count()
+    )
 
     return Response(
         {
-            "total_products": totals["total_products"] or 0,
-            "stock_in_hand": totals["stock_in_hand"] or 0,
+            "total_products": total_products,
+            "stock_in_hand": stock_in_hand,
             "low_stock_count": low_stock_count,
         }
     )

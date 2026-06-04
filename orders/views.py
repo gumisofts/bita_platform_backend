@@ -690,11 +690,18 @@ class HomeStatsViewSet(GenericViewSet):
 
         return start, end
 
-    def _get_best_seller(self, base_filter):
-        """Get best selling item by revenue"""
-        # Get completed orders
+    def _get_best_seller(
+        self, base_filter, range_type="today", start_date=None, end_date=None
+    ):
+        """Get best selling item by revenue within the given date range"""
+        start, end = self._get_date_range(range_type, start_date, end_date)
+
+        # Get completed orders within the date range
         completed_orders = Order.objects.filter(
-            base_filter, status=Order.StatusChoices.COMPLETED
+            base_filter,
+            status=Order.StatusChoices.COMPLETED,
+            created_at__gte=start,
+            created_at__lte=end,
         )
 
         # Aggregate order items by variant/item and calculate revenue (quantity * selling_price)
@@ -1076,7 +1083,9 @@ class HomeStatsViewSet(GenericViewSet):
         end_date = request.query_params.get("end_date")
 
         # Get best seller
-        best_seller = self._get_best_seller(base_filter)
+        best_seller = self._get_best_seller(
+            base_filter, summary_range, start_date, end_date
+        )
 
         # Get sales distribution
         try:
