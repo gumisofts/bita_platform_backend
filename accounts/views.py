@@ -125,6 +125,20 @@ class AuthViewset(GenericViewSet):
     @action(
         detail=False,
         methods=["post"],
+        url_path="telegram/login",
+        permission_classes=[],
+        serializer_class=TelegramAuthSerializer,
+    )
+    def telegram_login(self, request):
+        serializer = TelegramAuthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
         permission_classes=[],
         serializer_class=RefreshLoginSerializer,
     )

@@ -459,7 +459,7 @@ class ItemViewset(ModelViewSet):
                         "",  # variant_name (will default to product name on re-import)
                         "",  # selling_price — user must fill in
                         "",  # sku
-                        item.quantity,
+                        "",  # quantity — no variants, no stock data
                         group_value,
                     ]
                 )
@@ -547,6 +547,72 @@ class SupplyViewset(
                 instance, context=self.get_serializer_context()
             ).data
         )
+
+    @action(detail=True, methods=["post"], url_path="settle_debt")
+    def settle_debt(self, request, *args, **kwargs):
+        """
+        Settle an outstanding supply debt by recording an actual PURCHASE payment.
+
+        Body:
+            payment_method  (UUID, required) – the BusinessPaymentMethod used to pay
+            amount          (decimal, optional) – overrides supply.total_cost if provided
+        """
+        from finances.models import BusinessPaymentMethod, Transaction
+
+        supply = self.get_object()
+        supply_ref = f"supply:{supply.id}"
+
+        # Must have an existing DEBT transaction for this supply.
+        if not Transaction.objects.filter(
+            category=supply_ref, type=Transaction.TransactionType.DEBT
+        ).exists():
+            return Response(
+                {"detail": "No outstanding debt found for this supply."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Prevent double-settlement.
+        settled_ref = f"{supply_ref}:paid"
+        if Transaction.objects.filter(category=settled_ref).exists():
+            return Response(
+                {"detail": "This supply debt has already been settled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pm_id = request.data.get("payment_method")
+        if not pm_id:
+            return Response(
+                {"detail": "payment_method is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payment_method = BusinessPaymentMethod.objects.get(pk=pm_id)
+        except BusinessPaymentMethod.DoesNotExist:
+            return Response(
+                {"detail": "Payment method not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        raw_amount = request.data.get("amount")
+        try:
+            amount = float(raw_amount) if raw_amount else float(supply.total_cost)
+        except (ValueError, TypeError):
+            return Response(
+                {"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        tx = Transaction.objects.create(
+            type=Transaction.TransactionType.PURCHASE,
+            total_paid_amount=round(amount, 2),
+            payment_method=payment_method,
+            business=supply.business,
+            branch=supply.branch,
+            category=settled_ref,
+        )
+
+        from finances.serializers import TransactionSerializer
+
+        return Response(TransactionSerializer(tx).data, status=status.HTTP_201_CREATED)
 
 
 class SupplierViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
@@ -670,12 +736,7 @@ class SupplyItemViewset(
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        with transaction.atomic():
-            if instance.quantity > 0:
-                variant = instance.variant
-                variant.quantity = max(0, variant.quantity - instance.quantity)
-                variant.save(update_fields=["quantity", "updated_at"])
-            instance.delete()
+        instance.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1090,13 +1151,13 @@ def inventory_summary(request):
 
     total_products = items_qs.count()
     stock_in_hand = (
-        ItemVariant.objects.filter(item__in=items_qs).aggregate(total=Sum("quantity"))[
+        SuppliedItem.objects.filter(item__in=items_qs).aggregate(total=Sum("quantity"))[
             "total"
         ]
         or 0
     )
     low_stock_count = (
-        items_qs.annotate(total_stock=Sum("variants__quantity"))
+        items_qs.annotate(total_stock=Sum("variants__supplied_items__quantity"))
         .filter(Q(total_stock__lte=F("notify_below")) | Q(total_stock__isnull=True))
         .count()
     )

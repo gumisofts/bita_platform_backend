@@ -77,6 +77,12 @@ class BranchSerializer(serializers.ModelSerializer, BaseSerializerMixin):
 class BusinessSerializer(serializers.ModelSerializer, BaseSerializerMixin):
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
     address = AddressSerializer()
+    categories = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        many=True,
+        required=False,
+        allow_empty=True,
+    )
 
     class Meta:
         model = Business
@@ -117,6 +123,13 @@ class EmployeeSerializer(serializers.ModelSerializer, BaseSerializerMixin):
         user = User.objects.create(**user)
         validated_data["user"] = user
         return super().create(validated_data)
+
+
+class EmployeeReadSerializer(serializers.ModelSerializer, BaseSerializerMixin):
+    class Meta:
+        model = Employee
+        exclude = []
+        depth = 1
 
 
 class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMixin):

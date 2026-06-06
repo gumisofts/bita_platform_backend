@@ -188,6 +188,13 @@ class EmployeeViewset(ModelViewSet):
     permission_classes = [IsAuthenticated, BusinessLevelPermission]
     lookup_field = "id"
 
+    def get_serializer_class(self):
+        if self.request.method in ("GET",):
+            from business.serializers import EmployeeReadSerializer
+
+            return EmployeeReadSerializer
+        return EmployeeSerializer
+
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user

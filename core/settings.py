@@ -22,10 +22,37 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
     "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://localhost:3002"
 ).split(",")
 
+# Wildcard tunnel domains so dev tunnels (ngrok, cloudflared) work without
+# touching .env every session. These patterns are safe because they only
+# match HTTPS subdomains of the respective tunnel services.
+_TUNNEL_CSRF_ORIGINS = [
+    "https://*.ngrok-free.app",
+    "https://*.ngrok.io",
+    "https://*.trycloudflare.com",
+]
+CSRF_TRUSTED_ORIGINS = list(set(CSRF_TRUSTED_ORIGINS + _TUNNEL_CSRF_ORIGINS))
 
 CORS_ALLOWED_ORIGINS = os.getenv(
     "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"
 ).split(",")
+
+# Regex-based CORS to cover any ngrok / cloudflared subdomain without
+# needing to update .env when the tunnel URL rotates.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://[\w-]+\.ngrok-free\.app$",
+    r"^https://[\w-]+\.ngrok\.io$",
+    r"^https://[\w-]+\.trycloudflare\.com$",
+]
+
+# Allow the custom tenant-context headers sent by the frontend on every request.
+# django-cors-headers defaults only cover standard headers, so custom ones must
+# be listed explicitly here.
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-business-id",
+    "x-branch-id",
+]
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -308,3 +335,8 @@ X_FRAME_OPTIONS = "SAMEORIGIN"
 SILENCED_SYSTEM_CHECKS = ["security.W019"]
 
 TELEBIRR_BASE_URL = os.getenv("TELEBIRR_BASE_URL")
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

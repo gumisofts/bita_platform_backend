@@ -51,7 +51,6 @@ class Item(BaseModel):
     inventory_unit = models.CharField(max_length=255)
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     branch = models.ForeignKey("business.Branch", on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField(default=0)
     notify_below = models.PositiveIntegerField(default=1)
     receive_online_orders = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)

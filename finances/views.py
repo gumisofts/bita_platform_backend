@@ -9,7 +9,7 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import IsAuthenticated
@@ -23,7 +23,7 @@ from business.permissions import (
     filter_queryset_by_branch,
 )
 from core.utils import is_valid_uuid
-from finances.filters import BusinessPaymentMethodFilter
+from finances.filters import BusinessPaymentMethodFilter, TransactionFilter
 from inventories.models import SuppliedItem
 from orders.models import Order, OrderItem
 
@@ -48,6 +48,7 @@ class TransactionViewset(
     serializer_class = TransactionSerializer
     http_method_names = ["get", "post"]
     permission_classes = [IsAuthenticated, BranchLevelPermission]
+    filterset_class = TransactionFilter
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -75,6 +76,107 @@ class TransactionViewset(
             business = branch.business
 
         serializer.save(branch=branch, business=business, created_by=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="settle")
+    def settle(self, request, pk=None):
+        """
+        POST /finances/transactions/{id}/settle/
+
+        Settle a credit transaction (receivable or payable) by recording
+        the actual cash/bank payment.
+
+        Body:
+          - payment_method (UUID, required): real BPM to debit/credit
+          - amount         (decimal, optional): partial amount; defaults to full amount
+        """
+        transaction = self.get_object()
+
+        # Only credit transactions can be settled.
+        if (
+            not transaction.payment_method
+            or transaction.payment_method.identifier != "CREDIT"
+        ):
+            raise ValidationError(
+                {
+                    "detail": "Only transactions on a CREDIT payment method can be settled."
+                }
+            )
+
+        # Prevent double-settlement.
+        if transaction.category and (
+            transaction.category.endswith(":settled")
+            or transaction.category.endswith(":paid")
+        ):
+            raise ValidationError(
+                {"detail": "This transaction has already been settled."}
+            )
+
+        payment_method_id = request.data.get("payment_method")
+        amount_raw = request.data.get("amount")
+
+        if not payment_method_id:
+            raise ValidationError({"payment_method": "This field is required."})
+
+        try:
+            payment_method = BusinessPaymentMethod.objects.get(id=payment_method_id)
+        except BusinessPaymentMethod.DoesNotExist:
+            raise ValidationError({"payment_method": "Payment method not found."})
+
+        if payment_method.identifier == "CREDIT":
+            raise ValidationError(
+                {
+                    "payment_method": "Cannot settle a credit transaction with another credit account."
+                }
+            )
+
+        # Determine settlement amount.
+        try:
+            settle_amount = (
+                Decimal(str(amount_raw)).quantize(Decimal("0.01"))
+                if amount_raw
+                else transaction.total_paid_amount
+            )
+        except Exception:
+            raise ValidationError({"amount": "Enter a valid decimal amount."})
+
+        if settle_amount <= 0:
+            raise ValidationError({"amount": "Amount must be greater than zero."})
+        if settle_amount > transaction.total_paid_amount:
+            raise ValidationError(
+                {
+                    "amount": "Settlement amount cannot exceed the original transaction amount."
+                }
+            )
+
+        # Determine the settlement transaction type:
+        # - Income originals (SALE, SERVICE_REVENUE, OTHER_INCOME) → SALE settlement
+        # - Expense originals (DEBT, EXPENSE, PURCHASE, …) → PURCHASE settlement
+        if transaction.type in Transaction.INCOME_TYPES:
+            settle_type = Transaction.TransactionType.SALE
+        else:
+            settle_type = Transaction.TransactionType.PURCHASE
+
+        # Mark original transaction as settled (append :settled to category).
+        original_category = transaction.category or ""
+        transaction.category = (
+            f"{original_category}:settled" if original_category else "settled"
+        )
+        transaction.save(update_fields=["category"])
+
+        # Create settlement transaction.
+        settlement = Transaction.objects.create(
+            type=settle_type,
+            total_paid_amount=settle_amount,
+            payment_method=payment_method,
+            business=transaction.business,
+            branch=transaction.branch,
+            category=f"settled:{transaction.id}",
+            created_by=request.user,
+        )
+
+        return Response(
+            TransactionSerializer(settlement).data, status=status.HTTP_201_CREATED
+        )
 
 
 # CRUD for Business Payment Methods
@@ -223,17 +325,28 @@ def summary(request):
         total_assets += income_refund_total - expense_debt_total
 
     # Pending receivables/payables: transactions recorded against the CREDIT
-    # payment method are amounts not yet physically collected / disbursed.
+    # payment method that have not yet been settled.
     credit_pm_filter = Q(payment_method__identifier="CREDIT")
+    not_settled_filter = ~Q(category__endswith=":settled") & ~Q(
+        category__endswith=":paid"
+    )
 
     pending_receivables = transactions.filter(
         credit_pm_filter, type__in=Transaction.INCOME_TYPES
-    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
+    ).filter(not_settled_filter).aggregate(total=Sum("total_paid_amount"))[
+        "total"
+    ] or Decimal(
+        "0.00"
+    )
 
     pending_payables = transactions.filter(
         credit_pm_filter,
         type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT],
-    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
+    ).filter(not_settled_filter).aggregate(total=Sum("total_paid_amount"))[
+        "total"
+    ] or Decimal(
+        "0.00"
+    )
 
     total_liabilities = pending_payables
 
@@ -791,15 +904,26 @@ def finance_report(request):
     )
 
     credit_pm_filter = Q(payment_method__identifier="CREDIT")
+    not_settled_filter = ~Q(category__endswith=":settled") & ~Q(
+        category__endswith=":paid"
+    )
 
     pending_receivables = transactions.filter(
         credit_pm_filter, type__in=Transaction.INCOME_TYPES
-    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+    ).filter(not_settled_filter).aggregate(total=Sum("total_paid_amount"))[
+        "total"
+    ] or Decimal(
+        "0"
+    )
 
     pending_payables = transactions.filter(
         credit_pm_filter,
         type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT],
-    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+    ).filter(not_settled_filter).aggregate(total=Sum("total_paid_amount"))[
+        "total"
+    ] or Decimal(
+        "0"
+    )
 
     # --- By transaction type breakdown ----------------------------------
     by_transaction_type = {

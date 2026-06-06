@@ -9,6 +9,25 @@ from .payments import PaymentVerifier
 
 
 class TransactionSerializer(serializers.ModelSerializer):
+    is_settled = serializers.SerializerMethodField()
+    customer_name = serializers.SerializerMethodField()
+
+    def get_is_settled(self, obj) -> bool:
+        """True when this credit transaction has been settled via the settle endpoint
+        or via the legacy supply settle_debt flow."""
+        if not obj.category:
+            return False
+        return obj.category.endswith(":settled") or obj.category.endswith(":paid")
+
+    def get_customer_name(self, obj):
+        """Return the linked order's customer full_name, if available."""
+        try:
+            if obj.order_id and obj.order and obj.order.customer_id:
+                return obj.order.customer.full_name
+        except Exception:
+            pass
+        return None
+
     class Meta:
         model = Transaction
         fields = "__all__"

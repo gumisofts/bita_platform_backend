@@ -118,6 +118,14 @@ class OrderViewset(ModelViewSet):
             return OrderListSerializer
         return self.serializer_class
 
+    def perform_create(self, serializer):
+        """Ensure the employee is always set from the authenticated user."""
+        employee = Employee.objects.filter(
+            user=self.request.user,
+            business=self.request.business,
+        ).first()
+        serializer.save(employee=employee)
+
     def update(self, request, *args, **kwargs):
         order = self.get_object()
         previous_status = order.status
@@ -129,32 +137,28 @@ class OrderViewset(ModelViewSet):
 
             payment_method_id = request.data.get("payment_method")
 
-            # If the status is changing to COMPLETED or PARTIALLY_PAID, ensure payment method is provided
-            if new_status in [
-                Order.StatusChoices.COMPLETED,
-                Order.StatusChoices.PARTIALLY_PAID,
-            ]:
-                if not payment_method_id:
-                    return Response(
-                        {
-                            "error": "Payment method is required when completing or partially paying an order."
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+            if (
+                new_status
+                in [
+                    Order.StatusChoices.COMPLETED,
+                    Order.StatusChoices.PARTIALLY_PAID,
+                ]
+                and previous_status != new_status
+            ):
+                payment_method = None
+                if payment_method_id:
+                    try:
+                        payment_method = BusinessPaymentMethod.objects.get(
+                            id=payment_method_id,
+                            business=order.business,
+                        )
+                    except BusinessPaymentMethod.DoesNotExist:
+                        return Response(
+                            {"error": "Invalid payment method."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
-                try:
-                    payment_method = BusinessPaymentMethod.objects.get(
-                        id=payment_method_id,
-                        business=order.business,
-                    )
-                except BusinessPaymentMethod.DoesNotExist:
-                    return Response(
-                        {"error": "Invalid payment method."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                # Create a transaction if the status changed
-                if previous_status != new_status:
+                if payment_method:
                     with db_transaction.atomic():
                         Transaction.objects.create(
                             order=order,
@@ -190,17 +194,6 @@ class OrderViewset(ModelViewSet):
                 order.status = Order.StatusChoices.COMPLETED
                 order.save()
                 order_completed.send(sender=Order, instance=order)
-
-                if order.payment_method:
-                    Transaction.objects.create(
-                        order=order,
-                        type=Transaction.TransactionType.SALE,
-                        total_paid_amount=order.total_payable,
-                        payment_method=order.payment_method,
-                        branch=order.branch,
-                        business=order.business,
-                        created_by=request.user,
-                    )
         except DjangoValidationError as e:
             return Response(
                 {"error": e.message},
@@ -419,6 +412,9 @@ class OrderViewset(ModelViewSet):
                 hour=0, minute=0, second=0, microsecond=0
             )
             end = now
+        elif filter_type == "this_month":
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = now
         elif filter_type == "this_year":
             start = now.replace(
                 month=1, day=1, hour=0, minute=0, second=0, microsecond=0
@@ -427,7 +423,7 @@ class OrderViewset(ModelViewSet):
         else:
             raise ValidationError(
                 {
-                    "detail": f"Invalid filter type: {filter_type}. Use: today, this_week, this_year"
+                    "detail": f"Invalid filter type: {filter_type}. Use: today, this_week, this_month, this_year"
                 }
             )
 
