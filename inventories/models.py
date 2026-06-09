@@ -205,6 +205,16 @@ class SuppliedItem(BaseModel):
         return f"{self.item} - {self.quantity}"
 
 
+class ItemVideo(BaseModel):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="itemvideo_set")
+    file = models.ForeignKey(FileMeta, on_delete=models.CASCADE)
+    is_primary = models.BooleanField(default=False)
+    is_visible = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Video for {self.item.name}"
+
+
 class Pricing(BaseModel):
     price = models.PositiveBigIntegerField()
     item_variant = models.ForeignKey(

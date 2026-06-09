@@ -6,18 +6,15 @@ from .views import (
     MarketplaceCategoryViewSet,
     MarketplaceProductViewSet,
     MarketplaceStatsViewSet,
+    ReviewViewSet,
 )
 
 router = DefaultRouter()
 
-# Main marketplace endpoints
 router.register(r"products", MarketplaceProductViewSet, basename="marketplace-products")
-router.register(
-    r"categories", MarketplaceCategoryViewSet, basename="marketplace-categories"
-)
-router.register(
-    r"businesses", MarketplaceBusinessViewSet, basename="marketplace-businesses"
-)
+router.register(r"categories", MarketplaceCategoryViewSet, basename="marketplace-categories")
+router.register(r"businesses", MarketplaceBusinessViewSet, basename="marketplace-businesses")
 router.register(r"stats", MarketplaceStatsViewSet, basename="marketplace-stats")
+router.register(r"reviews", ReviewViewSet, basename="marketplace-reviews")
 
 urlpatterns = router.urls
