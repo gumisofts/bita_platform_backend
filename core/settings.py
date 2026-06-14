@@ -14,14 +14,45 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
-DEBUG = os.getenv("DJANGO_DEBUG", False) == "True"
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://localhost:3002"
+).split(",")
 
-CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(
-    ","
-)
+# Wildcard tunnel domains so dev tunnels (ngrok, cloudflared) work without
+# touching .env every session. These patterns are safe because they only
+# match HTTPS subdomains of the respective tunnel services.
+_TUNNEL_CSRF_ORIGINS = [
+    "https://*.ngrok-free.app",
+    "https://*.ngrok.io",
+    "https://*.trycloudflare.com",
+]
+CSRF_TRUSTED_ORIGINS = list(set(CSRF_TRUSTED_ORIGINS + _TUNNEL_CSRF_ORIGINS))
+
+CORS_ALLOWED_ORIGINS = os.getenv(
+    "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"
+).split(",")
+
+# Regex-based CORS to cover any ngrok / cloudflared subdomain without
+# needing to update .env when the tunnel URL rotates.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://[\w-]+\.ngrok-free\.app$",
+    r"^https://[\w-]+\.ngrok\.io$",
+    r"^https://[\w-]+\.trycloudflare\.com$",
+]
+
+# Allow the custom tenant-context headers sent by the frontend on every request.
+# django-cors-headers defaults only cover standard headers, so custom ones must
+# be listed explicitly here.
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-business-id",
+    "x-branch-id",
+]
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -79,14 +110,10 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "core.urls"
 
-CORS_ALLOWED_ORIGINS = os.getenv(
-    "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"
-).split(",")
-
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": ["notification.templates"],
+        "DIRS": [BASE_DIR / "notifications" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -94,6 +121,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "accounts.context_processors.impersonation_status",
             ],
         },
     },
@@ -103,20 +131,30 @@ WSGI_APPLICATION = "core.wsgi.app"
 ASGI_APPLICATION = "core.asgi.app"
 
 
-tmpPostgres = urlparse(os.getenv("DJANGO_POSTGRES_URL"))
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": tmpPostgres.path[1:],
-        "USER": tmpPostgres.username,
-        "PASSWORD": tmpPostgres.password,
-        "HOST": tmpPostgres.hostname,
-        "PORT": tmpPostgres.port,
-        "CONN_MAX_AGE": None,
-        "OPTIONS": dict(parse_qsl(tmpPostgres.query)),
-    },
-}
+_postgres_url = os.getenv("DJANGO_POSTGRES_URL")
+if _postgres_url:
+    tmpPostgres = urlparse(_postgres_url)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": tmpPostgres.path[1:] if tmpPostgres.path else "",
+            "USER": tmpPostgres.username,
+            "PASSWORD": tmpPostgres.password,
+            "HOST": tmpPostgres.hostname,
+            "PORT": tmpPostgres.port,
+            "CONN_MAX_AGE": 60,
+            "OPTIONS": dict(parse_qsl(tmpPostgres.query)),
+        },
+    }
+else:
+    # Fallback to SQLite for local development / management commands when no
+    # DJANGO_POSTGRES_URL is set. Production must always provide the env var.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -137,7 +175,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Africa/Addis_Ababa"
 
 USE_I18N = True
 
@@ -164,13 +202,18 @@ if not os.getenv("AWS_STORAGE_BUCKET_NAME") or DEBUG:
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     }
 
-STATIC_URL = os.getenv("STATIC_URL", "static/")
+STATIC_URL = os.getenv("STATIC_URL", "/static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
-STATIC_ROOT = BASE_DIR / "static"
+STATIC_ROOT = Path("/var/www/static")
 
-MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/medias/"
+MEDIA_ROOT = Path("/var/www/medias")
 
+# WhiteNoise configuration
+WHITENOISE_USE_FINDERS = DEBUG  # Use finders in development, storage in production
+WHITENOISE_AUTOREFRESH = DEBUG  # Auto-refresh in development
+WHITENOISE_MAX_AGE = 31536000 if not DEBUG else 0  # 1 year cache in production
+WHITENOISE_MANIFEST_STRICT = not DEBUG  # Strict manifest checking in production
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -197,12 +240,26 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 ADMIN = ("Murad", "nuradhussen082@gmail.com")
 
 CELERY_BROKER_URL = os.getenv("DJANGO_CELERY_BROKER_URL")
-CELERY_BACKEND_URL = os.getenv("DJANGO_CELERY_BACKEND_URL")
+CELERY_RESULT_BACKEND = os.getenv("DJANGO_CELERY_BACKEND_URL")
+
+from core.celery.queues import CeleryQueue  # noqa: E402
+
+CELERY_TASK_QUEUES = CeleryQueue.queues()
+CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_TASK_CREATE_MISSING_QUEUES = True
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=90),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=90),
+    # Defaults match common DRF SimpleJWT recommendations. Override per-environment
+    # via DJANGO_JWT_ACCESS_MINUTES / DJANGO_JWT_REFRESH_DAYS env vars when needed.
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=int(os.getenv("DJANGO_JWT_ACCESS_MINUTES", "60"))
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=int(os.getenv("DJANGO_JWT_REFRESH_DAYS", "30"))
+    ),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
@@ -276,3 +333,10 @@ ANONYMOUS_USER_NAME = None
 
 X_FRAME_OPTIONS = "SAMEORIGIN"
 SILENCED_SYSTEM_CHECKS = ["security.W019"]
+
+TELEBIRR_BASE_URL = os.getenv("TELEBIRR_BASE_URL")
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

@@ -8,8 +8,14 @@ from finances.models import *
 class BusinessPaymentMethodInline(admin.TabularInline):
     model = BusinessPaymentMethod
     extra = 0
-    fields = ("payment", "label", "identifier")
-    raw_id_fields = ("payment",)
+    fields = (
+        "payment",
+        "label",
+        "branch",
+        "identifier",
+        "receiver_name",
+    )
+    raw_id_fields = ("payment", "branch")
 
 
 @admin.register(PaymentMethod)
@@ -58,18 +64,20 @@ class BusinessPaymentMethodAdmin(admin.ModelAdmin):
         "id",
         "business_name",
         "payment_name",
-        "label",
+        "display_name",
+        "receiver_name",
         "identifier",
+        "branch",
         "created_at",
     ]
     list_filter = ["business", "payment", "created_at"]
     search_fields = ["business__name", "payment__name", "label", "identifier"]
     readonly_fields = ["id", "created_at", "updated_at"]
-    raw_id_fields = ["business", "payment"]
+    raw_id_fields = ["business", "payment", "branch"]
 
     fieldsets = (
-        (None, {"fields": ("id", "business", "payment")}),
-        (_("Configuration"), {"fields": ("label", "identifier")}),
+        (None, {"fields": ("id", "business", "payment", "branch")}),
+        (_("Configuration"), {"fields": ("label", "identifier", "receiver_name")}),
         (
             _("Timestamps"),
             {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
@@ -103,10 +111,10 @@ class TransactionAdmin(admin.ModelAdmin):
     raw_id_fields = ["order", "payment_method", "business", "branch"]
 
     fieldsets = (
-        (None, {"fields": ("id", "type", "order")}),
+        (None, {"fields": ("id", "type", "order", "branch", "business")}),
         (
             _("Financial Details"),
-            {"fields": ("total_paid_amount", "payment_method", "total_left_amount")},
+            {"fields": ("total_paid_amount", "payment_method")},
         ),
         (
             _("Timestamps"),
@@ -162,14 +170,6 @@ class TransactionAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("order")
 
 
-# Custom admin actions
-@admin.action(description="Mark selected transactions as fully paid")
-def mark_as_fully_paid(modeladmin, request, queryset):
-    for transaction in queryset:
-        transaction.total_left_amount = 0
-        transaction.save()
-
-
 @admin.action(description="Export financial summary")
 def export_financial_summary(modeladmin, request, queryset):
     # This would typically generate a report or CSV
@@ -186,4 +186,4 @@ def export_financial_summary(modeladmin, request, queryset):
 
 
 # Add actions to TransactionAdmin
-TransactionAdmin.actions = [mark_as_fully_paid, export_financial_summary]
+TransactionAdmin.actions = [export_financial_summary]

@@ -8,6 +8,12 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from accounts.admin_views import (
+    get_user_jwt_token,
+    impersonate_user,
+    stop_impersonation,
+)
+
 urlpatterns = [
     path(
         "docs/swagger/",
@@ -25,6 +31,17 @@ urlpatterns = [
         name="swagger-ui",
     ),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "admin/impersonate-user/<uuid:user_id>/",
+        impersonate_user,
+        name="impersonate_user",
+    ),
+    path(
+        "admin/get-user-jwt-token/<uuid:user_id>/",
+        get_user_jwt_token,
+        name="get_user_jwt_token",
+    ),
+    path("admin/stop-impersonation/", stop_impersonation, name="stop_impersonation"),
     path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),
     path("business/", include("business.urls")),

@@ -9,7 +9,7 @@ User = get_user_model()
 
 class Customer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    email = models.EmailField(unique=True, validators=[EmailValidator()])
+    email = models.EmailField(validators=[EmailValidator()])
     full_name = models.CharField(max_length=255)
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -23,9 +23,20 @@ class Customer(models.Model):
                     '912345678 / 712345678'. Up to 9 digits allowed.",
             )
         ],
-        unique=True,
         blank=True,
+        null=True,
+        default=None,
     )
+
+    class Meta:
+        unique_together = [("email", "business")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["phone_number", "business"],
+                condition=models.Q(phone_number__isnull=False),
+                name="unique_phone_number_per_business",
+            )
+        ]
 
     def __str__(self):
         return self.full_name

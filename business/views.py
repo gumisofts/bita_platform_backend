@@ -2,6 +2,7 @@ from uuid import UUID
 
 from django.db.models import Q
 from django.shortcuts import render
+from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_perms, remove_perm
@@ -119,10 +120,7 @@ class CategoryViewset(ListModelMixin, RetrieveModelMixin, GenericViewSet):
 class BusinessRoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BusinessLevelPermission]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -135,10 +133,7 @@ class BusinessRoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
 class BranchViewset(ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission,
-    ]
+    permission_classes = [IsAuthenticated, BusinessLevelPermission]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -190,35 +185,40 @@ class BusinessImageViewset(ListModelMixin, GenericViewSet):
 class EmployeeViewset(ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
-    permission_classes = [
-        IsAuthenticated,
-        BusinessLevelPermission | BranchLevelPermission,
-    ]  # TODO: Handle permissions
+    permission_classes = [IsAuthenticated, BusinessLevelPermission]
     lookup_field = "id"
+
+    def get_serializer_class(self):
+        if self.request.method in ("GET",):
+            from business.serializers import EmployeeReadSerializer
+
+            return EmployeeReadSerializer
+        return EmployeeSerializer
 
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
-        business_id = self.request.query_params.get("business_id")
+        business = self.request.business
+        branch = self.request.branch
 
-        if not business_id or not is_valid_uuid(business_id):
-            raise ValidationError({"detail": "Empty or invalid business_id"})
+        if not business:
+            raise ValidationError({"detail": "Empty or invalid business"})
 
         queryset = get_objects_for_user(user, "view_employee", queryset)
 
-        queryset = queryset.filter(business=business_id)
+        queryset = queryset.filter(business=business)
 
         business = get_objects_for_user(
             user,
             "can_view_employee_business",
-            Business.objects.filter(id=business_id),
+            Business.objects.filter(id=business.id),
             accept_global_perms=False,
         ).first()
 
         if business:
             queryset = queryset | business.employees.all()
 
-        return queryset
+        return queryset.distinct()
 
 
 class EmployeeInvitationViewset(ModelViewSet):
@@ -226,27 +226,19 @@ class EmployeeInvitationViewset(ModelViewSet):
     permission_classes = [EmployeeInvitationPermission]
 
     def get_queryset(self):
-        queryset = EmployeeInvitation.objects.all()
+        queryset = EmployeeInvitation.objects.select_related(
+            "business", "business__address", "role", "branch"
+        )
         user = self.request.user
-        business_id = self.request.query_params.get("business_id")
+        business = self.request.business
 
-        if business_id and is_valid_uuid(business_id):
-            try:
-                # Check if user has access to the business
-                user_business = Business.objects.filter(
-                    Q(owner=user) | Q(employees__user=user), id=business_id
-                ).first()
+        if not business:
+            return queryset.none()
 
-                if user_business:
-                    queryset = queryset.filter(business=business_id)
-                else:
-                    queryset = queryset.none()
-            except ValueError:
-                queryset = queryset.none()
-        else:
-            queryset = queryset.none()
+        if not user.has_perm("can_view_employeeinvitation_business", business):
+            return queryset.none()
 
-        return queryset
+        return queryset.filter(business=business)
 
     def get_permissions(self):
         """
@@ -269,9 +261,18 @@ class EmployeeInvitationViewset(ModelViewSet):
         List pending invitations for the current user.
         """
         user = request.user
+        match_q = Q()
+        if user.email:
+            match_q |= Q(email=user.email)
+        if user.phone_number:
+            match_q |= Q(phone_number=user.phone_number)
+
+        if not match_q:
+            return Response([])
+
         queryset = EmployeeInvitation.objects.filter(
-            Q(phone_number=user.phone_number) | Q(email=user.email), status="pending"
-        )
+            match_q, status="pending", expires_at__gt=timezone.now()
+        ).select_related("business", "business__address", "role", "branch")
 
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -285,6 +286,7 @@ class EmployeeInvitationViewset(ModelViewSet):
         detail=True,
         methods=["patch"],
         url_path="status",
+        permission_classes=[IsAuthenticated],
         serializer_class=EmployeeInvitationStatusSerializer,
     )
     def update_status(self, request, pk=None):
@@ -300,13 +302,23 @@ class EmployeeInvitationViewset(ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        if invitation.is_expired:
+            invitation.status = "expired"
+            invitation.save(update_fields=["status"])
+            return Response(
+                {"detail": "This invitation has expired"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         user = request.user
 
-        # Check if the user is the one who was invited
-        if not (
-            invitation.email == user.email
-            or invitation.phone_number == user.phone_number
-        ):
+        email_match = invitation.email and user.email and invitation.email == user.email
+        phone_match = (
+            invitation.phone_number
+            and user.phone_number
+            and invitation.phone_number == user.phone_number
+        )
+        if not (email_match or phone_match):
             return Response(
                 {"detail": "You can only update your own invitations"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -337,10 +349,9 @@ class EmployeeInvitationViewset(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Trigger the signal to resend the invitation
-        from business.signals import post_save
+        from business.signals import employee_invitation_resend
 
-        post_save.send(sender=EmployeeInvitation, instance=invitation, created=False)
+        employee_invitation_resend.send(sender=EmployeeInvitation, instance=invitation)
 
         return Response(
             {"message": "Invitation resent successfully"}, status=status.HTTP_200_OK
@@ -359,36 +370,29 @@ class EmployeeInvitationViewset(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = request.user
         try:
-            # Check if user has access to the business
-            user_business = Business.objects.filter(
-                Q(owner=user) | Q(employees__user=user), id=business_id
-            ).first()
-
-            if not user_business:
-                return Response(
-                    {"error": "You don't have access to this business"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            # Get invitation statistics
-            invitations = EmployeeInvitation.objects.filter(business=business_id)
-            stats = {
-                "total": invitations.count(),
-                "pending": invitations.filter(status="pending").count(),
-                "accepted": invitations.filter(status="accepted").count(),
-                "rejected": invitations.filter(status="rejected").count(),
-                "expired": invitations.filter(status="expired").count(),
-                "revoked": invitations.filter(status="revoked").count(),
-            }
-
-            return Response(stats)
-
-        except ValueError:
+            business = Business.objects.get(id=business_id)
+        except Business.DoesNotExist:
             return Response(
-                {"error": "Invalid business_id"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Business not found"}, status=status.HTTP_404_NOT_FOUND
             )
+
+        if not request.user.has_perm("can_view_employeeinvitation_business", business):
+            return Response(
+                {"error": "You don't have access to this business"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        invitations = EmployeeInvitation.objects.filter(business=business)
+        stats = {
+            "total": invitations.count(),
+            "pending": invitations.filter(status="pending").count(),
+            "accepted": invitations.filter(status="accepted").count(),
+            "rejected": invitations.filter(status="rejected").count(),
+            "expired": invitations.filter(status="expired").count(),
+            "revoked": invitations.filter(status="revoked").count(),
+        }
+        return Response(stats)
 
     def create(self, request, *args, **kwargs):
         """
@@ -396,16 +400,11 @@ class EmployeeInvitationViewset(ModelViewSet):
         """
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            # Additional validation
-            business_id = serializer.validated_data.get("business")
-            if business_id:
-                user = request.user
-                # Check if user has permission to invite to this business
-                user_business = Business.objects.filter(
-                    Q(owner=user) | Q(employees__user=user), id=business_id.id
-                ).first()
-
-                if not user_business:
+            business = serializer.validated_data.get("business")
+            if business:
+                if not request.user.has_perm(
+                    "can_add_employeeinvitation_business", business
+                ):
                     return Response(
                         {
                             "error": "You don't have permission to invite to this business"
@@ -413,18 +412,39 @@ class EmployeeInvitationViewset(ModelViewSet):
                         status=status.HTTP_403_FORBIDDEN,
                     )
 
-            # Check for duplicate invitations
             email = serializer.validated_data.get("email")
             phone_number = serializer.validated_data.get("phone_number")
-            business = serializer.validated_data.get("business")
 
+            if email and email == request.user.email:
+                return Response(
+                    {"error": "You cannot invite yourself"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if phone_number and phone_number == request.user.phone_number:
+                return Response(
+                    {"error": "You cannot invite yourself"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            existing_employee_q = Q(business=business)
+            if email:
+                existing_employee_q &= Q(user__email=email)
+            elif phone_number:
+                existing_employee_q &= Q(user__phone_number=phone_number)
+            if Employee.objects.filter(existing_employee_q).exists():
+                return Response(
+                    {"error": "This user is already an employee of this business"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            existing_invitation = None
             if email:
                 existing_invitation = EmployeeInvitation.objects.filter(
                     email=email,
                     business=business,
                     status="pending",
                 ).first()
-            if phone_number:
+            if phone_number and not existing_invitation:
                 existing_invitation = EmployeeInvitation.objects.filter(
                     phone_number=phone_number,
                     business=business,

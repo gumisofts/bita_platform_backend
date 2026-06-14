@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from business.models import Branch
+from business.models import Branch, Category
 from inventories.models import *
 
 from .models import Item
@@ -9,12 +9,36 @@ from .models import Item
 
 
 class ItemSerializer(serializers.ModelSerializer):
+    categories = serializers.PrimaryKeyRelatedField(
+        many=True, allow_empty=True, queryset=Category.objects.all()
+    )
+    description = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    quantity = serializers.SerializerMethodField(read_only=True)
+
+    def get_quantity(self, obj):
+        return sum(
+            supplied_item.quantity
+            for variant in obj.variants.all()
+            for supplied_item in variant.supplied_items.all()
+        )
+
     class Meta:
         model = Item
         fields = "__all__"
 
 
 class ItemReadSerializer(serializers.ModelSerializer):
+    quantity = serializers.SerializerMethodField(read_only=True)
+
+    def get_quantity(self, obj):
+        return sum(
+            supplied_item.quantity
+            for variant in obj.variants.all()
+            for supplied_item in variant.supplied_items.all()
+        )
+
     class Meta:
         model = Item
         exclude = []
@@ -30,20 +54,58 @@ class PropertySerializer(serializers.ModelSerializer):
 
 
 class SuppliedItemSerializer(serializers.ModelSerializer):
+    supply_label = serializers.CharField(source="supply.label", read_only=True)
+    item_name = serializers.CharField(source="item.name", read_only=True, default=None)
+    variant_name = serializers.CharField(
+        source="variant.name", read_only=True, default=None
+    )
+
     class Meta:
         model = SuppliedItem
         exclude = []
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class SuppliedItemUpdateSerializer(serializers.ModelSerializer):
+    """Used for PUT / PATCH on the dedicated supplied-items endpoint.
+
+    Structural FK fields (supply, variant, item, business) are read-only to
+    prevent accidentally re-pointing a batch to a different supply or variant.
+    Quantity changes are synced to the owning ItemVariant by the viewset.
+    """
+
+    supply_label = serializers.CharField(source="supply.label", read_only=True)
+
+    class Meta:
+        model = SuppliedItem
+        exclude = []
+        read_only_fields = [
+            "id",
+            "supply",
+            "variant",
+            "item",
+            "business",
+            "initial_quantity",
+            "created_at",
+            "updated_at",
+        ]
+
+
 class SupplyDetailsSerializer(serializers.ModelSerializer):
+    """Used for retrieve and update of a Supply.
+
+    ``supplied_items`` is read-only here; use the dedicated
+    ``/inventories/supplied_items/`` endpoints to create, update or delete
+    individual batches.
+    """
+
     supplied_items = SuppliedItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = Supply
         exclude = []
         depth = 1
-        read_only_fields = ["id", "created_at", "updated_at", "supplied_items"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 
 class SupplySerializer(serializers.ModelSerializer):
@@ -82,12 +144,41 @@ class SupplySerializer(serializers.ModelSerializer):
         exclude = []
         extra_kwargs = {
             "business": {"required": True},
+            "label": {"required": False, "allow_blank": True},
         }
+
+    def get_unique_together_validators(self):
+        """Skip unique-together so we can reuse existing supply via get_or_create."""
+        return []
+
+    def to_internal_value(self, data):
+        """Set label when missing so unique lookup works; when provided we reuse existing."""
+        internal = super().to_internal_value(data)
+        branch = internal.get("branch")
+        if branch is not None and not internal.get("label"):
+            internal["label"] = get_next_supply_label(branch)
+        return internal
 
     def create(self, validated_data):
         item = validated_data.pop("item", None)
         business = validated_data.get("business", None)
-        supply = super().create(validated_data)
+        branch = validated_data.pop("branch")
+        label = validated_data.pop("label")
+
+        # Pre-calculate total_cost so the post_save signal fires with the
+        # correct amount when creating the DEBT/PURCHASE transaction.
+        # The finance signal runs when Supply is saved (before SuppliedItem
+        # exists), so we derive the cost from the validated payload here.
+        # Use the already-validated types (int, Decimal) to avoid type errors
+        # in the on_supplied_item_saved signal which does Decimal arithmetic.
+        if item and not validated_data.get("total_cost"):
+            qty = item.get("quantity") or 0  # int after DRF validation
+            price = item.get("purchase_price") or 0  # Decimal after DRF validation
+            validated_data["total_cost"] = qty * price
+
+        supply, _ = Supply.objects.get_or_create(
+            branch=branch, label=label, defaults=validated_data
+        )
         if item:
             item["item"] = item.get("variant").item
             item["initial_quantity"] = item.get("quantity")
@@ -121,6 +212,10 @@ class ReturnRecallSerializer(serializers.ModelSerializer):
 
 
 class GroupSerializer(serializers.ModelSerializer):
+    description = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+
     class Meta:
         model = Group
         fields = "__all__"
@@ -128,6 +223,56 @@ class GroupSerializer(serializers.ModelSerializer):
 
 
 class ItemVariantReadSerializer(serializers.ModelSerializer):
+    class InnerPricingSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Pricing
+            exclude = ["item_variant"]
+            read_only_fields = ["id", "created_at", "updated_at"]
+
+    class InnerPropertySerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Property
+            exclude = ["item_variant"]
+            read_only_fields = ["id", "created_at", "updated_at"]
+
+    class InnerSuppliedItemSerializer(serializers.ModelSerializer):
+        """Exposes per-supply-batch values so callers can track how price,
+        expiry, and quantity have changed across supply runs."""
+
+        supply_label = serializers.CharField(source="supply.label", read_only=True)
+        supply_date = serializers.DateTimeField(
+            source="supply.created_at", read_only=True
+        )
+
+        class Meta:
+            model = SuppliedItem
+            fields = [
+                "id",
+                "supply",
+                "supply_label",
+                "supply_date",
+                "purchase_price",
+                "selling_price",
+                "expire_date",
+                "man_date",
+                "batch_number",
+                "product_number",
+                "quantity",
+                "initial_quantity",
+                "created_at",
+            ]
+            read_only_fields = fields
+
+    properties = InnerPropertySerializer(many=True, read_only=True)
+    pricings = InnerPricingSerializer(many=True, read_only=True)
+    supplied_items = InnerSuppliedItemSerializer(many=True, read_only=True)
+    quantity = serializers.SerializerMethodField()
+
+    def get_quantity(self, obj):
+        return sum(
+            [supplied_item.quantity for supplied_item in obj.supplied_items.all()]
+        )
+
     class Meta:
         model = ItemVariant
         exclude = []
@@ -336,3 +481,50 @@ class SupplierSerializer(serializers.ModelSerializer):
         model = Supplier
         exclude = []
         read_only_fields = ["id", "created_at", "updated_at"]
+        extra_kwargs = {
+            "email": {"required": False, "allow_blank": True},
+        }
+
+
+# ---------------------------------------------------------------------------
+# Bulk import / export
+# ---------------------------------------------------------------------------
+
+# Column order is the contract between import and export — do not reorder.
+BULK_IMPORT_COLUMNS = [
+    "name",
+    "description",
+    "inventory_unit",
+    "variant_name",
+    "selling_price",
+    "sku",
+    "quantity",
+    "groups",
+]
+
+BULK_IMPORT_COLUMN_NOTES = {
+    "name": "Required. Product name. Repeat on multiple rows to add more variants to the same product.",
+    "description": "Optional. Product description (only read from the first row of each product).",
+    "inventory_unit": "Required. Unit of measure, e.g. piece, kg, litre.",
+    "variant_name": "Optional. Variant label, e.g. '500mg' or 'Large'. Defaults to the product name when left blank.",
+    "selling_price": "Required. Selling price — must be a positive number.",
+    "sku": "Optional. Unique SKU code for this variant. Leave blank to auto-assign none.",
+    "quantity": "Optional. Starting stock quantity (default 0).",
+    "groups": "Optional. Comma-separated group names, e.g. 'Antibiotics, Painkillers'. Groups are created automatically if they do not exist.",
+}
+
+
+class BulkItemImportSerializer(serializers.Serializer):
+    """Accepts a CSV or Excel file and bulk-creates Items with one default variant each."""
+
+    file = serializers.FileField()
+
+    def validate_file(self, value):
+        name = value.name.lower()
+        if not (
+            name.endswith(".csv") or name.endswith(".xlsx") or name.endswith(".xls")
+        ):
+            raise serializers.ValidationError(
+                "Only CSV (.csv) and Excel (.xlsx / .xls) files are supported."
+            )
+        return value

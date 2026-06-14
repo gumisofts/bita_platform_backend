@@ -55,8 +55,7 @@ class RoleSerializer(serializers.ModelSerializer):
     permissions = serializers.SerializerMethodField()
 
     def get_permissions(self, obj):
-
-        return map(lambda x: x.codename, obj.permissions.all())
+        return [x.codename for x in obj.permissions.all()]
 
     class Meta:
         model = Role
@@ -78,6 +77,12 @@ class BranchSerializer(serializers.ModelSerializer, BaseSerializerMixin):
 class BusinessSerializer(serializers.ModelSerializer, BaseSerializerMixin):
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
     address = AddressSerializer()
+    categories = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        many=True,
+        required=False,
+        allow_empty=True,
+    )
 
     class Meta:
         model = Business
@@ -120,19 +125,20 @@ class EmployeeSerializer(serializers.ModelSerializer, BaseSerializerMixin):
         return super().create(validated_data)
 
 
+class EmployeeReadSerializer(serializers.ModelSerializer, BaseSerializerMixin):
+    class Meta:
+        model = Employee
+        exclude = []
+        depth = 1
+
+
 class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMixin):
-    class CompanySmallDetailSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = Business
-            fields = ["id", "name"]
-
-    class BranchSmallDetailSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = Branch
-            fields = ["id", "name"]
-
-    branch = BranchSmallDetailSerializer(read_only=True)
-    business = CompanySmallDetailSerializer(read_only=True)
+    business = serializers.PrimaryKeyRelatedField(
+        queryset=Business.objects.all(),
+        required=True,
+        allow_null=False,
+    )
+    business_details = BusinessSerializer(source="business", read_only=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -145,7 +151,24 @@ class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMi
             if not regex_validator.regex.match(phone_number):
                 raise ValidationError({"phone_number": "Invalid phone number"})
 
+        # Require a branch for every role except 'Business Admin'
+        role = attrs.get("role")
+        branch = attrs.get("branch")
+
+        if role and hasattr(role, "role_name"):
+            if role.role_name != ROLES.BUSINESS_ADMIN.value and branch is None:
+                raise ValidationError({"branch": "Branch is required for this role."})
+
         return attrs
+
+    def to_representation(self, instance):
+        """Override to include business_details in the response"""
+        representation = super().to_representation(instance)
+        if hasattr(instance, "business") and instance.business:
+            representation["business"] = BusinessSerializer(
+                instance.business, context=self.context
+            ).data
+        return representation
 
     class Meta:
         model = EmployeeInvitation
@@ -154,16 +177,14 @@ class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMi
 
 
 class EmployeeInvitationStatusSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(
-        choices=list(map(lambda x: x[0], EmployeeInvitation.STATUS_CHOICES))
-    )
+    ALLOWED_STATUS_TRANSITIONS = ["accepted", "rejected"]
 
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        status = attrs.get("status")
-        if status not in list(map(lambda x: x[0], EmployeeInvitation.STATUS_CHOICES)):
-            raise ValidationError({"status": "Invalid status"})
-        return attrs
+    status = serializers.ChoiceField(choices=ALLOWED_STATUS_TRANSITIONS)
+
+    def validate_status(self, value):
+        if value not in self.ALLOWED_STATUS_TRANSITIONS:
+            raise ValidationError("Can only accept or reject an invitation.")
+        return value
 
     def update(self, instance, validated_data):
         instance.status = validated_data.get("status")

@@ -1,138 +1,80 @@
 import enum
+from datetime import timedelta
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.validators import RegexValidator
 from django.db import models
+from django.utils import timezone
 
 from core.models import BaseModel
 
 User = get_user_model()
 
 
-class AdditionalBusinessPermissionNames(enum.Enum):
+# Models whose permissions live on the Business object itself.
+# These are things that span the whole business rather than a single branch.
+BUSINESS_SCOPED_MODELS: list[str] = [
+    "branch",
+    "employee",
+    "address",
+    "employeeinvitation",
+    "group",
+    "customer",
+]
 
-    CAN_ADD_BRANCH = ("can_add_branch", "Can add branch")
-    CAN_CHANGE_BRANCH = ("can_change_branch", "Can change branch")
-    CAN_DELETE_BRANCH = ("can_delete_branch", "Can delete branch")
-    CAN_VIEW_BRANCH = ("can_view_branch", "Can view branch")
+# Models whose permissions live on a Branch object.
+# Owners / admins receive _branch perms on every branch instead of a single
+# _business perm so that access stays consistent with manager/employee roles
+# and new branches are handled automatically via the Branch post-save signal.
+BRANCH_SCOPED_MODELS: list[str] = [
+    "order",
+    "item",
+    "inventorymovement",
+    "inventory",
+    "property",
+    "itemvariant",
+    "supplier",
+    "businesspaymentmethod",
+    "transaction",
+    "giftcard",
+    "supply",
+]
 
-    CAN_ADD_EMPLOYEE = ("can_add_employee", "Can add employee")
-    CAN_CHANGE_EMPLOYEE = ("can_change_employee", "Can change employee")
-    CAN_DELETE_EMPLOYEE = ("can_delete_employee", "Can delete employee")
-    CAN_VIEW_EMPLOYEE = ("can_view_employee", "Can view employee")
+# Full list used only for generating Meta.permissions on Business and Branch.
+PERMISSIONED_MODELS: list[str] = BUSINESS_SCOPED_MODELS + BRANCH_SCOPED_MODELS
 
-    CAN_ADD_ADDRESS = ("can_add_address", "Can add address")
-    CAN_CHANGE_ADDRESS = ("can_change_address", "Can change address")
-    CAN_DELETE_ADDRESS = ("can_delete_address", "Can delete address")
-    CAN_VIEW_ADDRESS = ("can_view_address", "Can view address")
+CRUD_ACTIONS: list[str] = ["add", "change", "delete", "view"]
 
-    CAN_ADD_EMPLOYEE_INVITATION = (
-        "can_add_employeeinvitation",
-        "Can add employee invitation",
-    )
-    CAN_CHANGE_EMPLOYEE_INVITATION = (
-        "can_change_employeeinvitation",
-        "Can change employee invitation",
-    )
-    CAN_DELETE_EMPLOYEE_INVITATION = (
-        "can_delete_employeeinvitation",
-        "Can delete employee invitation",
-    )
-    CAN_VIEW_EMPLOYEE_INVITATION = (
-        "can_view_employeeinvitation",
-        "Can view employee invitation",
-    )
+# Human-readable overrides for compound model names.
+_MODEL_DISPLAY_NAMES: dict[str, str] = {
+    "employeeinvitation": "employee invitation",
+    "inventorymovement": "inventory movement",
+    "itemvariant": "item variant",
+    "businesspaymentmethod": "business payment method",
+    "giftcard": "gift card",
+}
 
-    CAN_ADD_GROUP = ("can_add_group", "Can add group")
-    CAN_CHANGE_GROUP = ("can_change_group", "Can change group")
-    CAN_DELETE_GROUP = ("can_delete_group", "Can delete group")
-    CAN_VIEW_GROUP = ("can_view_group", "Can view group")
 
-    CAN_ADD_ORDER = ("can_add_order", "Can add order")
-    CAN_CHANGE_ORDER = ("can_change_order", "Can change order")
-    CAN_DELETE_ORDER = ("can_delete_order", "Can delete order")
-    CAN_VIEW_ORDER = ("can_view_order", "Can view order")
+def biz_perm(model_name: str, action: str, scope: str = "business") -> str:
+    """Return the guardian permission codename for a business/branch-scoped action.
 
-    CAN_ADD_ITEM = ("can_add_item", "Can add item")
-    CAN_CHANGE_ITEM = ("can_change_item", "Can change item")
-    CAN_DELETE_ITEM = ("can_delete_item", "Can delete item")
-    CAN_VIEW_ITEM = ("can_view_item", "Can view item")
+    Example: biz_perm("item", "view", "branch") → "can_view_item_branch"
+    """
+    return f"can_{action}_{model_name}_{scope}"
 
-    CAN_ADD_INVENTORY_MOVEMENT = (
-        "can_add_inventorymovement",
-        "Can add inventory movement",
-    )
-    CAN_CHANGE_INVENTORY_MOVEMENT = (
-        "can_change_inventorymovement",
-        "Can change inventory movement",
-    )
-    CAN_DELETE_INVENTORY_MOVEMENT = (
-        "can_delete_inventorymovement",
-        "Can delete inventory movement",
-    )
-    CAN_VIEW_INVENTORY_MOVEMENT = (
-        "can_view_inventorymovement",
-        "Can view inventory movement",
-    )
 
-    CAN_ADD_INVENTORY = ("can_add_inventory", "Can add inventory")
-    CAN_CHANGE_INVENTORY = ("can_change_inventory", "Can change inventory")
-    CAN_DELETE_INVENTORY = ("can_delete_inventory", "Can delete inventory")
-    CAN_VIEW_INVENTORY = ("can_view_inventory", "Can view inventory")
-
-    CAN_ADD_PROPERTY = ("can_add_property", "Can add property")
-    CAN_CHANGE_PROPERTY = ("can_change_property", "Can change property")
-    CAN_DELETE_PROPERTY = ("can_delete_property", "Can delete property")
-    CAN_VIEW_PROPERTY = ("can_view_property", "Can view property")
-
-    CAN_ADD_ITEM_VARIANT = ("can_add_itemvariant", "Can add item variant")
-    CAN_CHANGE_ITEM_VARIANT = ("can_change_itemvariant", "Can change item variant")
-    CAN_DELETE_ITEM_VARIANT = ("can_delete_itemvariant", "Can delete item variant")
-    CAN_VIEW_ITEM_VARIANT = ("can_view_itemvariant", "Can view item variant")
-
-    CAN_ADD_SUPPLIER = ("can_add_supplier", "Can add supplier")
-    CAN_CHANGE_SUPPLIER = ("can_change_supplier", "Can change supplier")
-    CAN_DELETE_SUPPLIER = ("can_delete_supplier", "Can delete supplier")
-    CAN_VIEW_SUPPLIER = ("can_view_supplier", "Can view supplier")
-
-    CAN_ADD_CUSTOMER = ("can_add_customer", "Can add customer")
-    CAN_CHANGE_CUSTOMER = ("can_change_customer", "Can change customer")
-    CAN_DELETE_CUSTOMER = ("can_delete_customer", "Can delete customer")
-    CAN_VIEW_CUSTOMER = ("can_view_customer", "Can view customer")
-
-    CAN_ADD_BUSINESS_PAYMENT_METHOD = (
-        "can_add_businesspaymentmethod",
-        "Can add business payment method",
-    )
-    CAN_CHANGE_BUSINESS_PAYMENT_METHOD = (
-        "can_change_businesspaymentmethod",
-        "Can change business payment method",
-    )
-    CAN_DELETE_BUSINESS_PAYMENT_METHOD = (
-        "can_delete_businesspaymentmethod",
-        "Can delete business payment method",
-    )
-    CAN_VIEW_BUSINESS_PAYMENT_METHOD = (
-        "can_view_businesspaymentmethod",
-        "Can view business payment method",
-    )
-
-    CAN_ADD_TRANSACTION = ("can_add_transaction", "Can add transaction")
-    CAN_CHANGE_TRANSACTION = ("can_change_transaction", "Can change transaction")
-    CAN_DELETE_TRANSACTION = ("can_delete_transaction", "Can delete transaction")
-    CAN_VIEW_TRANSACTION = ("can_view_transaction", "Can view transaction")
-
-    CAN_ADD_GIFT_CARD = ("can_add_giftcard", "Can add gift card")
-    CAN_CHANGE_GIFT_CARD = ("can_change_giftcard", "Can change gift card")
-    CAN_DELETE_GIFT_CARD = ("can_delete_giftcard", "Can delete gift card")
-    CAN_VIEW_GIFT_CARD = ("can_view_giftcard", "Can view gift card")
-
-    CAN_ADD_SUPPLY = ("can_add_supply", "Can add supply")
-    CAN_CHANGE_SUPPLY = ("can_change_supply", "Can change supply")
-    CAN_DELETE_SUPPLY = ("can_delete_supply", "Can delete supply")
-    CAN_VIEW_SUPPLY = ("can_view_supply", "Can view supply")
+def _generate_permissions(scope: str, models: list[str]) -> list[tuple[str, str]]:
+    """Generate the Meta.permissions list for a given scope and model list."""
+    return [
+        (
+            biz_perm(model, action, scope),
+            f"Can {action} {_MODEL_DISPLAY_NAMES.get(model, model)}",
+        )
+        for model in models
+        for action in CRUD_ACTIONS
+    ]
 
 
 class Address(BaseModel):
@@ -207,10 +149,7 @@ class Business(BaseModel):
         return self.name
 
     class Meta:
-        permissions = [
-            (perm.value[0] + "_business", perm.value[1])
-            for perm in AdditionalBusinessPermissionNames
-        ]
+        permissions = _generate_permissions("business", BUSINESS_SCOPED_MODELS)
 
 
 class ROLES(str, enum.Enum):
@@ -352,10 +291,11 @@ class Branch(BaseModel):
         return f"{self.name} - {self.business.name}"
 
     class Meta:
-        permissions = [
-            (perm.value[0] + "_branch", perm.value[1])
-            for perm in AdditionalBusinessPermissionNames
-        ]
+        permissions = _generate_permissions("branch", BRANCH_SCOPED_MODELS)
+
+
+def default_invitation_expiry():
+    return timezone.now() + timedelta(days=7)
 
 
 class EmployeeInvitation(BaseModel):
@@ -372,6 +312,11 @@ class EmployeeInvitation(BaseModel):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, null=True, blank=True)
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
     status = models.CharField(max_length=255, choices=STATUS_CHOICES, default="pending")
+    expires_at = models.DateTimeField(default=default_invitation_expiry)
+
+    @property
+    def is_expired(self):
+        return self.status == "pending" and timezone.now() > self.expires_at
 
     def __str__(self):
         return f"{self.email} - {self.business.name}"

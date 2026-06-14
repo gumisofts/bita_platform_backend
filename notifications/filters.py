@@ -8,4 +8,10 @@ class NotificationFilter(FilterSet):
 
     class Meta:
         model = Notification
-        fields = ["notification_type", "delivery_method", "created_at", "timestamp"]
+        fields = [
+            "notification_type",
+            "event_type",
+            "delivery_method",
+            "created_at",
+            "timestamp",
+        ]

@@ -42,7 +42,9 @@ class FileModel(BaseModel):
         return f"{self.purpose.lower()}/{filename}"
 
     file = models.FileField(upload_to=upload_to)
-    file_type = models.CharField(max_length=50, choices=FileType.choices)
+    file_type = models.CharField(
+        max_length=50, choices=FileType.choices, default=FileType.OTHER
+    )
     purpose = models.CharField(max_length=255, choices=FilePurpose.choices)
 
     def __str__(self):

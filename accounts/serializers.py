@@ -48,61 +48,12 @@ class UserSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class PhoneChangeRequestSerializer(serializers.Serializer):
-    new_phone = serializers.CharField(max_length=15)
-
-    def validate_new_phone(self, value):
-        phone_regex = r"^(9|7)\d{8}$"
-        if not re.match(phone_regex, value):
-            raise serializers.ValidationError(
-                "Phone number must be entered in the format: \
-                '912345678 / 712345678'. Up to 9 digits allowed."
-            )
-        return value
-
-    def save(self):
-        request = self.context.get("request")
-        user = request.user
-
-        expires_at = timezone.now() + timedelta(hours=1)
-        PhoneChangeRequest.objects.create(
-            user=user,
-            new_phone=self.validated_data["new_phone"],
-            expires_at=expires_at,
-        )
-
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        confirm_url = f"""
-                {request.scheme}://{request.get_host()}/accounts/phone-change-confirm/{uid}/{token}/
-                """
-
-        email_message = (
-            "Click the link below to confirm your phone number change:\n\n"
-            + confirm_url
-        )
-        email_subject = "Phone Number Change Confirmation"
-        payload = json.dumps(
-            {
-                "subject": email_subject,
-                "message": email_message,
-                "recipients": user.email,
-            }
-        )
-        notification_api_key = os.environ.get("NOTIFICATION_API_KEY")
-        email_url = os.environ.get("EMAIL_URL")
-        headers = {
-            "Authorization": f"Api-Key {notification_api_key}",
-            "Content-Type": "application/json",
-        }
-        requests.request("POST", email_url, headers=headers, data=payload)
-
-
 class PasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_email(self, value):
-        if not User.objects.filter(email=value).exists():
+        value = value.lower()
+        if not User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError(
                 "User with this email does not exist.",
             )
@@ -110,7 +61,7 @@ class PasswordResetSerializer(serializers.Serializer):
 
     def save(self):
         request = self.context.get("request")
-        user = User.objects.get(email=self.validated_data["email"])
+        user = User.objects.get(email__iexact=self.validated_data["email"])
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         reset_url = f"""
@@ -149,21 +100,22 @@ class PasswordChangeSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         instance = attrs.get("user")
         errors = {}
-        password = (
-            Password.objects.filter(
-                password=Password.hash_password(attrs.get("new_password"))
-            )
-            .order_by("created_at")
-            .first()
-        )
 
         if not instance.check_password(attrs.get("old_password")):
             errors["old_password"] = ["Old password is not correct."]
 
-        if password:
-            errors["new_password"] = [
-                "you cannot use one of your old passwords as new password"
-            ]
+        # Hashes contain a per-record salt, so two hashes of the same plaintext
+        # are not byte-equal. We have to iterate and use the constant-time
+        # check_password to detect re-use against the user's own history.
+        new_password = attrs.get("new_password")
+        if new_password and instance is not None:
+            previous_hashes = Password.objects.filter(user=instance).values_list(
+                "password", flat=True
+            )
+            if any(check_password(new_password, h) for h in previous_hashes):
+                errors["new_password"] = [
+                    "you cannot use one of your old passwords as new password"
+                ]
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -172,11 +124,14 @@ class PasswordChangeSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         user = validated_data.get("user")
-        # old_password = user.password
+        old_password_hash = user.password
         user.set_password(validated_data.get("new_password"))
         user.save()
 
-        # Password.objects.create(password=old_password)
+        # Persist the previous password hash so it can be checked against
+        # future change attempts and we can refuse re-use.
+        if old_password_hash:
+            Password.objects.create(user=user, password=old_password_hash)
 
         return {"status": "password changed successfully"}
 
@@ -241,6 +196,12 @@ class RegisterSerializer(serializers.ModelSerializer):
             "is_phone_verified",
         )
 
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
@@ -258,20 +219,22 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = super().create(validated_data)
         email = validated_data.get("email")
         phone_number = validated_data.get("phone_number")
+        # code = generate_secure_six_digits()
+        code = "123456"  # TODO: generate a secure random code and dispatch it to the user via the notification service.
 
         if email:
+            # Pass the raw code; VerificationCode.save() hashes it on insert.
+            # TODO: dispatch the raw code to the recipient via the notification service.
             VerificationCode.objects.create(
                 user=user,
-                code="123456",
+                code=code,
                 email=email,
-                # phone_number=phone_number,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
         if phone_number:
             VerificationCode.objects.create(
                 user=user,
-                code="123456",
-                # email=email,
+                code=code,
                 phone_number=phone_number,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
@@ -379,10 +342,10 @@ class LoginWithGoogleIdTokenSerializer(serializers.Serializer):
         return userInfo
 
     def create(self, validated_data):
-        email = validated_data.pop("email")
+        email = validated_data.pop("email").lower()
         first_name = validated_data.pop("given_name")
         last_name = validated_data.pop("family_name")
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email__iexact=email).first()
 
         if not user:
 
@@ -422,6 +385,15 @@ class ResetPasswordRequestSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
+        if not attrs.get("email") and not attrs.get("phone_number"):
+            raise ValidationError(
+                {
+                    "email": ["either email or phone_number is required"],
+                    "phone_number": ["either email or phone_number is required"],
+                },
+                400,
+            )
+
         user = User.objects.filter(**attrs).first()
 
         if not user:
@@ -429,10 +401,8 @@ class ResetPasswordRequestSerializer(serializers.ModelSerializer):
                 {key: [f"no user found with given {key}"] for key in attrs.keys()}, 404
             )
         attrs["user"] = user
-        # code = generate_secure_six_digits()
-        code = str(123456)  # TODO change this on production
-        # TODO send the generated code
-        print(code)
+        code = generate_secure_six_digits()
+        # TODO: dispatch the generated code via the SMS / email notification service.
         attrs["code"] = make_password(code)
         return attrs
 
@@ -468,7 +438,7 @@ class ConfirmResetPasswordRequestViewsetSerializer(serializers.Serializer):
 
         if not user:
             raise ValidationError(
-                {key: [f"no user found with the given {key}"] for key in attrs.key()},
+                {key: [f"no user found with the given {key}"] for key in attrs.keys()},
                 400,
             )
 
@@ -609,10 +579,19 @@ class SendVerificationCodeSerializer(serializers.Serializer):
 
         attrs = super().validate(attrs)
 
+        if not attrs.get("email") and not attrs.get("phone_number"):
+            raise ValidationError(
+                {
+                    "email": ["either email or phone_number is required"],
+                    "phone_number": ["either email or phone_number is required"],
+                },
+                400,
+            )
+
         user = User.objects.filter(**attrs).first()
         if not user:
             raise ValidationError(
-                {key: [f"no unverified user with this {key}"]} for key in attrs
+                {key: [f"no unverified user with this {key}"] for key in attrs}
             )
 
         attrs["user"] = user
@@ -623,19 +602,18 @@ class SendVerificationCodeSerializer(serializers.Serializer):
         email = validated_data.get("email")
         phone_number = validated_data.get("phone_number")
         user = validated_data.get("user")
+        # TODO: dispatch the raw code to the recipient via the notification service.
         if email:
             VerificationCode.objects.create(
                 user=user,
-                code="123456",
+                code=generate_secure_six_digits(),
                 email=email,
-                # phone_number=phone_number,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
         if phone_number:
             VerificationCode.objects.create(
                 user=user,
-                code="123456",
-                # email=email,
+                code=generate_secure_six_digits(),
                 phone_number=phone_number,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
@@ -648,6 +626,21 @@ class UserDeviceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserDevice
         exclude = []
+        read_only_fields = ["is_active"]
+
+    def create(self, validated_data):
+        user = validated_data.pop("user")
+        device_id = validated_data.get("device_id", "unknown")
+        device, created = UserDevice.objects.get_or_create(
+            user=user,
+            device_id=device_id,
+            defaults=validated_data,
+        )
+        if not created:
+            for attr, value in validated_data.items():
+                setattr(device, attr, value)
+            device.save()
+        return device
 
 
 class PhoneChangeRequestSerializer(serializers.Serializer):
@@ -674,8 +667,8 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
-        # code = generate_secure_six_digits()
-        code = str(123456)  # TODO change this on production
+        code = generate_secure_six_digits()
+        # TODO: dispatch the raw code via SMS to validated_data["new_phone"].
         phone_change_request = PhoneChangeRequest.objects.create(
             user=validated_data.get("user"),
             new_phone=validated_data.get("new_phone"),
@@ -724,20 +717,22 @@ class EmailChangeRequestSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        new_email = attrs.get("new_email")
+        new_email = attrs.get("new_email").lower()
         if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", new_email):
             raise serializers.ValidationError({"new_email": ["Invalid email"]})
-        if User.objects.filter(email=new_email).exists():
+        if User.objects.filter(email__iexact=new_email).exists():
             raise serializers.ValidationError({"new_email": ["Email already exists"]})
         attrs["new_email"] = new_email
         attrs["user"] = self.context.get("request").user
         return attrs
 
     def create(self, validated_data):
+        code = generate_secure_six_digits()
+        # TODO: dispatch the raw code via email to validated_data["new_email"].
         email_change_request = EmailChangeRequest.objects.create(
             user=validated_data.get("user"),
             new_email=validated_data.get("new_email"),
-            code=make_password(str(123456)),  # TODO change this on production
+            code=make_password(code),
             expires_at=timezone.now() + timedelta(hours=1),
         )
         return {"detail": "success", "change_request_id": email_change_request.id}
@@ -788,9 +783,10 @@ class ConfirmDeleteUserSerializer(serializers.Serializer):
                 {"email": ["Email or phone number is required"]}
             )
 
+        user = None
         if attrs.get("email"):
             user = User.objects.filter(email=attrs.get("email")).first()
-        if attrs.get("phone_number"):
+        if not user and attrs.get("phone_number"):
             user = User.objects.filter(phone_number=attrs.get("phone_number")).first()
         if not user:
             raise serializers.ValidationError({"email": ["User not found"]})
@@ -812,3 +808,76 @@ class ConfirmDeleteUserSerializer(serializers.Serializer):
         user = validated_data.get("user")
         user.delete()
         return {"detail": "success"}
+
+
+class TelegramAuthSerializer(serializers.Serializer):
+    init_data = serializers.CharField(write_only=True)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+    user = UserReadSerializer(read_only=True)
+    actions = serializers.ListField(read_only=True)
+
+    def validate(self, attrs):
+        from accounts.telegram_auth import verify_init_data
+
+        try:
+            payload = verify_init_data(attrs["init_data"])
+        except ValueError:
+            raise serializers.ValidationError(
+                {"init_data": ["Invalid Telegram authentication data"]}
+            )
+
+        tg_user = payload.get("user")
+        if not tg_user or not isinstance(tg_user, dict):
+            raise serializers.ValidationError(
+                {"init_data": ["Missing user data in initData"]}
+            )
+
+        attrs["tg_user"] = tg_user
+        return attrs
+
+    def create(self, validated_data):
+        from guardian.shortcuts import assign_perm
+
+        tg_user = validated_data["tg_user"]
+        telegram_id = int(tg_user["id"])
+
+        user, created = User.objects.get_or_create(
+            telegram_id=telegram_id,
+            defaults={
+                "first_name": tg_user.get("first_name", ""),
+                "last_name": tg_user.get("last_name", ""),
+                "is_active": True,
+            },
+        )
+
+        if created:
+            # Grant permission to create businesses — normally assigned on
+            # phone/email verification, but Telegram users skip that flow.
+            assign_perm("business.add_business", user)
+        else:
+            # Keep name in sync with Telegram profile
+            updated = False
+            if tg_user.get("first_name") and user.first_name != tg_user["first_name"]:
+                user.first_name = tg_user["first_name"]
+                updated = True
+            if tg_user.get("last_name") and user.last_name != tg_user.get(
+                "last_name", ""
+            ):
+                user.last_name = tg_user.get("last_name", "")
+                updated = True
+            if updated:
+                user.save(update_fields=["first_name", "last_name"])
+
+            # Also ensure existing Telegram users who may have been created
+            # before this fix have the permission.
+            if not user.has_perm("business.add_business"):
+                assign_perm("business.add_business", user)
+
+        refresh = RefreshToken.for_user(user)
+        return {
+            "user": user,
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "actions": get_required_user_actions(user),
+        }

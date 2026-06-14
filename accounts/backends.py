@@ -10,7 +10,7 @@ class EmailBackend(ModelBackend):
         return super().user_can_authenticate(user) and user.is_email_verified
 
     def authenticate(self, request, email, password, **kwargs):
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email__iexact=email).first()
 
         if user and user.check_password(password) and self.user_can_authenticate(user):
             return user

@@ -1,3 +1,4 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from inventories.views import *
@@ -12,10 +13,12 @@ router.register(r"items", ItemViewset, basename="items")
 router.register(r"suppliers", SupplierViewset, basename="suppliers")
 router.register(r"supplies", SupplyViewset, basename="supplies")
 router.register(r"groups", GroupViewset, basename="groups")
-router.register(r"supplied_items", SupplyItemViewset, basename="supplied-items")
+router.register(r"supplied-items", SupplyItemViewset, basename="supplied-items")
 router.register(r"movements", InventoryMovementViewSet, basename="inventory-movements")
 router.register(
     r"movement-items", InventoryMovementItemViewSet, basename="movement-items"
 )
 
-urlpatterns = [] + router.urls
+urlpatterns = [
+    path("summary/", inventory_summary, name="inventory-summary"),
+] + router.urls

@@ -37,7 +37,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install Dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install poetry
+          poetry install --no-interaction --no-ansi --no-root
         shell: bash
       - name: Create Directory
         run: |
@@ -45,7 +47,7 @@ jobs:
             mkdir schema/build
 
       - name: Generate Schema File
-        run: python manage.py spectacular --color --file schema/index.yaml
+        run: poetry run python manage.py spectacular --color --file schema/index.yaml
 
 
       - name: Setup Node.js
