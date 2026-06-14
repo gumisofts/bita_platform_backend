@@ -822,8 +822,10 @@ class TelegramAuthSerializer(serializers.Serializer):
 
         try:
             payload = verify_init_data(attrs["init_data"])
-        except ValueError as exc:
-            raise serializers.ValidationError({"init_data": [str(exc)]})
+        except ValueError:
+            raise serializers.ValidationError(
+                {"init_data": ["Invalid Telegram authentication data"]}
+            )
 
         tg_user = payload.get("user")
         if not tg_user or not isinstance(tg_user, dict):
