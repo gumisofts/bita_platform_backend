@@ -6,11 +6,13 @@ from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 from django.urls import path
 
-from accounts.urls import auth_router
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
 
+# Initialize Django (populates the app registry) before importing anything
+# that touches models/DRF, otherwise: AppRegistryNotReady.
 asgi_app = get_asgi_application()
+
+from accounts.urls import auth_router
 
 app = ProtocolTypeRouter(
     {
