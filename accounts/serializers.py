@@ -808,3 +808,76 @@ class ConfirmDeleteUserSerializer(serializers.Serializer):
         user = validated_data.get("user")
         user.delete()
         return {"detail": "success"}
+
+
+class TelegramAuthSerializer(serializers.Serializer):
+    init_data = serializers.CharField(write_only=True)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+    user = UserReadSerializer(read_only=True)
+    actions = serializers.ListField(read_only=True)
+
+    def validate(self, attrs):
+        from accounts.telegram_auth import verify_init_data
+
+        try:
+            payload = verify_init_data(attrs["init_data"])
+        except ValueError:
+            raise serializers.ValidationError(
+                {"init_data": ["Invalid Telegram authentication data"]}
+            )
+
+        tg_user = payload.get("user")
+        if not tg_user or not isinstance(tg_user, dict):
+            raise serializers.ValidationError(
+                {"init_data": ["Missing user data in initData"]}
+            )
+
+        attrs["tg_user"] = tg_user
+        return attrs
+
+    def create(self, validated_data):
+        from guardian.shortcuts import assign_perm
+
+        tg_user = validated_data["tg_user"]
+        telegram_id = int(tg_user["id"])
+
+        user, created = User.objects.get_or_create(
+            telegram_id=telegram_id,
+            defaults={
+                "first_name": tg_user.get("first_name", ""),
+                "last_name": tg_user.get("last_name", ""),
+                "is_active": True,
+            },
+        )
+
+        if created:
+            # Grant permission to create businesses — normally assigned on
+            # phone/email verification, but Telegram users skip that flow.
+            assign_perm("business.add_business", user)
+        else:
+            # Keep name in sync with Telegram profile
+            updated = False
+            if tg_user.get("first_name") and user.first_name != tg_user["first_name"]:
+                user.first_name = tg_user["first_name"]
+                updated = True
+            if tg_user.get("last_name") and user.last_name != tg_user.get(
+                "last_name", ""
+            ):
+                user.last_name = tg_user.get("last_name", "")
+                updated = True
+            if updated:
+                user.save(update_fields=["first_name", "last_name"])
+
+            # Also ensure existing Telegram users who may have been created
+            # before this fix have the permission.
+            if not user.has_perm("business.add_business"):
+                assign_perm("business.add_business", user)
+
+        refresh = RefreshToken.for_user(user)
+        return {
+            "user": user,
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "actions": get_required_user_actions(user),
+        }

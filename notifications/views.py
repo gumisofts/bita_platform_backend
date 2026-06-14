@@ -1,6 +1,6 @@
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.mixins import DestroyModelMixin, ListModelMixin
+from rest_framework.mixins import DestroyModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -16,7 +16,9 @@ from .serializers import (
 )
 
 
-class NotificationViewSet(ListModelMixin, DestroyModelMixin, GenericViewSet):
+class NotificationViewSet(
+    ListModelMixin, RetrieveModelMixin, DestroyModelMixin, GenericViewSet
+):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
@@ -27,6 +29,15 @@ class NotificationViewSet(ListModelMixin, DestroyModelMixin, GenericViewSet):
             recipients__recipient=self.request.user,
             recipients__is_deleted=False,
         ).order_by("-created_at")
+
+    def retrieve(self, request, *args, **kwargs):
+        """Return notification detail and auto-mark it as read for the requesting user."""
+        instance = self.get_object()
+        NotificationRecipient.objects.filter(
+            notification=instance, recipient=request.user
+        ).update(is_read=True)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def perform_destroy(self, instance):
         """Soft-delete: mark the recipient record as deleted instead of removing the row."""

@@ -20,6 +20,7 @@ class ItemFilter(FilterSet):
     branch_id = CharFilter(field_name="branch_id", lookup_expr="exact")
     business = CharFilter(field_name="business_id", lookup_expr="exact")
     business_id = CharFilter(field_name="business_id", lookup_expr="exact")
+    low_stock = BooleanFilter(method="filter_low_stock")
 
     class Meta:
         model = Item
@@ -30,6 +31,22 @@ class ItemFilter(FilterSet):
             "categories",
             "inventory_unit",
         ]
+
+    def filter_low_stock(self, queryset, name, value):
+        """
+        When value=True: items whose total supplied quantity across all variants
+        is at or below their notify_below threshold, or items with no stock at all.
+        When value=False: exclude those items.
+        """
+        annotated = queryset.annotate(
+            total_supplied_qty=Sum("variants__supplied_items__quantity")
+        )
+        condition = Q(total_supplied_qty__lte=F("notify_below")) | Q(
+            total_supplied_qty__isnull=True
+        )
+        if value:
+            return annotated.filter(condition)
+        return annotated.exclude(condition)
 
 
 class ItemVariantFilter(FilterSet):

@@ -33,6 +33,9 @@ class User(AbstractUser):
     )
     is_email_verified = models.BooleanField(default=False)
     is_phone_verified = models.BooleanField(default=False)
+    telegram_id = models.BigIntegerField(
+        null=True, blank=True, unique=True, db_index=True
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
