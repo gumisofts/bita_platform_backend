@@ -204,7 +204,8 @@ if not os.getenv("AWS_STORAGE_BUCKET_NAME") or DEBUG:
 
 STATIC_URL = os.getenv("STATIC_URL", "/static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
-STATIC_ROOT = Path("/var/www/static")
+
+STATIC_ROOT = Path(os.getenv("STATIC_ROOT", "/var/www/static"))
 
 MEDIA_URL = "/medias/"
 MEDIA_ROOT = Path("/var/www/medias")
