@@ -822,9 +822,9 @@ class TelegramAuthSerializer(serializers.Serializer):
 
         try:
             payload = verify_init_data(attrs["init_data"])
-        except ValueError:
+        except ValueError as err:
             raise serializers.ValidationError(
-                {"init_data": ["Invalid Telegram authentication data"]}
+                {"init_data": [f"Invalid Telegram authentication data {err}"]},
             )
 
         tg_user = payload.get("user")
