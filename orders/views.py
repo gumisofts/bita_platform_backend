@@ -717,11 +717,11 @@ class HomeStatsViewSet(GenericViewSet):
 
         if not best_seller:
             return {
-                "itemId": None,
-                "itemName": "N/A",
-                "totalSales": 0,
+                "item_id": None,
+                "item_name": "N/A",
+                "total_sales": 0,
                 "currency": "ETB",
-                "progressPercent": 0,
+                "progress_percent": 0,
             }
 
         # Calculate progress percent (compare with second best seller)
@@ -751,11 +751,11 @@ class HomeStatsViewSet(GenericViewSet):
             progress_percent = 100
 
         return {
-            "itemId": str(best_seller["variant__item__id"]),
-            "itemName": best_seller["variant__item__name"],
-            "totalSales": float(best_seller["total_sales"]),
+            "item_id": str(best_seller["variant__item__id"]),
+            "item_name": best_seller["variant__item__name"],
+            "total_sales": float(best_seller["total_sales"]),
             "currency": "ETB",
-            "progressPercent": progress_percent,
+            "progress_percent": progress_percent,
         }
 
     def _get_sales_distribution(
@@ -920,11 +920,21 @@ class HomeStatsViewSet(GenericViewSet):
         ] or Decimal("0")
 
         # Low stock items (quantity <= notify_below)
-        items_queryset = Item.objects.filter(business=self._current_business)
+        # Mirror inventories.views.inventory_summary's low_stock_count: only
+        # active items count, so the dashboard matches the dedicated low-stock page.
+        items_queryset = Item.objects.filter(
+            business=self._current_business, is_active=True
+        )
         if self._current_branch:
             items_queryset = items_queryset.filter(branch=self._current_branch)
 
-        low_stock_items = items_queryset.filter(quantity__lte=F("notify_below")).count()
+        low_stock_items = (
+            items_queryset.annotate(
+                total_stock=Sum("variants__supplied_items__quantity")
+            )
+            .filter(Q(total_stock__lte=F("notify_below")) | Q(total_stock__isnull=True))
+            .count()
+        )
 
         # Items expiring (within next 30 days)
         from datetime import date
@@ -1006,17 +1016,17 @@ class HomeStatsViewSet(GenericViewSet):
             200: {
                 "type": "object",
                 "properties": {
-                    "bestSeller": {
+                    "best_seller": {
                         "type": "object",
                         "properties": {
-                            "itemId": {"type": "string"},
-                            "itemName": {"type": "string"},
-                            "totalSales": {"type": "integer"},
+                            "item_id": {"type": "string"},
+                            "item_name": {"type": "string"},
+                            "total_sales": {"type": "number"},
                             "currency": {"type": "string"},
-                            "progressPercent": {"type": "integer"},
+                            "progress_percent": {"type": "integer"},
                         },
                     },
-                    "salesDistribution": {
+                    "sales_distribution": {
                         "type": "object",
                         "properties": {
                             "range": {"type": "string"},
@@ -1043,8 +1053,8 @@ class HomeStatsViewSet(GenericViewSet):
                                     "currency": {"type": "string"},
                                 },
                             },
-                            "lowStockItems": {"type": "integer"},
-                            "itemsExpiring": {"type": "integer"},
+                            "low_stock_items": {"type": "integer"},
+                            "items_expiring": {"type": "integer"},
                             "sales_logged": {"type": "integer"},
                         },
                     },
