@@ -191,14 +191,14 @@ class SupplySerializer(serializers.ModelSerializer):
         supply, _ = Supply.objects.get_or_create(
             branch=branch, label=label, defaults=validated_data
         )
-        supply._created_item = None
+        supply._created_supplied_item = None
         if item:
             item["item"] = item.get("variant").item
             item["initial_quantity"] = item.get("quantity")
             created_item = SuppliedItem.objects.create(
                 supply=supply, business=business, **item
             )
-            supply._created_item = created_item
+            supply._created_supplied_item = created_item
 
         return supply
 
