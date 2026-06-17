@@ -14,7 +14,6 @@ from drf_spectacular.utils import (
 from rest_framework import filters, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -74,12 +73,6 @@ class OrderItemViewset(ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class OrderPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = "page_size"
-    max_page_size = 100
-
-
 class OrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
@@ -96,7 +89,6 @@ class OrderViewset(ModelViewSet):
         "employee__user__last_name",
         "id",
     ]
-    pagination_class = OrderPagination
 
     def get_queryset(self):
         queryset = super().get_queryset()
