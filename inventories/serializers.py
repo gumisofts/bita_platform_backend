@@ -138,6 +138,18 @@ class SupplySerializer(serializers.ModelSerializer):
             return instance
 
     item = SuppliedItemInSupplySerializer(required=False)
+    created_supplied_item = serializers.SerializerMethodField(read_only=True)
+
+    def get_created_supplied_item(self, obj):
+        """Return the id(s) of supplied item(s) created in this request only."""
+
+        if (
+            hasattr(obj, "_created_supplied_item")
+            and obj._created_supplied_item is not None
+        ):
+            return obj._created_supplied_item.id
+
+        return None
 
     class Meta:
         model = Supply
@@ -179,10 +191,14 @@ class SupplySerializer(serializers.ModelSerializer):
         supply, _ = Supply.objects.get_or_create(
             branch=branch, label=label, defaults=validated_data
         )
+        supply._created_item = None
         if item:
             item["item"] = item.get("variant").item
             item["initial_quantity"] = item.get("quantity")
-            SuppliedItem.objects.create(supply=supply, business=business, **item)
+            created_item = SuppliedItem.objects.create(
+                supply=supply, business=business, **item
+            )
+            supply._created_item = created_item
 
         return supply
 
@@ -190,8 +206,12 @@ class SupplySerializer(serializers.ModelSerializer):
         item = validated_data.pop("item", None)
         business = validated_data.get("business", None)
         instance = super().update(instance, validated_data)
+        instance._created_supplied_items = []
         if item:
-            SuppliedItem.objects.create(supply=instance, business=business, **item)
+            created_item = SuppliedItem.objects.create(
+                supply=instance, business=business, **item
+            )
+            instance._created_supplied_items.append(created_item)
         return instance
 
 
