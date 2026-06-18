@@ -5,7 +5,7 @@ import logging
 import openpyxl
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import transaction
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
@@ -279,6 +279,25 @@ class ItemViewset(ModelViewSet):
                 continue
             groups.setdefault(name, []).append((row_num, row))
 
+        # Stock from the import is recorded as a single supply batch so the
+        # quantities are tracked like any other received inventory (and the
+        # SuppliedItem post_save signal drives variant.quantity & supply totals).
+        # The label is the import moment — identifiable and unique per branch.
+        # No payment_method is set, so no purchase/debt transaction is created.
+        import_supply_label = f"import-{timezone.now():%Y%m%d-%H%M%S}"
+        needs_supply = any(
+            self._parse_int(r.get("quantity"), default=0) > 0
+            and self._parse_decimal(str(r.get("selling_price", "")).strip()) is not None
+            for r in rows
+        )
+        import_supply = None
+        if needs_supply:
+            import_supply, _ = Supply.objects.get_or_create(
+                branch=branch,
+                label=import_supply_label,
+                defaults={"business": business},
+            )
+
         created_items = []
         created_variants = []
         errors = []
@@ -330,10 +349,14 @@ class ItemViewset(ModelViewSet):
                     is_first_variant = not item.variants.exists()
 
                     for row_num, row in group_rows:
-                        selling_price = self._parse_decimal(
-                            row.get("selling_price", "")
-                        )
-                        if selling_price is None:
+                        selling_price_raw = str(row.get("selling_price", "")).strip()
+                        selling_price = self._parse_decimal(selling_price_raw)
+                        # A blank price is allowed — the variant is still created
+                        # with no price (the model permits a null selling_price).
+                        # Only a non-blank, unparseable value is an error. This
+                        # keeps priceless variants from vanishing on an
+                        # export -> import round-trip.
+                        if selling_price_raw and selling_price is None:
                             errors.append(
                                 {
                                     "row": row_num,
@@ -371,21 +394,46 @@ class ItemViewset(ModelViewSet):
                                 item=item, name=variant_name
                             ).first()
 
+                        # Quantity is populated through a supplied batch below,
+                        # not set directly on the variant.
                         if variant:
                             variant.selling_price = selling_price
-                            variant.quantity = quantity
                             variant.sku = sku
-                            variant.save()
+                            variant.save(update_fields=["selling_price", "sku"])
                         else:
-                            ItemVariant.objects.create(
+                            variant = ItemVariant.objects.create(
                                 item=item,
                                 name=variant_name,
                                 selling_price=selling_price,
-                                quantity=quantity,
+                                quantity=0,
                                 sku=sku,
                                 is_default=is_first_variant,
                             )
                             is_first_variant = False
+
+                        # Record stock as a supplied batch under the import
+                        # supply. The signal bumps variant.quantity and supply
+                        # totals. A SuppliedItem requires a selling price, so
+                        # when none is given we set the quantity on the variant.
+                        if quantity > 0:
+                            if import_supply is not None and selling_price is not None:
+                                SuppliedItem.objects.create(
+                                    supply=import_supply,
+                                    item=item,
+                                    variant=variant,
+                                    quantity=quantity,
+                                    initial_quantity=quantity,
+                                    selling_price=selling_price,
+                                    purchase_price=None,
+                                    batch_number=import_supply_label,
+                                    product_number=(
+                                        sku or f"{item.name} — {variant_name}"
+                                    )[:255],
+                                    business=business,
+                                )
+                            else:
+                                variant.quantity = quantity
+                                variant.save(update_fields=["quantity"])
 
                         created_variants.append(
                             {
@@ -405,6 +453,7 @@ class ItemViewset(ModelViewSet):
                 "products_created": len(created_items),
                 "variants_processed": len(created_variants),
                 "error_count": len(errors),
+                "supply_label": import_supply.label if import_supply else None,
                 "products": created_items,
                 "variants": created_variants,
                 "errors": errors,
@@ -440,15 +489,34 @@ class ItemViewset(ModelViewSet):
         items = (
             self.get_queryset()
             .select_related("group")
-            .prefetch_related("variants")
+            .prefetch_related(
+                "variants",
+                # Latest batch first so supplied_items[0] is the most recent
+                # supply — used to source the variant's selling price below.
+                Prefetch(
+                    "variants__supplied_items",
+                    queryset=SuppliedItem.objects.order_by("-created_at"),
+                ),
+            )
             .order_by("name")
         )
+
+        def variant_selling_price(variant):
+            """Selling price from the latest supply batch, falling back to the
+            variant's own price when the variant has never been supplied."""
+            latest = next(iter(variant.supplied_items.all()), None)
+            if latest and latest.selling_price:
+                return str(latest.selling_price)
+            if variant.selling_price:
+                return str(variant.selling_price)
+            return ""
 
         # Build flat rows — one per variant
         data_rows = []
         for item in items:
             group_value = item.group.name if item.group else ""
-            variants = list(item.variants.order_by("name"))
+            # Sort in Python to preserve the prefetched supplied_items.
+            variants = sorted(item.variants.all(), key=lambda v: v.name)
             if not variants:
                 # Emit one placeholder row so the product is not silently lost
                 data_rows.append(
@@ -471,7 +539,7 @@ class ItemViewset(ModelViewSet):
                             item.description or "",
                             item.inventory_unit,
                             "" if variant.name == item.name else variant.name,
-                            str(variant.selling_price) if variant.selling_price else "",
+                            variant_selling_price(variant),
                             variant.sku or "",
                             variant.quantity,
                             group_value,

@@ -184,7 +184,11 @@ class SuppliedItem(BaseModel):
         ItemVariant, related_name="supplied_items", on_delete=models.CASCADE
     )
     purchase_price = models.DecimalField(
-        max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(1)],
+        null=True,
+        blank=True,
     )
     selling_price = models.DecimalField(
         max_digits=12, decimal_places=2, validators=[MinValueValidator(1)]

@@ -26,7 +26,8 @@ def capture_supplied_item_old_price(sender, instance, **kwargs):
 def on_supplied_item_saved(sender, instance, created, **kwargs):
     if created:
         instance.supply.no_of_items += 1
-        instance.supply.total_cost += instance.quantity * instance.purchase_price
+        # purchase_price is optional; treat a missing price as zero cost.
+        instance.supply.total_cost += instance.quantity * (instance.purchase_price or 0)
         instance.supply.save()
         instance.variant.quantity += instance.quantity
         instance.variant.save()
