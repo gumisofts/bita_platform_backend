@@ -4,6 +4,7 @@ from django_filters import (
     CharFilter,
     DateFilter,
     FilterSet,
+    IsoDateTimeFilter,
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
     NumberFilter,
@@ -89,6 +90,7 @@ class ItemVariantFilter(FilterSet):
     expiring = BooleanFilter(method="filter_expiring")
     quantity_lte = NumberFilter(method="filter_quantity_lte")
     expire_date_lte = DateFilter(method="filter_expire_date_lte")
+    updated_since = IsoDateTimeFilter(method="filter_updated_since")
 
     class Meta:
         model = ItemVariant
@@ -141,6 +143,36 @@ class ItemVariantFilter(FilterSet):
         return queryset.filter(
             supplied_items__expire_date__isnull=False,
             supplied_items__expire_date__lte=value,
+        ).distinct()
+
+    def filter_updated_since(self, queryset, name, value):
+        """
+        Variants that changed at/after ``value`` (an ISO-8601 timestamp).
+
+        "Changed" is intentionally broad: a variant is considered updated when
+        the variant row itself OR any related record that carries variant info
+        was touched on/after the timestamp. This covers updates that never land
+        on the ItemVariant model directly, such as:
+          - restocking / new supply batches (SuppliedItem) and the parent
+            Supply (supplier, payment, totals)
+          - price-tier changes (Pricing)
+          - variant attributes (Property)
+          - returns / recalls (ReturnRecall)
+          - inter-branch inventory movements (InventoryMovementItem)
+          - the parent Item (name, group, flags, reorder point, ...)
+
+        Send an ISO-8601 timestamp, ideally timezone-aware
+        (e.g. ``2026-06-01T00:00:00Z``), so the comparison is unambiguous.
+        """
+        return queryset.filter(
+            Q(updated_at__gte=value)
+            | Q(item__updated_at__gte=value)
+            | Q(supplied_items__updated_at__gte=value)
+            | Q(supplied_items__supply__updated_at__gte=value)
+            | Q(pricings__updated_at__gte=value)
+            | Q(properties__updated_at__gte=value)
+            | Q(returnrecall__updated_at__gte=value)
+            | Q(inventorymovementitem__updated_at__gte=value)
         ).distinct()
 
 
