@@ -161,10 +161,22 @@ class SupplierFilter(FilterSet):
     name = CharFilter(field_name="name", lookup_expr="icontains")
     business = CharFilter(field_name="business_id", lookup_expr="exact")
     business_id = CharFilter(field_name="business_id", lookup_expr="exact")
+    search = CharFilter(method="filter_search")
 
     class Meta:
         model = Supplier
         fields = ["name", "email", "phone_number"]
+
+    def filter_search(self, queryset, name, value):
+        """Free-text search across supplier name, phone, and email."""
+        value = (value or "").strip()
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value)
+            | Q(phone_number__icontains=value)
+            | Q(email__icontains=value)
+        )
 
 
 class SupplyFilter(FilterSet):

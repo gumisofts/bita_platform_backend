@@ -9,7 +9,7 @@ User = get_user_model()
 
 class Customer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    email = models.EmailField(validators=[EmailValidator()])
+    email = models.EmailField(validators=[EmailValidator()], blank=True, null=True)
     full_name = models.CharField(max_length=255)
     business = models.ForeignKey("business.Business", on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)

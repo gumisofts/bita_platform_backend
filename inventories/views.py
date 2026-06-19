@@ -700,6 +700,11 @@ class SupplierViewset(ListModelMixin, CreateModelMixin, GenericViewSet):
             return self.queryset.none()
         return self.queryset.filter(business=business)
 
+    def perform_create(self, serializer):
+        # Supplier is shared across the business; bind it to the active business
+        # from the request context rather than trusting the client payload.
+        serializer.save(business=self.request.business)
+
 
 class SupplyItemViewset(
     ListModelMixin,

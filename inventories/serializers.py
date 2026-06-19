@@ -500,9 +500,11 @@ class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
         exclude = []
-        read_only_fields = ["id", "created_at", "updated_at"]
+        # business is taken from the request context in the viewset, not the client.
+        read_only_fields = ["id", "created_at", "updated_at", "business"]
         extra_kwargs = {
             "email": {"required": False, "allow_blank": True},
+            "phone_number": {"required": False, "allow_blank": True},
         }
 
 
