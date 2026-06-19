@@ -8,6 +8,7 @@ from business.permissions import (
     GuardianObjectPermissions,
 )
 
+from .filters import CustomerFilter
 from .models import Customer, GiftCard, GiftCardTransfer
 from .serializers import (
     CustomerSerializer,
@@ -19,6 +20,7 @@ from .serializers import (
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
+    filterset_class = CustomerFilter
     permission_classes = [
         IsAuthenticated,
         BusinessLevelPermission | BranchLevelPermission | GuardianObjectPermissions,
