@@ -881,12 +881,15 @@ def finance_report(request):
     total_expense = sum(
         totals_by_type.get(t, Decimal("0")) for t in Transaction.EXPENSE_TYPES
     )
+    # Refunds are stored negative, so total_refunds is <= 0.
     total_refunds = totals_by_type.get(Transaction.TransactionType.REFUND, Decimal("0"))
     total_debt_issued = totals_by_type.get(
         Transaction.TransactionType.DEBT, Decimal("0")
     )
 
-    net_profit = total_income - total_expense
+    # Refunds reduce profit. They are not in EXPENSE_TYPES (so not in
+    # total_expense); fold them in via their negative sign instead.
+    net_profit = total_income - total_expense + total_refunds
     profit_margin = (
         (net_profit / total_income * 100).quantize(Decimal("0.01"))
         if total_income > 0

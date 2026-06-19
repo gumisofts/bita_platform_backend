@@ -21,6 +21,7 @@ class ItemFilter(FilterSet):
     business = CharFilter(field_name="business_id", lookup_expr="exact")
     business_id = CharFilter(field_name="business_id", lookup_expr="exact")
     low_stock = BooleanFilter(method="filter_low_stock")
+    search = CharFilter(method="filter_search")
 
     class Meta:
         model = Item
@@ -31,6 +32,19 @@ class ItemFilter(FilterSet):
             "categories",
             "inventory_unit",
         ]
+
+    def filter_search(self, queryset, name, value):
+        """Free-text search across item name/description and its variants."""
+        value = (value or "").strip()
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value)
+            | Q(description__icontains=value)
+            | Q(group__name__icontains=value)
+            | Q(variants__name__icontains=value)
+            | Q(variants__sku__icontains=value)
+        ).distinct()
 
     def filter_low_stock(self, queryset, name, value):
         """

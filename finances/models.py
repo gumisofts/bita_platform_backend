@@ -78,8 +78,11 @@ class Transaction(BaseModel):
         TransactionType.MAINTENANCE,
         TransactionType.OTHER_EXPENSE,
         TransactionType.DEBT,
-        TransactionType.REFUND,
     ]
+    # REFUND is intentionally NOT in EXPENSE_TYPES. Refunds are stored with a
+    # negative ``total_paid_amount`` and treated as a signed, additive term in
+    # the income/refund aggregations (see get_balance / total_assets). Listing
+    # it as an expense magnitude as well would double-count it.
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(

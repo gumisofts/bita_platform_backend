@@ -363,14 +363,16 @@ class OrderViewset(ModelViewSet):
                     ]
                 )
 
-                # Record a REFUND transaction
+                # Record a REFUND transaction. Refunds are money paid back to
+                # the customer, so the amount is stored negative — it reduces
+                # account balances/assets and net profit in the finance reports.
                 Transaction.objects.create(
                     order=order,
                     branch=order.branch,
                     business=order.business,
                     payment_method=refund_method,
                     type=Transaction.TransactionType.REFUND,
-                    total_paid_amount=total_refund,
+                    total_paid_amount=-total_refund,
                     created_by=request.user,
                 )
 
