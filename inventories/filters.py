@@ -23,6 +23,7 @@ class ItemFilter(FilterSet):
     business_id = CharFilter(field_name="business_id", lookup_expr="exact")
     low_stock = BooleanFilter(method="filter_low_stock")
     search = CharFilter(method="filter_search")
+    updated_since = IsoDateTimeFilter(method="filter_updated_since")
 
     class Meta:
         model = Item
@@ -33,6 +34,32 @@ class ItemFilter(FilterSet):
             "categories",
             "inventory_unit",
         ]
+
+    def filter_updated_since(self, queryset, name, value):
+        """
+        Items that changed at/after ``value`` (an ISO-8601 timestamp).
+
+        Mirrors ``ItemVariantFilter.updated_since`` but rooted at the item: an
+        item is considered updated when the item row itself OR any of its
+        variants OR any related record carrying variant info was touched on/after
+        the timestamp. This covers restocks (SuppliedItem / Supply), price-tier
+        changes (Pricing), variant attributes (Property), returns (ReturnRecall)
+        and inter-branch movements (InventoryMovementItem), so a sync client can
+        pull only the items that actually changed.
+
+        Send an ISO-8601 timestamp, ideally timezone-aware
+        (e.g. ``2026-06-01T00:00:00Z``), so the comparison is unambiguous.
+        """
+        return queryset.filter(
+            Q(updated_at__gte=value)
+            | Q(variants__updated_at__gte=value)
+            | Q(variants__supplied_items__updated_at__gte=value)
+            | Q(variants__supplied_items__supply__updated_at__gte=value)
+            | Q(variants__pricings__updated_at__gte=value)
+            | Q(variants__properties__updated_at__gte=value)
+            | Q(variants__returnrecall__updated_at__gte=value)
+            | Q(variants__inventorymovementitem__updated_at__gte=value)
+        ).distinct()
 
     def filter_search(self, queryset, name, value):
         """Free-text search across item name/description and its variants."""
