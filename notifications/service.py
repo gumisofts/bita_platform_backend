@@ -1,6 +1,7 @@
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
@@ -8,6 +9,61 @@ from .deep_links import deep_link_for_notification
 from .models import Notification, NotificationRecipient
 
 logger = logging.getLogger(__name__)
+
+
+def send_email_notification(subject, message, recipients, html_message=None):
+    """Send an email, asynchronously via Celery when enabled.
+
+    When ``settings.EMAIL_USE_CELERY`` is true the work is queued on the
+    ``email-notifications`` queue; otherwise (e.g. local development) it is sent
+    synchronously. If enqueuing fails for any reason we fall back to a
+    synchronous send so transactional mail is never silently dropped.
+
+    Args:
+        subject: Email subject line.
+        message: Plain-text body (also used to render the HTML template).
+        recipients: A single address or an iterable of addresses.
+        html_message: Optional pre-rendered HTML body.
+    """
+    if isinstance(recipients, str):
+        recipients = [recipients]
+    recipients = [r for r in (recipients or []) if r]
+    if not recipients:
+        logger.warning("send_email_notification: no recipients (subject=%r)", subject)
+        return
+
+    from .tasks import send_email_task
+
+    if getattr(settings, "EMAIL_USE_CELERY", False):
+        try:
+            send_email_task.delay(subject, message, recipients, html_message)
+            return
+        except Exception:
+            logger.exception(
+                "Could not enqueue email %r; sending synchronously", subject
+            )
+
+    from .emails import send_email
+
+    send_email(subject, message, recipients, html_message=html_message)
+
+
+def send_verification_code_email(email, code, *, purpose="verify your account"):
+    """Email a 6-digit verification/one-time code to ``email``.
+
+    Args:
+        email: Recipient address.
+        code: The raw (un-hashed) verification code to display.
+        purpose: Short phrase describing what the code is for, e.g.
+            "verify your email" or "reset your password".
+    """
+    subject = "Your verification code"
+    message = (
+        f"Your verification code is {code}.\n\n"
+        f"Use it to {purpose}. This code expires in 5 minutes.\n\n"
+        "If you didn't request this, you can safely ignore this email."
+    )
+    send_email_notification(subject, message, email)
 
 
 def _get_business_user_ids(business):

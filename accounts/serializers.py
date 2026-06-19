@@ -216,25 +216,27 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        from notifications.service import send_verification_code_email
+
         user = super().create(validated_data)
         email = validated_data.get("email")
         phone_number = validated_data.get("phone_number")
-        # code = generate_secure_six_digits()
-        code = "123456"  # TODO: generate a secure random code and dispatch it to the user via the notification service.
 
         if email:
             # Pass the raw code; VerificationCode.save() hashes it on insert.
-            # TODO: dispatch the raw code to the recipient via the notification service.
+            code = generate_secure_six_digits()
             VerificationCode.objects.create(
                 user=user,
                 code=code,
                 email=email,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
+            send_verification_code_email(email, code, purpose="verify your email")
         if phone_number:
+            # TODO: dispatch the raw code via SMS once an SMS provider is wired up.
             VerificationCode.objects.create(
                 user=user,
-                code=code,
+                code=generate_secure_six_digits(),
                 phone_number=phone_number,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
@@ -402,12 +404,21 @@ class ResetPasswordRequestSerializer(serializers.ModelSerializer):
             )
         attrs["user"] = user
         code = generate_secure_six_digits()
-        # TODO: dispatch the generated code via the SMS / email notification service.
+        # Store the hashed code; keep the raw one so create() can email it.
         attrs["code"] = make_password(code)
+        self._raw_code = code
         return attrs
 
     def create(self, validated_data):
+        from notifications.service import send_verification_code_email
+
+        email = validated_data.get("email")
         super().create(validated_data)
+        if email:
+            send_verification_code_email(
+                email, self._raw_code, purpose="reset your password"
+            )
+        # TODO: dispatch the raw code via SMS when only a phone number is given.
         return {"detail": "success"}
 
 
@@ -599,18 +610,22 @@ class SendVerificationCodeSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
+        from notifications.service import send_verification_code_email
+
         email = validated_data.get("email")
         phone_number = validated_data.get("phone_number")
         user = validated_data.get("user")
-        # TODO: dispatch the raw code to the recipient via the notification service.
         if email:
+            code = generate_secure_six_digits()
             VerificationCode.objects.create(
                 user=user,
-                code=generate_secure_six_digits(),
+                code=code,
                 email=email,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
+            send_verification_code_email(email, code, purpose="verify your email")
         if phone_number:
+            # TODO: dispatch the raw code via SMS once an SMS provider is wired up.
             VerificationCode.objects.create(
                 user=user,
                 code=generate_secure_six_digits(),
@@ -727,13 +742,18 @@ class EmailChangeRequestSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
+        from notifications.service import send_verification_code_email
+
         code = generate_secure_six_digits()
-        # TODO: dispatch the raw code via email to validated_data["new_email"].
+        new_email = validated_data.get("new_email")
         email_change_request = EmailChangeRequest.objects.create(
             user=validated_data.get("user"),
-            new_email=validated_data.get("new_email"),
+            new_email=new_email,
             code=make_password(code),
             expires_at=timezone.now() + timedelta(hours=1),
+        )
+        send_verification_code_email(
+            new_email, code, purpose="confirm your new email address"
         )
         return {"detail": "success", "change_request_id": email_change_request.id}
 

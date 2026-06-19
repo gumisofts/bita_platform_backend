@@ -52,6 +52,32 @@ def send_push_notification_task(notification_id, user_ids):
     )
 
 
+@shared_task(
+    queue=CeleryQueue.Definitions.EMAIL_NOTIFICATIONS,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_email_task(self, subject, message, recipients, html_message=None):
+    """Render and deliver an email asynchronously.
+
+    Retries up to 3 times (60s apart) on transient SMTP failures.
+    """
+    from .emails import send_email
+
+    try:
+        return send_email(subject, message, recipients, html_message=html_message)
+    except Exception as exc:
+        logger.warning(
+            "Email %r failed (attempt %d/%d): %s",
+            subject,
+            self.request.retries + 1,
+            self.max_retries + 1,
+            exc,
+        )
+        raise self.retry(exc=exc)
+
+
 @shared_task(queue=CeleryQueue.Definitions.INVENTORY_ALERTS)
 def check_low_stock_task(variant_ids, business_id):
     """

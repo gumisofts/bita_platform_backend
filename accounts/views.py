@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model, update_session_auth_hash
-from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -447,16 +447,24 @@ class ConfirmDeleteUserDeleteView(GenericViewSet):
                 {"success": False, "message": "User not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        # NOTE: store the hashed code so it can never be replayed by reading the DB.
+        # Pass the raw code; VerificationCode.save() hashes it on insert so the
+        # plaintext is never stored. (Pre-hashing here would double-hash and
+        # break verification.)
         raw_code = generate_secure_six_digits()
         VerificationCode.objects.create(
             user=user,
-            code=make_password(raw_code),
+            code=raw_code,
             phone_number=phone_number,
             email=email,
             expires_at=timezone.now() + timedelta(minutes=5),
         )
-        # TODO: dispatch the SMS/email containing `raw_code` via the notification service.
+        if email:
+            from notifications.service import send_verification_code_email
+
+            send_verification_code_email(
+                email, raw_code, purpose="confirm deleting your account"
+            )
+        # TODO: dispatch the raw code via SMS when only a phone number is given.
         return Response(
             {"success": True, "message": "Code sent"}, status=status.HTTP_200_OK
         )

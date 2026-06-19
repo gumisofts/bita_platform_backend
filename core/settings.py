@@ -232,11 +232,42 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
 }
 
-EMAIL_USE_TLS = True
-EMAIL_BACKEND = "django_smtp_ssl.SSLEmailBackend"
+# --- Email -----------------------------------------------------------------
 EMAIL_HOST = os.getenv("EMAIL_HOST")
-EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+# Port 465 uses implicit SSL; 587 uses STARTTLS. Pick one automatically unless
+# overridden — Django raises if both EMAIL_USE_SSL and EMAIL_USE_TLS are True.
+EMAIL_USE_SSL = os.getenv(
+    "EMAIL_USE_SSL", "true" if EMAIL_PORT == 465 else "false"
+).lower() in ("true", "1", "yes")
+EMAIL_USE_TLS = os.getenv(
+    "EMAIL_USE_TLS", "false" if EMAIL_USE_SSL else "true"
+).lower() in ("true", "1", "yes")
+
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@bita.et"
+)
+
+# Use the real SMTP backend only when a host is configured and we're not in
+# DEBUG; otherwise print emails (incl. verification codes) to the console so
+# local development doesn't require an SMTP server.
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    (
+        "django.core.mail.backends.smtp.EmailBackend"
+        if (EMAIL_HOST and not DEBUG)
+        else "django.core.mail.backends.console.EmailBackend"
+    ),
+)
+
+# Deliver email asynchronously through Celery in production; send synchronously
+# in DEBUG so a running worker/broker isn't required locally.
+EMAIL_USE_CELERY = os.getenv(
+    "EMAIL_USE_CELERY", "false" if DEBUG else "true"
+).lower() in ("true", "1", "yes")
 
 ADMIN = ("Murad", "nuradhussen082@gmail.com")
 
