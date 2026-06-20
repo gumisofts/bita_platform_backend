@@ -103,7 +103,19 @@ class OrderViewset(ModelViewSet):
             queryset = queryset.filter(branch=self.request.branch)
         else:
             queryset = queryset.none()
-        return queryset.order_by("-created_at")
+        # customer_name/employee_name traverse FKs and items_display_name walks
+        # items->variant->item; pull them in up front to avoid per-row queries.
+        return (
+            queryset.select_related(
+                "customer",
+                "employee__user",
+                "payment_method",
+                "business",
+                "branch",
+            )
+            .prefetch_related("items__variant__item")
+            .order_by("-created_at")
+        )
 
     def get_serializer_class(self):
         if self.action == "retrieve":

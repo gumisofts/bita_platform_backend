@@ -190,7 +190,9 @@ class ConversationListSerializer(serializers.ModelSerializer):
         ]
 
     def get_participants_count(self, obj):
-        return obj.participants.filter(is_active=True).count()
+        # ``participants`` is prefetched by the viewset; count in Python to avoid
+        # a query per conversation row.
+        return sum(1 for p in obj.participants.all() if p.is_active)
 
     def get_last_message(self, obj):
         last_message = (
@@ -216,7 +218,15 @@ class ConversationListSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and hasattr(request, "user"):
             user = request.user
-            participant = obj.participants.filter(user=user, is_active=True).first()
+            # Reuse the prefetched participants rather than querying per row.
+            participant = next(
+                (
+                    p
+                    for p in obj.participants.all()
+                    if p.user_id == user.id and p.is_active
+                ),
+                None,
+            )
             if participant:
                 if participant.last_read_at:
                     return (

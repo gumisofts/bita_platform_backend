@@ -123,7 +123,8 @@ class BusinessRoleViewset(RetrieveModelMixin, ListModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated, BusinessLevelPermission]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        # RoleSerializer.get_permissions walks the permissions M2M per row.
+        queryset = super().get_queryset().prefetch_related("permissions")
         business_id = self.request.query_params.get("business_id")
         if business_id:
             queryset = queryset.filter(business=business_id)

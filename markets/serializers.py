@@ -25,8 +25,15 @@ class MarketplaceCategorySerializer(serializers.ModelSerializer):
         fields = ["id", "name", "industry_name", "image", "item_count"]
 
     def get_item_count(self, obj):
+        # Prefer the annotation set by the viewset's prefetch queryset to avoid
+        # a COUNT query per category row; fall back to the direct query.
+        annotated = getattr(obj, "_mp_item_count", None)
+        if annotated is not None:
+            return annotated
+        # ``is_visible_online`` lives on Item (not ItemVariant); match the
+        # annotation above and the rest of the marketplace queries.
         return (
-            obj.items.filter(variants__is_visible_online=True, variants__quantity__gt=0)
+            obj.items.filter(is_visible_online=True, variants__quantity__gt=0)
             .distinct()
             .count()
         )
@@ -121,7 +128,9 @@ class MarketplaceItemVariantSerializer(serializers.ModelSerializer):
         ]
 
     def get_item_images(self, obj):
-        images = ItemImage.objects.filter(item=obj.item, is_visible=True)
+        # ``item__itemimage_set`` is prefetched on the viewset queryset; filter
+        # in Python so we don't fire a query per product row.
+        images = [img for img in obj.item.itemimage_set.all() if img.is_visible]
         return MarketplaceItemImageSerializer(images, many=True).data
 
     def get_is_in_stock(self, obj):
@@ -136,11 +145,12 @@ class MarketplaceItemVariantSerializer(serializers.ModelSerializer):
             return "in_stock"
 
     def get_discount_percentage(self, obj):
-        # Calculate discount if there are pricing tiers
-        pricings = obj.pricings.all().order_by("min_selling_quota")
-        if pricings.count() > 1:
-            highest_price = pricings.first().price
-            lowest_price = pricings.last().price
+        # ``pricings`` is prefetched; sort in Python so we reuse the cache rather
+        # than issuing fresh ordered/count queries per product row.
+        pricings = sorted(obj.pricings.all(), key=lambda p: p.min_selling_quota)
+        if len(pricings) > 1:
+            highest_price = pricings[0].price
+            lowest_price = pricings[-1].price
             if highest_price > lowest_price:
                 return round(((highest_price - lowest_price) / highest_price) * 100, 2)
         return 0

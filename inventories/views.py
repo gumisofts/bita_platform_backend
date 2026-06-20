@@ -58,7 +58,11 @@ class ItemViewset(ModelViewSet):
         return self.serializer_class
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = (
+            super()
+            .get_queryset()
+            .prefetch_related("categories", "variants__supplied_items")
+        )
         return filter_queryset_by_branch(queryset, self.request, "item")
 
     # ------------------------------------------------------------------
@@ -902,8 +906,18 @@ class ItemVariantViewset(ModelViewSet):
         queryset = filter_queryset_by_branch(
             queryset, self.request, "itemvariant", branch_field="item__branch"
         )
-        return queryset.prefetch_related("supplied_items__supply").order_by(
-            Lower("name"), "id"
+        # ItemVariantReadSerializer nests properties/pricings/supplied_items and
+        # uses depth=2 over item -> (group/business/branch/categories); pull them
+        # all in so list/retrieve don't issue per-row queries.
+        return (
+            queryset.select_related("item__group", "item__business", "item__branch")
+            .prefetch_related(
+                "supplied_items__supply",
+                "properties",
+                "pricings",
+                "item__categories",
+            )
+            .order_by(Lower("name"), "id")
         )
 
     def create(self, request, *args, **kwargs):

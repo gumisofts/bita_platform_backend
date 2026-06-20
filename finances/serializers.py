@@ -129,6 +129,14 @@ class AccountSerializer(serializers.ModelSerializer):
 
     def get_balance(self, obj):
         """Calculate balance: all income types + REFUND add; all expense types + DEBT subtract."""
+        # Fast path: the AccountViewset annotates these totals at the DB level so
+        # we avoid two aggregation queries per row. Fall back to per-object
+        # queries when the serializer is used outside that annotated queryset.
+        income_refund = getattr(obj, "_income_refund_total", None)
+        expense_debt = getattr(obj, "_expense_debt_total", None)
+        if income_refund is not None and expense_debt is not None:
+            return float(income_refund - expense_debt)
+
         transactions = Transaction.objects.filter(payment_method=obj)
 
         income_refund_total = transactions.filter(

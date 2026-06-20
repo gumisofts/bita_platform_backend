@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from django.db import transaction as db_transaction
 from django.db.models import Avg, Count, Q, Sum
-from django.db.models.functions import TruncDate
+from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework import status, viewsets
@@ -56,9 +56,17 @@ class TransactionViewset(
         return TransactionSerializer
 
     def get_queryset(self):
-        return filter_queryset_by_branch(
-            self.queryset, self.request, "transaction"
-        ).order_by("-created_at")
+        return (
+            filter_queryset_by_branch(self.queryset, self.request, "transaction")
+            .select_related(
+                "order__customer",
+                "branch",
+                "business",
+                "payment_method",
+                "created_by",
+            )
+            .order_by("-created_at")
+        )
 
     def perform_create(self, serializer):
         branch = serializer.validated_data.get("branch")
@@ -189,7 +197,7 @@ class BusinessPaymentMethodViewset(ModelViewSet):
     def get_queryset(self):
         queryset = filter_queryset_by_branch(
             self.queryset, self.request, "businesspaymentmethod"
-        )
+        ).select_related("payment", "business", "branch")
         return queryset.filter(business=self.request.business)
 
 
@@ -210,7 +218,39 @@ class AccountViewset(ListModelMixin, GenericViewSet):
         queryset = filter_queryset_by_branch(
             self.queryset, self.request, "businesspaymentmethod"
         )
-        return queryset.filter(business=self.request.business)
+        # Annotate the balance with two conditional sums over the single
+        # ``transactions`` relation instead of running two aggregation queries
+        # per account row in the serializer (was an N+1 of 2*page_size queries).
+        return (
+            queryset.filter(business=self.request.business)
+            .select_related("payment")
+            .annotate(
+                _income_refund_total=Coalesce(
+                    Sum(
+                        "transactions__total_paid_amount",
+                        filter=Q(
+                            transactions__type__in=[
+                                *Transaction.INCOME_TYPES,
+                                Transaction.TransactionType.REFUND,
+                            ]
+                        ),
+                    ),
+                    Decimal("0.00"),
+                ),
+                _expense_debt_total=Coalesce(
+                    Sum(
+                        "transactions__total_paid_amount",
+                        filter=Q(
+                            transactions__type__in=[
+                                *Transaction.EXPENSE_TYPES,
+                                Transaction.TransactionType.DEBT,
+                            ]
+                        ),
+                    ),
+                    Decimal("0.00"),
+                ),
+            )
+        )
 
 
 @api_view(["GET"])

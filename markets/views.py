@@ -1,5 +1,5 @@
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
-from django.db.models import Avg, Case, CharField, Count, F, Q, Value, When
+from django.db.models import Avg, Case, CharField, Count, F, Prefetch, Q, Value, When
 from django.shortcuts import render
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -32,7 +32,25 @@ class MarketplaceProductViewSet(ReadOnlyModelViewSet):
     queryset = (
         ItemVariant.objects.select_related("item", "item__business")
         .prefetch_related(
-            "item__categories", "properties", "pricings", "item__itemimage_set"
+            # Annotate the per-category item count so the nested category
+            # serializer reads it off the prefetched rows instead of running a
+            # COUNT query per category per product.
+            Prefetch(
+                "item__categories",
+                queryset=Category.objects.annotate(
+                    _mp_item_count=Count(
+                        "items",
+                        filter=Q(
+                            items__is_visible_online=True,
+                            items__variants__quantity__gt=0,
+                        ),
+                        distinct=True,
+                    )
+                ),
+            ),
+            "properties",
+            "pricings",
+            "item__itemimage_set",
         )
         .filter()  # TODO: add filters
     )
