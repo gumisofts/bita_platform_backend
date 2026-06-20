@@ -104,7 +104,7 @@ def create_notification(
                          event_type and this key in data was created within the window.
         deduplicate_window_hours: Hours to look back for deduplication.
     """
-    from .tasks import send_push_notification_task
+    from .tasks import send_push_notification_task, send_telegram_notification_task
 
     if deduplicate_key:
         cutoff = timezone.now() - timedelta(hours=deduplicate_window_hours)
@@ -164,6 +164,12 @@ def create_notification(
 
     transaction.on_commit(
         lambda: send_push_notification_task.delay(str(notification.id), user_id_strings)
+    )
+    # Deliver the same notification to recipients who have linked Telegram.
+    transaction.on_commit(
+        lambda: send_telegram_notification_task.delay(
+            str(notification.id), user_id_strings
+        )
     )
 
     return notification

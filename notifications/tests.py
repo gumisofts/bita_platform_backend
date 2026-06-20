@@ -100,6 +100,71 @@ class TelegramUpdateDispatchTests(unittest.TestCase):
         send.assert_not_called()
 
 
+class TelegramNotificationDeliveryTests(APITestCase):
+    """Rendering + delivery of Notifications over the Telegram bot."""
+
+    def _make_notification(self, **kwargs):
+        from notifications.models import Notification
+
+        defaults = dict(
+            title="Low Stock Alert",
+            message="Sugar is running low.",
+            event_type="low_stock",
+            notification_type="warning",
+            data={"deep_link": "bita://app/inventory/abc-123"},
+        )
+        defaults.update(kwargs)
+        return Notification.objects.create(**defaults)
+
+    @override_settings(FRONTEND_URL="https://app.test")
+    def test_format_includes_title_message_and_app_button(self):
+        from notifications.telegram_delivery import format_notification
+
+        text, markup = format_notification(self._make_notification())
+        self.assertIn("Low Stock Alert", text)
+        self.assertIn("Sugar is running low.", text)
+        # Deep link maps to the Mini App route under FRONTEND_URL.
+        url = markup["inline_keyboard"][0][0]["web_app"]["url"]
+        self.assertEqual(url, "https://app.test/inventory/abc-123")
+
+    @override_settings(FRONTEND_URL="http://localhost:5173")
+    def test_no_button_without_https_frontend(self):
+        from notifications.telegram_delivery import format_notification
+
+        _, markup = format_notification(self._make_notification())
+        self.assertIsNone(markup)
+
+    @override_settings(FRONTEND_URL="https://app.test")
+    def test_html_in_title_is_escaped(self):
+        from notifications.telegram_delivery import format_notification
+
+        text, _ = format_notification(self._make_notification(title="A <b>B</b> & C"))
+        self.assertIn("A &lt;b&gt;B&lt;/b&gt; &amp; C", text)
+
+    def test_task_only_messages_linked_users(self):
+        from accounts.models import User
+        from notifications.tasks import send_telegram_notification_task
+
+        linked = User.objects.create(
+            email="linked@example.com", phone_number="911111111", telegram_id=4242
+        )
+        User.objects.create(email="nolink@example.com", phone_number="922222222")
+        notification = self._make_notification()
+
+        with mock.patch(
+            "notifications.telegram_bot._send_bot_message_sync", return_value=True
+        ) as send:
+            send_telegram_notification_task(
+                str(notification.id),
+                [str(linked.id)]
+                + list(User.objects.exclude(id=linked.id).values_list("id", flat=True)),
+            )
+
+        # Only the linked user's telegram_id is messaged.
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(send.call_args.args[0], 4242)
+
+
 class TelegramWebhookViewTests(APITestCase):
     URL = "/notifications/telegram/webhook/"
     UPDATE = {"update_id": 9, "message": {"chat": {"id": 7}, "text": "/start"}}

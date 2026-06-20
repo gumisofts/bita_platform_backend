@@ -18,10 +18,16 @@ python manage.py set_telegram_webhook --info
 python manage.py set_telegram_webhook --delete
 """
 
+import hashlib
+import re
+
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 WEBHOOK_PATH = "/notifications/telegram/webhook/"
+
+# Telegram's allowed charset for the webhook secret_token (1-256 chars).
+_SECRET_CHARSET = re.compile(r"[A-Za-z0-9_-]{1,256}")
 
 
 class Command(BaseCommand):
@@ -66,6 +72,12 @@ class Command(BaseCommand):
             for key in ("url", "pending_update_count", "last_error_message"):
                 if key in info:
                     self.stdout.write(f"  {key}: {info[key]}")
+            # Telegram never returns the registered secret, so surface the
+            # fingerprint of the secret THIS process would enforce. Compare it
+            # against the one printed when you registered — they must match.
+            self.stdout.write(
+                f"  server secret fingerprint: {self._fingerprint(self._server_secret())}"
+            )
             return
 
         if options["delete"]:
@@ -82,7 +94,7 @@ class Command(BaseCommand):
         if not url.startswith("https://"):
             raise CommandError("Telegram requires an HTTPS webhook URL.")
 
-        secret = getattr(settings, "TELEGRAM_WEBHOOK_SECRET", "") or None
+        secret = self._server_secret()
         if not secret:
             self.stdout.write(
                 self.style.WARNING(
@@ -90,11 +102,35 @@ class Command(BaseCommand):
                     "secret token. Set one for production."
                 )
             )
+        elif not _SECRET_CHARSET.fullmatch(secret):
+            # Telegram only accepts 1-256 chars of A-Z, a-z, 0-9, _ and -. An
+            # invalid secret is rejected, so the view would enforce a secret
+            # Telegram never echoes — exactly the cause of a 403 loop.
+            raise CommandError(
+                "TELEGRAM_WEBHOOK_SECRET contains characters Telegram rejects. "
+                "Use only A-Z, a-z, 0-9, '_' and '-' (max 256). Avoid base64 "
+                "output (it contains +, / and =)."
+            )
 
         if set_webhook(url, secret_token=secret) is None:
             raise CommandError("Failed to set webhook (see logs).")
 
         self.stdout.write(self.style.SUCCESS(f"✓ Webhook registered at {url}"))
+        self.stdout.write(
+            f"  secret fingerprint: {self._fingerprint(secret)} "
+            "(must match what the running server prints via --info)"
+        )
+
+    @staticmethod
+    def _server_secret():
+        return getattr(settings, "TELEGRAM_WEBHOOK_SECRET", "") or None
+
+    @staticmethod
+    def _fingerprint(secret):
+        """Short, non-reversible fingerprint of the secret for safe comparison."""
+        if not secret:
+            return "(none)"
+        return hashlib.sha256(secret.encode()).hexdigest()[:12]
 
     def _default_url(self):
         base = getattr(settings, "BACKEND_URL", "").rstrip("/")

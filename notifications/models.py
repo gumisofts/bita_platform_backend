@@ -13,6 +13,7 @@ MESSAGE_DELIVERY_CHOICES = [
     ("email", "Email"),
     ("push", "Push"),
     ("sms", "SMS"),
+    ("telegram", "Telegram"),
     ("all", "All"),
 ]
 

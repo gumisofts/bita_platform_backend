@@ -78,6 +78,50 @@ def send_email_task(self, subject, message, recipients, html_message=None):
         raise self.retry(exc=exc)
 
 
+@shared_task(queue=CeleryQueue.Definitions.REAL_TIME_NOTIFICATIONS)
+def send_telegram_notification_task(notification_id, user_ids):
+    """DM a Notification to every recipient who has linked their Telegram.
+
+    Runs alongside the FCM push task; users without a ``telegram_id`` are simply
+    skipped, so this is effectively opt-in by virtue of having linked Telegram.
+    """
+    from django.contrib.auth import get_user_model
+
+    from .models import Notification
+    from .telegram_bot import _send_bot_message_sync
+    from .telegram_delivery import format_notification
+
+    try:
+        notification = Notification.objects.get(id=notification_id)
+    except Notification.DoesNotExist:
+        logger.error(
+            "Notification %s not found, skipping Telegram delivery", notification_id
+        )
+        return
+
+    User = get_user_model()
+    telegram_ids = list(
+        User.objects.filter(id__in=user_ids, telegram_id__isnull=False)
+        .values_list("telegram_id", flat=True)
+        .distinct()
+    )
+    if not telegram_ids:
+        return
+
+    text, reply_markup = format_notification(notification)
+    sent = 0
+    for tg_id in telegram_ids:
+        if _send_bot_message_sync(tg_id, text, reply_markup=reply_markup):
+            sent += 1
+
+    logger.info(
+        "Telegram notification %s delivered to %d/%d users",
+        notification_id,
+        sent,
+        len(telegram_ids),
+    )
+
+
 @shared_task(
     queue=CeleryQueue.Definitions.USER_VERIFICATION,
     bind=True,

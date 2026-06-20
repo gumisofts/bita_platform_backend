@@ -119,9 +119,7 @@ def set_webhook(url, secret_token=None):
 
 def delete_webhook(drop_pending_updates=False):
     """Remove the bot's webhook (required before long-polling can be used)."""
-    return _api_call(
-        "deleteWebhook", {"drop_pending_updates": drop_pending_updates}
-    )
+    return _api_call("deleteWebhook", {"drop_pending_updates": drop_pending_updates})
 
 
 def get_webhook_info():
