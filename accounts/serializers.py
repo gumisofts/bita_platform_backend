@@ -1001,6 +1001,100 @@ class TelegramContactLinkSerializer(serializers.Serializer):
         return _auth_payload(user)
 
 
+class TelegramContactCreateSerializer(serializers.Serializer):
+    """Create a brand-new account from the shared (verified) Telegram contact.
+
+    Used when contact sharing found no existing account: the phone number is
+    already Telegram-verified, so we create the account, mark the phone verified,
+    link Telegram, and DM the login credentials via the bot.
+    """
+
+    init_data = serializers.CharField(write_only=True)
+    contact_raw = serializers.CharField(write_only=True)
+    status = serializers.CharField(read_only=True)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+    user = UserReadSerializer(read_only=True)
+    actions = serializers.ListField(read_only=True)
+
+    def validate(self, attrs):
+        from accounts.telegram_auth import verify_contact_data
+
+        tg_user = _verified_telegram_user(attrs["init_data"])
+
+        try:
+            contact = verify_contact_data(attrs["contact_raw"])
+        except ValueError as err:
+            raise serializers.ValidationError(
+                {"contact_raw": [f"Invalid Telegram contact data: {err}"]}
+            )
+
+        if str(contact.get("user_id")) != str(tg_user["id"]):
+            raise serializers.ValidationError(
+                {"contact_raw": ["Contact does not match the current Telegram user"]}
+            )
+
+        attrs["tg_user"] = tg_user
+        attrs["contact"] = contact
+        return attrs
+
+    def create(self, validated_data):
+        from notifications.telegram_bot import send_bot_message
+
+        tg_user = validated_data["tg_user"]
+        contact = validated_data["contact"]
+        telegram_id = int(tg_user["id"])
+        phone = User.normalize_phone(contact.get("phone_number"))
+
+        # Guard against races: the phone or Telegram may have been claimed since
+        # the "no match" result that sent the user here. Link rather than dupe.
+        existing = User.objects.filter(phone_number=phone).first()
+        if existing:
+            if existing.telegram_id and existing.telegram_id != telegram_id:
+                raise serializers.ValidationError(
+                    {
+                        "status": "conflict",
+                        "detail": ["An account with this phone number already exists."],
+                    }
+                )
+            existing.telegram_id = telegram_id
+            existing.is_phone_verified = True
+            _sync_telegram_profile(existing, tg_user)
+            existing.save(update_fields=["telegram_id", "is_phone_verified"])
+            _grant_business_perm(existing)
+            return _auth_payload(existing)
+
+        if User.objects.filter(telegram_id=telegram_id).exists():
+            raise serializers.ValidationError(
+                {"status": "conflict", "detail": ["This Telegram is already linked."]}
+            )
+
+        password = get_random_string(12)
+        user = User.objects.create(
+            phone_number=phone,
+            telegram_id=telegram_id,
+            first_name=tg_user.get("first_name", ""),
+            last_name=tg_user.get("last_name", ""),
+            is_phone_verified=True,
+            is_active=True,
+        )
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        _grant_business_perm(user)
+
+        send_bot_message(
+            telegram_id,
+            (
+                "✅ Your Bita account is ready!\n\n"
+                f"<b>Phone:</b> {phone}\n"
+                f"<b>Temporary password:</b> <code>{password}</code>\n\n"
+                "Use these to sign in on the web or mobile app. "
+                "Please change your password after your first login."
+            ),
+        )
+        return _auth_payload(user, status="created")
+
+
 class TelegramEmailLinkRequestSerializer(serializers.Serializer):
     """Ask to connect Telegram to an account identified by email.
 

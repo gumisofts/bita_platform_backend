@@ -153,6 +153,20 @@ class AuthViewset(GenericViewSet):
     @action(
         detail=False,
         methods=["post"],
+        url_path="telegram/link/contact/create",
+        permission_classes=[],
+        serializer_class=TelegramContactCreateSerializer,
+    )
+    def telegram_link_contact_create(self, request):
+        serializer = TelegramContactCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
         url_path="telegram/link/email/request",
         permission_classes=[],
         serializer_class=TelegramEmailLinkRequestSerializer,

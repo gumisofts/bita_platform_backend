@@ -178,6 +178,43 @@ class TelegramLinkingTestCase(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data["status"], "no_phone_match")
 
+    @mock.patch("notifications.telegram_bot.send_bot_message")
+    def test_contact_create_new_account_with_phone(self, mock_send):
+        url = reverse("auth-telegram-link-contact-create")
+        res = self.client.post(
+            url,
+            {
+                "init_data": make_init_data(self.tg_id),
+                "contact_raw": make_contact_raw(self.tg_id, "+251700000000"),
+            },
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "created")
+        self.assertIn("access", res.data)
+        user = User.objects.get(telegram_id=self.tg_id)
+        # Phone is stored bare and pre-verified (the contact is Telegram-signed).
+        self.assertEqual(user.phone_number, "700000000")
+        self.assertTrue(user.is_phone_verified)
+        mock_send.assert_called_once()
+        self.assertEqual(mock_send.call_args.args[0], self.tg_id)
+
+    def test_contact_create_links_when_phone_now_exists(self):
+        # Race: an account with the phone appeared after the "no match" result.
+        url = reverse("auth-telegram-link-contact-create")
+        res = self.client.post(
+            url,
+            {
+                "init_data": make_init_data(self.tg_id),
+                "contact_raw": make_contact_raw(self.tg_id, "+251912345678"),
+            },
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("access", res.data)
+        self.existing.refresh_from_db()
+        # Linked to the existing account rather than creating a duplicate.
+        self.assertEqual(self.existing.telegram_id, self.tg_id)
+        self.assertEqual(User.objects.filter(phone_number="912345678").count(), 1)
+
     def test_contact_link_conflict(self):
         self.existing.telegram_id = 999999999  # already linked elsewhere
         self.existing.save(update_fields=["telegram_id"])
