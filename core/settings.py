@@ -373,3 +373,11 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 # Public base URL of the Mini App / web frontend, used to build the
 # "connect your Telegram" magic link emailed to users (no trailing slash).
 FRONTEND_URL = os.getenv("FRONTEND_URL", "")
+
+# Public base URL of THIS backend API (no trailing slash). Used to build the
+# Telegram webhook URL in the set_telegram_webhook management command.
+BACKEND_URL = os.getenv("BACKEND_URL", "")
+
+# Shared secret echoed by Telegram in the X-Telegram-Bot-Api-Secret-Token header
+# on every webhook request; the webhook view rejects requests that don't match.
+TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")

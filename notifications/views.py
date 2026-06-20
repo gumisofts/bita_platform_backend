@@ -1,9 +1,16 @@
+import hmac
+import logging
+
+from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.mixins import DestroyModelMixin, ListModelMixin, RetrieveModelMixin
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+
+logger = logging.getLogger(__name__)
 
 from .filters import NotificationFilter
 from .models import Notification, NotificationRecipient
@@ -151,3 +158,37 @@ class NotificationViewSet(
             },
             status=status.HTTP_502_BAD_GATEWAY,
         )
+
+
+class TelegramWebhookView(APIView):
+    """Receive Telegram bot updates in production.
+
+    Telegram POSTs an ``Update`` to this endpoint for every message/command.
+    The endpoint is unauthenticated (Telegram can't carry our JWT) but is
+    protected two ways: a secret, hard-to-guess URL path component and the
+    ``X-Telegram-Bot-Api-Secret-Token`` header that Telegram echoes back when
+    the webhook is registered with a secret (see the ``set_telegram_webhook``
+    command).
+
+    Always responds 200 so Telegram does not retry indefinitely on our errors.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        secret = getattr(settings, "TELEGRAM_WEBHOOK_SECRET", "")
+        if secret:
+            header = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+            if not hmac.compare_digest(header, secret):
+                logger.warning("Telegram webhook: bad secret token header")
+                return Response(status=status.HTTP_403_FORBIDDEN)
+
+        from .telegram_updates import handle_update
+
+        try:
+            handle_update(request.data)
+        except Exception:
+            logger.exception("Error handling Telegram update")
+
+        return Response(status=status.HTTP_200_OK)

@@ -84,11 +84,11 @@ def send_email_task(self, subject, message, recipients, html_message=None):
     max_retries=3,
     default_retry_delay=60,
 )
-def send_bot_message_task(self, telegram_id, text):
+def send_bot_message_task(self, telegram_id, text, reply_markup=None):
     """Deliver a Telegram bot DM asynchronously, retrying transient failures."""
     from .telegram_bot import _send_bot_message_sync
 
-    if not _send_bot_message_sync(telegram_id, text):
+    if not _send_bot_message_sync(telegram_id, text, reply_markup=reply_markup):
         try:
             raise self.retry(
                 exc=RuntimeError(f"bot message to {telegram_id} failed"),
