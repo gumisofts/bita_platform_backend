@@ -47,10 +47,29 @@ class User(AbstractUser):
 
     @staticmethod
     def normalize_phone(phone_number):
-        return phone_number
+        """Normalize a phone number to the bare local form stored in the DB.
+
+        Phones are persisted in the ``^(9|7)\\d{8}$`` form (no country code),
+        but external sources — notably Telegram contact sharing — return E.164
+        (e.g. ``+251912345678`` / ``251912345678``). Strip the ``+``, spaces and
+        separators, and a leading ``251`` country code so both forms compare
+        equal. Unknown formats are returned digit-only and left to the caller.
+        """
+        if not phone_number:
+            return phone_number
+        digits = "".join(ch for ch in str(phone_number) if ch.isdigit())
+        if digits.startswith("251") and len(digits) > 9:
+            digits = digits[3:]
+        return digits
 
     def __str__(self):
-        return f"User({str(self.id)})"
+        representation = f"User({str(self.id)})"
+        if self.email:
+            representation = f"User({str(self.id)}, {self.email})"
+
+        if self.phone_number:
+            representation = f"User({str(self.id)}, {self.phone_number})"
+        return representation
 
 
 class PhoneChangeRequest(BaseModel):
@@ -81,6 +100,28 @@ class EmailChangeRequest(BaseModel):
     )
     new_email = models.EmailField()
     code = models.CharField(max_length=255)
+    expires_at = models.DateTimeField()
+
+
+class TelegramLinkRequest(BaseModel):
+    """A pending request to link a Telegram account to a Bita account by email.
+
+    Created when a Mini App user (whose Telegram is not yet linked and whose
+    shared phone matched no account) asks to connect to an existing account.
+    A signed, single-use token is emailed; confirming it links ``telegram_id``
+    to ``user``.
+    """
+
+    telegram_id = models.BigIntegerField(db_index=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="telegram_link_requests",
+    )
+    email = models.EmailField()
+    # Hashed token (make_password); the raw signed value is only ever emailed.
+    token = models.CharField(max_length=255, db_index=True)
+    is_used = models.BooleanField(default=False)
     expires_at = models.DateTimeField()
 
 

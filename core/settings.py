@@ -369,3 +369,7 @@ SILENCED_SYSTEM_CHECKS = ["security.W019"]
 TELEBIRR_BASE_URL = os.getenv("TELEBIRR_BASE_URL")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+# Public base URL of the Mini App / web frontend, used to build the
+# "connect your Telegram" magic link emailed to users (no trailing slash).
+FRONTEND_URL = os.getenv("FRONTEND_URL", "")

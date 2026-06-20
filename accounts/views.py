@@ -139,6 +139,62 @@ class AuthViewset(GenericViewSet):
     @action(
         detail=False,
         methods=["post"],
+        url_path="telegram/link/contact",
+        permission_classes=[],
+        serializer_class=TelegramContactLinkSerializer,
+    )
+    def telegram_link_contact(self, request):
+        serializer = TelegramContactLinkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="telegram/link/email/request",
+        permission_classes=[],
+        serializer_class=TelegramEmailLinkRequestSerializer,
+    )
+    def telegram_link_email_request(self, request):
+        serializer = TelegramEmailLinkRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="telegram/link/email/create",
+        permission_classes=[],
+        serializer_class=TelegramEmailCreateSerializer,
+    )
+    def telegram_link_email_create(self, request):
+        serializer = TelegramEmailCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="telegram/connect/confirm",
+        permission_classes=[],
+        serializer_class=TelegramConnectConfirmSerializer,
+    )
+    def telegram_connect_confirm(self, request):
+        serializer = TelegramConnectConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
+
+    @action(
+        detail=False,
+        methods=["post"],
         permission_classes=[],
         serializer_class=RefreshLoginSerializer,
     )

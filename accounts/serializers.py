@@ -4,13 +4,16 @@ import re
 from datetime import timedelta
 
 import requests
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, password_validation
 from django.contrib.auth.tokens import default_token_generator
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.crypto import get_random_string
 from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
+from django.utils.http import urlencode, urlsafe_base64_encode
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -830,74 +833,341 @@ class ConfirmDeleteUserSerializer(serializers.Serializer):
         return {"detail": "success"}
 
 
+# ─── Telegram linking helpers ──────────────────────────────────────────────
+#
+# Signer/salt for the single-use "connect Telegram" magic link emailed to users.
+TELEGRAM_LINK_SALT = "accounts.telegram-link"
+TELEGRAM_LINK_MAX_AGE = 60 * 60  # 1 hour
+
+
+def _grant_business_perm(user):
+    """Ensure a Telegram-linked/created user can create businesses.
+
+    Normally granted on phone/email verification, but Telegram users may skip
+    that flow, so grant it here (idempotent).
+    """
+    from guardian.shortcuts import assign_perm
+
+    if not user.has_perm("business.add_business"):
+        assign_perm("business.add_business", user)
+
+
+def _auth_payload(user, status="linked"):
+    """Build the standard JWT auth response for a logged-in/linked user."""
+    refresh = RefreshToken.for_user(user)
+    return {
+        "status": status,
+        "user": user,
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+        "actions": get_required_user_actions(user),
+    }
+
+
+def _sync_telegram_profile(user, tg_user):
+    """Keep first/last name in sync with the Telegram profile."""
+    updated = []
+    if tg_user.get("first_name") and user.first_name != tg_user["first_name"]:
+        user.first_name = tg_user["first_name"]
+        updated.append("first_name")
+    if tg_user.get("last_name") is not None and user.last_name != tg_user.get(
+        "last_name", ""
+    ):
+        user.last_name = tg_user.get("last_name", "")
+        updated.append("last_name")
+    if updated:
+        user.save(update_fields=updated)
+
+
+def _verified_telegram_user(init_data):
+    """Verify initData and return the nested Telegram user dict, or raise."""
+    from accounts.telegram_auth import verify_init_data
+
+    try:
+        payload = verify_init_data(init_data)
+    except ValueError as err:
+        raise serializers.ValidationError(
+            {"init_data": [f"Invalid Telegram authentication data: {err}"]},
+        )
+
+    tg_user = payload.get("user")
+    if not tg_user or not isinstance(tg_user, dict):
+        raise serializers.ValidationError(
+            {"init_data": ["Missing user data in initData"]}
+        )
+    return tg_user
+
+
 class TelegramAuthSerializer(serializers.Serializer):
+    """Mini App auto-login.
+
+    If the Telegram account is already linked to a Bita account, issue tokens.
+    Otherwise return ``{"status": "needs_link"}`` (no account is created) so the
+    Mini App can prompt the user to connect via contact sharing or email.
+    """
+
     init_data = serializers.CharField(write_only=True)
+    status = serializers.CharField(read_only=True)
+    telegram = serializers.DictField(read_only=True)
     access = serializers.CharField(read_only=True)
     refresh = serializers.CharField(read_only=True)
     user = UserReadSerializer(read_only=True)
     actions = serializers.ListField(read_only=True)
 
     def validate(self, attrs):
-        from accounts.telegram_auth import verify_init_data
-
-        try:
-            payload = verify_init_data(attrs["init_data"])
-        except ValueError as err:
-            raise serializers.ValidationError(
-                {"init_data": [f"Invalid Telegram authentication data {err}"]},
-            )
-
-        tg_user = payload.get("user")
-        if not tg_user or not isinstance(tg_user, dict):
-            raise serializers.ValidationError(
-                {"init_data": ["Missing user data in initData"]}
-            )
-
-        attrs["tg_user"] = tg_user
+        attrs["tg_user"] = _verified_telegram_user(attrs["init_data"])
         return attrs
 
     def create(self, validated_data):
-        from guardian.shortcuts import assign_perm
-
         tg_user = validated_data["tg_user"]
         telegram_id = int(tg_user["id"])
 
-        user, created = User.objects.get_or_create(
-            telegram_id=telegram_id,
-            defaults={
+        user = User.objects.filter(telegram_id=telegram_id).first()
+        if user:
+            _sync_telegram_profile(user, tg_user)
+            _grant_business_perm(user)
+            return _auth_payload(user)
+
+        # Not linked yet — do NOT create an account. Ask the Mini App to link.
+        return {
+            "status": "needs_link",
+            "telegram": {
                 "first_name": tg_user.get("first_name", ""),
                 "last_name": tg_user.get("last_name", ""),
-                "is_active": True,
             },
-        )
-
-        if created:
-            # Grant permission to create businesses — normally assigned on
-            # phone/email verification, but Telegram users skip that flow.
-            assign_perm("business.add_business", user)
-        else:
-            # Keep name in sync with Telegram profile
-            updated = False
-            if tg_user.get("first_name") and user.first_name != tg_user["first_name"]:
-                user.first_name = tg_user["first_name"]
-                updated = True
-            if tg_user.get("last_name") and user.last_name != tg_user.get(
-                "last_name", ""
-            ):
-                user.last_name = tg_user.get("last_name", "")
-                updated = True
-            if updated:
-                user.save(update_fields=["first_name", "last_name"])
-
-            # Also ensure existing Telegram users who may have been created
-            # before this fix have the permission.
-            if not user.has_perm("business.add_business"):
-                assign_perm("business.add_business", user)
-
-        refresh = RefreshToken.for_user(user)
-        return {
-            "user": user,
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "actions": get_required_user_actions(user),
         }
+
+
+class TelegramContactLinkSerializer(serializers.Serializer):
+    """Link Telegram to an existing account by the shared (verified) phone number."""
+
+    init_data = serializers.CharField(write_only=True)
+    contact_raw = serializers.CharField(write_only=True)
+    status = serializers.CharField(read_only=True)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+    user = UserReadSerializer(read_only=True)
+    actions = serializers.ListField(read_only=True)
+
+    def validate(self, attrs):
+        from accounts.telegram_auth import verify_contact_data
+
+        tg_user = _verified_telegram_user(attrs["init_data"])
+
+        try:
+            contact = verify_contact_data(attrs["contact_raw"])
+        except ValueError as err:
+            raise serializers.ValidationError(
+                {"contact_raw": [f"Invalid Telegram contact data: {err}"]}
+            )
+
+        # The contact must belong to the same user that opened the Mini App,
+        # so a captured payload can't be replayed to claim another phone.
+        if str(contact.get("user_id")) != str(tg_user["id"]):
+            raise serializers.ValidationError(
+                {"contact_raw": ["Contact does not match the current Telegram user"]}
+            )
+
+        attrs["tg_user"] = tg_user
+        attrs["contact"] = contact
+        return attrs
+
+    def create(self, validated_data):
+        tg_user = validated_data["tg_user"]
+        contact = validated_data["contact"]
+        telegram_id = int(tg_user["id"])
+        phone = User.normalize_phone(contact.get("phone_number"))
+
+        user = User.objects.filter(phone_number=phone).first()
+        if not user:
+            return {"status": "no_phone_match"}
+
+        # Refuse to hijack an account already tied to a different Telegram.
+        if user.telegram_id and user.telegram_id != telegram_id:
+            raise serializers.ValidationError(
+                {
+                    "status": "conflict",
+                    "detail": [
+                        "This account is already linked to another Telegram account."
+                    ],
+                }
+            )
+
+        user.telegram_id = telegram_id
+        user.is_phone_verified = True
+        _sync_telegram_profile(user, tg_user)
+        user.save(update_fields=["telegram_id", "is_phone_verified"])
+        _grant_business_perm(user)
+        return _auth_payload(user)
+
+
+class TelegramEmailLinkRequestSerializer(serializers.Serializer):
+    """Ask to connect Telegram to an account identified by email.
+
+    If an account with that email exists, email it a single-use magic link.
+    Otherwise return ``no_account`` so the Mini App can offer to create one.
+    """
+
+    init_data = serializers.CharField(write_only=True)
+    email = serializers.EmailField(write_only=True)
+    status = serializers.CharField(read_only=True)
+    detail = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        attrs["tg_user"] = _verified_telegram_user(attrs["init_data"])
+        attrs["email"] = attrs["email"].lower()
+        return attrs
+
+    def create(self, validated_data):
+        from notifications.service import send_email_notification
+
+        tg_user = validated_data["tg_user"]
+        telegram_id = int(tg_user["id"])
+        email = validated_data["email"]
+
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return {"status": "no_account"}
+
+        if user.telegram_id and user.telegram_id != telegram_id:
+            raise serializers.ValidationError(
+                {
+                    "status": "conflict",
+                    "detail": [
+                        "This account is already linked to another Telegram account."
+                    ],
+                }
+            )
+
+        link_request = TelegramLinkRequest.objects.create(
+            telegram_id=telegram_id,
+            user=user,
+            email=email,
+            token="",
+            expires_at=timezone.now() + timedelta(seconds=TELEGRAM_LINK_MAX_AGE),
+        )
+        raw_token = signing.dumps(str(link_request.id), salt=TELEGRAM_LINK_SALT)
+        link_request.token = make_password(raw_token)
+        link_request.save(update_fields=["token"])
+
+        frontend = getattr(settings, "FRONTEND_URL", "").rstrip("/")
+        connect_url = f"{frontend}/telegram/connect?{urlencode({'token': raw_token})}"
+        message = (
+            f"You're connecting your Telegram account to your Bita account "
+            f"({email}).\n\n"
+            f"Click the link below to confirm and finish connecting:\n\n"
+            f"{connect_url}\n\n"
+            "This link expires in 1 hour. If you didn't request this, you can "
+            "safely ignore this email."
+        )
+        send_email_notification("Connect your Telegram account", message, email)
+        return {"status": "link_sent", "detail": f"A connect link was sent to {email}."}
+
+
+class TelegramEmailCreateSerializer(serializers.Serializer):
+    """Create a brand-new account linked to Telegram and DM credentials via the bot."""
+
+    init_data = serializers.CharField(write_only=True)
+    email = serializers.EmailField(write_only=True)
+    status = serializers.CharField(read_only=True)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+    user = UserReadSerializer(read_only=True)
+    actions = serializers.ListField(read_only=True)
+
+    def validate(self, attrs):
+        attrs["tg_user"] = _verified_telegram_user(attrs["init_data"])
+        attrs["email"] = attrs["email"].lower()
+        if User.objects.filter(email__iexact=attrs["email"]).exists():
+            raise serializers.ValidationError({"email": ["Email already exists"]})
+        return attrs
+
+    def create(self, validated_data):
+        from notifications.telegram_bot import send_bot_message
+
+        tg_user = validated_data["tg_user"]
+        telegram_id = int(tg_user["id"])
+        email = validated_data["email"]
+
+        # A Telegram could in theory already be linked elsewhere — guard.
+        if User.objects.filter(telegram_id=telegram_id).exists():
+            raise serializers.ValidationError(
+                {"status": "conflict", "detail": ["This Telegram is already linked."]}
+            )
+
+        password = get_random_string(12)
+        user = User.objects.create(
+            email=email,
+            telegram_id=telegram_id,
+            first_name=tg_user.get("first_name", ""),
+            last_name=tg_user.get("last_name", ""),
+            is_active=True,
+        )
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        _grant_business_perm(user)
+
+        send_bot_message(
+            telegram_id,
+            (
+                "✅ Your Bita account is ready!\n\n"
+                f"<b>Email:</b> {email}\n"
+                f"<b>Temporary password:</b> <code>{password}</code>\n\n"
+                "Use these to sign in on the web or mobile app. "
+                "Please change your password after your first login."
+            ),
+        )
+        return _auth_payload(user, status="created")
+
+
+class TelegramConnectConfirmSerializer(serializers.Serializer):
+    """Confirm a magic-link token and link Telegram to the account."""
+
+    token = serializers.CharField(write_only=True)
+    detail = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        raw_token = attrs["token"]
+        try:
+            request_id = signing.loads(
+                raw_token,
+                salt=TELEGRAM_LINK_SALT,
+                max_age=TELEGRAM_LINK_MAX_AGE,
+            )
+        except signing.SignatureExpired:
+            raise serializers.ValidationError({"token": ["This link has expired."]})
+        except signing.BadSignature:
+            raise serializers.ValidationError({"token": ["Invalid link."]})
+
+        link_request = TelegramLinkRequest.objects.filter(id=request_id).first()
+        if (
+            not link_request
+            or link_request.is_used
+            or link_request.expires_at < timezone.now()
+            or not check_password(raw_token, link_request.token)
+        ):
+            raise serializers.ValidationError({"token": ["Invalid or expired link."]})
+
+        attrs["link_request"] = link_request
+        return attrs
+
+    def create(self, validated_data):
+        link_request = validated_data["link_request"]
+        user = link_request.user
+        telegram_id = link_request.telegram_id
+
+        # Another account may have claimed this Telegram since the link was sent.
+        clash = User.objects.filter(telegram_id=telegram_id).exclude(pk=user.pk).first()
+        if clash:
+            raise serializers.ValidationError(
+                {"token": ["This Telegram is already linked to another account."]}
+            )
+
+        user.telegram_id = telegram_id
+        user.save(update_fields=["telegram_id"])
+        _grant_business_perm(user)
+
+        link_request.is_used = True
+        link_request.save(update_fields=["is_used"])
+        return {"status": "connected", "detail": "Telegram connected successfully."}

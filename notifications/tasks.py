@@ -78,6 +78,28 @@ def send_email_task(self, subject, message, recipients, html_message=None):
         raise self.retry(exc=exc)
 
 
+@shared_task(
+    queue=CeleryQueue.Definitions.USER_VERIFICATION,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_bot_message_task(self, telegram_id, text):
+    """Deliver a Telegram bot DM asynchronously, retrying transient failures."""
+    from .telegram_bot import _send_bot_message_sync
+
+    if not _send_bot_message_sync(telegram_id, text):
+        try:
+            raise self.retry(
+                exc=RuntimeError(f"bot message to {telegram_id} failed"),
+            )
+        except self.MaxRetriesExceededError:
+            logger.error(
+                "send_bot_message_task: giving up on telegram_id=%s", telegram_id
+            )
+    return None
+
+
 @shared_task(queue=CeleryQueue.Definitions.INVENTORY_ALERTS)
 def check_low_stock_task(variant_ids, business_id):
     """
