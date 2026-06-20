@@ -111,7 +111,7 @@ def send_telegram_notification_task(notification_id, user_ids):
     text, reply_markup = format_notification(notification)
     sent = 0
     for tg_id in telegram_ids:
-        if _send_bot_message_sync(tg_id, text, reply_markup=reply_markup):
+        if _send_bot_message_sync(tg_id, text, reply_markup=reply_markup)["ok"]:
             sent += 1
 
     logger.info(
@@ -129,18 +129,40 @@ def send_telegram_notification_task(notification_id, user_ids):
     default_retry_delay=60,
 )
 def send_bot_message_task(self, telegram_id, text, reply_markup=None):
-    """Deliver a Telegram bot DM asynchronously, retrying transient failures."""
+    """Deliver a Telegram bot DM asynchronously, retrying only transient failures."""
     from .telegram_bot import _send_bot_message_sync
 
-    if not _send_bot_message_sync(telegram_id, text, reply_markup=reply_markup):
-        try:
-            raise self.retry(
-                exc=RuntimeError(f"bot message to {telegram_id} failed"),
-            )
-        except self.MaxRetriesExceededError:
-            logger.error(
-                "send_bot_message_task: giving up on telegram_id=%s", telegram_id
-            )
+    result = _send_bot_message_sync(telegram_id, text, reply_markup=reply_markup)
+    if result["ok"]:
+        return None
+
+    description = result.get("description") or "unknown error"
+
+    # Permanent failures (chat not found, bot blocked, can't initiate a chat
+    # with a user who never started the bot, bad token) will never succeed —
+    # log the real reason and stop, rather than burning 3 retries.
+    if not result.get("transient"):
+        logger.error(
+            "send_bot_message_task: permanent failure for telegram_id=%s "
+            "(error_code=%s): %s",
+            telegram_id,
+            result.get("error_code"),
+            description,
+        )
+        return None
+
+    try:
+        raise self.retry(
+            exc=RuntimeError(
+                f"telegram sendMessage to {telegram_id} failed: {description}"
+            ),
+        )
+    except self.MaxRetriesExceededError:
+        logger.error(
+            "send_bot_message_task: giving up on telegram_id=%s after retries: %s",
+            telegram_id,
+            description,
+        )
     return None
 
 

@@ -152,7 +152,8 @@ class TelegramNotificationDeliveryTests(APITestCase):
         notification = self._make_notification()
 
         with mock.patch(
-            "notifications.telegram_bot._send_bot_message_sync", return_value=True
+            "notifications.telegram_bot._send_bot_message_sync",
+            return_value={"ok": True},
         ) as send:
             send_telegram_notification_task(
                 str(notification.id),
@@ -163,6 +164,45 @@ class TelegramNotificationDeliveryTests(APITestCase):
         # Only the linked user's telegram_id is messaged.
         self.assertEqual(send.call_count, 1)
         self.assertEqual(send.call_args.args[0], 4242)
+
+
+class SendBotMessageTaskTests(unittest.TestCase):
+    """Retry behaviour of the credential-DM task."""
+
+    def test_permanent_failure_is_not_retried(self):
+        from notifications.tasks import send_bot_message_task
+
+        permanent = {
+            "ok": False,
+            "transient": False,
+            "error_code": 403,
+            "description": "Forbidden: bot can't initiate conversation with a user",
+        }
+        with mock.patch(
+            "notifications.telegram_bot._send_bot_message_sync", return_value=permanent
+        ):
+            with mock.patch.object(send_bot_message_task, "retry") as retry:
+                send_bot_message_task.run(123, "hi")
+        retry.assert_not_called()
+
+    def test_transient_failure_triggers_retry(self):
+        from notifications.tasks import send_bot_message_task
+
+        transient = {
+            "ok": False,
+            "transient": True,
+            "error_code": 429,
+            "description": "Too Many Requests",
+        }
+        with mock.patch(
+            "notifications.telegram_bot._send_bot_message_sync", return_value=transient
+        ):
+            with mock.patch.object(
+                send_bot_message_task, "retry", side_effect=RuntimeError("retried")
+            ) as retry:
+                with self.assertRaises(RuntimeError):
+                    send_bot_message_task.run(123, "hi")
+        retry.assert_called_once()
 
 
 class TelegramWebhookViewTests(APITestCase):
