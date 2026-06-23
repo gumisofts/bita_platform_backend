@@ -144,6 +144,8 @@ def on_employee_invitation_status_changed(sender, instance, status, **kwargs):
             user_q |= Q(phone_number=instance.phone_number)
         if instance.email:
             user_q |= Q(email=instance.email)
+        if instance.telegram_username:
+            user_q |= Q(telegram_username=instance.telegram_username)
 
         if not user_q:
             return
@@ -173,8 +175,13 @@ def on_employee_invitation_status_changed(sender, instance, status, **kwargs):
 
 @receiver(employee_invitation_resend)
 def on_employee_invitation_resend(sender, instance, **kwargs):
+    # Re-deliver to a linked Telegram account immediately; username-only invites
+    # for users who haven't started the bot are picked up on their next /start.
+    if instance.telegram_username:
+        from business.telegram_invites import notify_user_if_linked
+
+        notify_user_if_linked(instance)
     # TODO: Implement actual email/SMS notification sending
-    print(f"Resending invitation: {instance}")
 
 
 @receiver(post_save, sender=Branch)

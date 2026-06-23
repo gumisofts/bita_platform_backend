@@ -141,11 +141,22 @@ class EmployeeInvitationSerializer(serializers.ModelSerializer, BaseSerializerMi
     business_details = BusinessSerializer(source="business", read_only=True)
 
     def validate(self, attrs):
+        from business.telegram_invites import normalize_telegram_username
+
         attrs = super().validate(attrs)
         email = attrs.get("email")
         phone_number = attrs.get("phone_number")
-        if not email and not phone_number:
-            raise ValidationError("Email or phone number is required")
+
+        if "telegram_username" in attrs:
+            attrs["telegram_username"] = normalize_telegram_username(
+                attrs.get("telegram_username")
+            )
+        telegram_username = attrs.get("telegram_username")
+
+        if not email and not phone_number and not telegram_username:
+            raise ValidationError(
+                "Email, phone number, or Telegram username is required"
+            )
 
         if phone_number:
             if not regex_validator.regex.match(phone_number):

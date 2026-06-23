@@ -9,7 +9,11 @@ import logging
 
 from django.conf import settings
 
-from .telegram_bot import _send_bot_message_sync
+from .telegram_bot import (
+    _answer_callback_query_sync,
+    _edit_message_text_sync,
+    _send_bot_message_sync,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +23,14 @@ def handle_update(update: dict) -> None:
     if not isinstance(update, dict):
         return
 
+    callback_query = update.get("callback_query")
+    if callback_query:
+        _handle_callback_query(callback_query)
+        return
+
     message = update.get("message") or update.get("edited_message")
     if not message:
-        # Other update types (callback_query, etc.) aren't handled yet.
+        # Any other update type we asked for but don't act on yet.
         return
 
     chat_id = (message.get("chat") or {}).get("id")
@@ -58,7 +67,9 @@ def _open_app_markup():
 
 
 def _handle_start(chat_id, message):
-    first_name = (message.get("from") or {}).get("first_name", "").strip()
+    from_user = message.get("from") or {}
+    first_name = (from_user.get("first_name") or "").strip()
+    username = from_user.get("username")
     greeting = f"Hi {first_name}!" if first_name else "Hi!"
     markup = _open_app_markup()
 
@@ -74,6 +85,62 @@ def _handle_start(chat_id, message):
             text += f"\n\nOpen the app: {app_url}"
 
     _send_bot_message_sync(chat_id, text, reply_markup=markup)
+
+    # Keep a linked account's stored handle current, then surface any business
+    # invitations that were waiting for this person to start the bot.
+    try:
+        from business.telegram_invites import (
+            deliver_pending_invitations,
+            remember_telegram_username,
+        )
+
+        remember_telegram_username(chat_id, username)
+        deliver_pending_invitations(chat_id, username)
+    except Exception:
+        logger.exception("Error delivering pending invitations on /start")
+
+
+def _handle_callback_query(callback_query):
+    """Process a tapped inline button (currently invitation Accept/Reject)."""
+    callback_id = callback_query.get("id")
+    data = callback_query.get("data") or ""
+    from_user = callback_query.get("from") or {}
+    telegram_id = from_user.get("id")
+    username = from_user.get("username")
+
+    message = callback_query.get("message") or {}
+    chat_id = (message.get("chat") or {}).get("id")
+    message_id = message.get("message_id")
+
+    parts = data.split(":")
+    if len(parts) != 3 or parts[0] != "inv":
+        _answer_callback_query_sync(callback_id)
+        return
+
+    _, action, invitation_id = parts
+    try:
+        from business.telegram_invites import process_invitation_callback
+
+        result = process_invitation_callback(
+            action, invitation_id, telegram_id, username
+        )
+    except Exception:
+        logger.exception("Error processing invitation callback %s", data)
+        _answer_callback_query_sync(
+            callback_id, text="Something went wrong. Please try again."
+        )
+        return
+
+    _answer_callback_query_sync(
+        callback_id,
+        text=result.get("answer"),
+        show_alert=result.get("alert", False),
+    )
+    new_text = result.get("text")
+    if new_text and chat_id and message_id:
+        # Omitting reply_markup drops the keyboard once the choice is final.
+        markup = None if result.get("clear") else result.get("reply_markup")
+        _edit_message_text_sync(chat_id, message_id, new_text, reply_markup=markup)
 
 
 def _handle_fallback(chat_id):

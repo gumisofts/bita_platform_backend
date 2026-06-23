@@ -308,6 +308,10 @@ class EmployeeInvitation(BaseModel):
     ]
     email = models.EmailField(blank=True, null=True)
     phone_number = models.CharField(max_length=255, blank=True, null=True)
+    # Telegram @username (normalised: no leading "@", lower-cased). Lets a
+    # business invite someone by Telegram handle before that person has ever
+    # started the bot; the invitation is matched on their first /start.
+    telegram_username = models.CharField(max_length=255, blank=True, null=True)
     role = models.ForeignKey(Role, on_delete=models.CASCADE)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, null=True, blank=True)
     business = models.ForeignKey(Business, on_delete=models.CASCADE)

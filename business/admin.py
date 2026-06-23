@@ -348,13 +348,22 @@ class EmployeeInvitationAdmin(admin.ModelAdmin):
         "created_at",
     ]
     list_filter = ["status", "business", "role", "created_at"]
-    search_fields = ["email", "phone_number", "business__name", "role__role_name"]
+    search_fields = [
+        "email",
+        "phone_number",
+        "telegram_username",
+        "business__name",
+        "role__role_name",
+    ]
     readonly_fields = ["id", "created_at", "updated_at"]
     raw_id_fields = ["business", "role", "branch"]
 
     fieldsets = (
         (None, {"fields": ("id", "business", "status")}),
-        (_("Contact Information"), {"fields": ("email", "phone_number")}),
+        (
+            _("Contact Information"),
+            {"fields": ("email", "phone_number", "telegram_username")},
+        ),
         (_("Position"), {"fields": ("role", "branch")}),
         (
             _("Timestamps"),
@@ -363,8 +372,10 @@ class EmployeeInvitationAdmin(admin.ModelAdmin):
     )
 
     def contact_info(self, obj):
-        contact = obj.email or obj.phone_number or "-"
-        return contact
+        contact = obj.email or obj.phone_number
+        if not contact and obj.telegram_username:
+            contact = f"@{obj.telegram_username}"
+        return contact or "-"
 
     contact_info.short_description = "Contact"
 

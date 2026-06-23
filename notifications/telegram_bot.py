@@ -156,6 +156,40 @@ def send_bot_message(telegram_id, text, reply_markup=None):
     _send_bot_message_sync(telegram_id, text, reply_markup=reply_markup)
 
 
+def _answer_callback_query_sync(callback_query_id, text=None, show_alert=False):
+    """Acknowledge a tapped inline button so Telegram stops its loading spinner.
+
+    ``text`` (optional) shows a toast, or a modal alert when ``show_alert`` is
+    set. Telegram caps the text at 200 characters.
+    """
+    if not callback_query_id:
+        return {"ok": False, "transient": False, "description": "no callback_query_id"}
+    payload = {"callback_query_id": callback_query_id, "show_alert": bool(show_alert)}
+    if text:
+        payload["text"] = text[:200]
+    return _request("answerCallbackQuery", payload)
+
+
+def _edit_message_text_sync(chat_id, message_id, text, reply_markup=None):
+    """Replace the text (and keyboard) of a message the bot already sent.
+
+    Used to reflect an Accept/Reject decision in-place. Omitting ``reply_markup``
+    removes the inline keyboard so the buttons can't be tapped again.
+    """
+    if not chat_id or not message_id:
+        return {"ok": False, "transient": False, "description": "missing message ref"}
+    payload = {
+        "chat_id": int(chat_id),
+        "message_id": int(message_id),
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    return _request("editMessageText", payload)
+
+
 # ─── Webhook administration & polling ───────────────────────────────────────
 
 

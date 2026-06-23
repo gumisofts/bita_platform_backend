@@ -36,6 +36,12 @@ class User(AbstractUser):
     telegram_id = models.BigIntegerField(
         null=True, blank=True, unique=True, db_index=True
     )
+    # Telegram @username (without the leading "@", lower-cased). Not unique:
+    # usernames are optional, can change, and are eventually reusable. Stored so
+    # invitations addressed to a @username can be matched to a linked account.
+    telegram_username = models.CharField(
+        max_length=255, null=True, blank=True, db_index=True
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from django.db.models import Q
@@ -22,6 +23,8 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from business.permissions import *
 from business.serializers import *
 from core.utils import is_valid_uuid
+
+logger = logging.getLogger(__name__)
 
 
 class BusinessViewset(ModelViewSet):
@@ -267,6 +270,8 @@ class EmployeeInvitationViewset(ModelViewSet):
             match_q |= Q(email=user.email)
         if user.phone_number:
             match_q |= Q(phone_number=user.phone_number)
+        if user.telegram_username:
+            match_q |= Q(telegram_username=user.telegram_username)
 
         if not match_q:
             return Response([])
@@ -319,7 +324,12 @@ class EmployeeInvitationViewset(ModelViewSet):
             and user.phone_number
             and invitation.phone_number == user.phone_number
         )
-        if not (email_match or phone_match):
+        telegram_match = (
+            invitation.telegram_username
+            and user.telegram_username
+            and invitation.telegram_username == user.telegram_username
+        )
+        if not (email_match or phone_match or telegram_match):
             return Response(
                 {"detail": "You can only update your own invitations"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -415,6 +425,7 @@ class EmployeeInvitationViewset(ModelViewSet):
 
             email = serializer.validated_data.get("email")
             phone_number = serializer.validated_data.get("phone_number")
+            telegram_username = serializer.validated_data.get("telegram_username")
 
             if email and email == request.user.email:
                 return Response(
@@ -426,12 +437,23 @@ class EmployeeInvitationViewset(ModelViewSet):
                     {"error": "You cannot invite yourself"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if (
+                telegram_username
+                and request.user.telegram_username
+                and telegram_username == request.user.telegram_username
+            ):
+                return Response(
+                    {"error": "You cannot invite yourself"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             existing_employee_q = Q(business=business)
             if email:
                 existing_employee_q &= Q(user__email=email)
             elif phone_number:
                 existing_employee_q &= Q(user__phone_number=phone_number)
+            elif telegram_username:
+                existing_employee_q &= Q(user__telegram_username=telegram_username)
             if Employee.objects.filter(existing_employee_q).exists():
                 return Response(
                     {"error": "This user is already an employee of this business"},
@@ -451,6 +473,12 @@ class EmployeeInvitationViewset(ModelViewSet):
                     business=business,
                     status="pending",
                 ).first()
+            if telegram_username and not existing_invitation:
+                existing_invitation = EmployeeInvitation.objects.filter(
+                    telegram_username=telegram_username,
+                    business=business,
+                    status="pending",
+                ).first()
 
             if existing_invitation:
                 return Response(
@@ -458,7 +486,21 @@ class EmployeeInvitationViewset(ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            serializer.save()
+            invitation = serializer.save()
+
+            # If the invited @username already belongs to a linked account,
+            # deliver the Telegram invite right away; otherwise it waits for
+            # their first /start.
+            if telegram_username:
+                from business.telegram_invites import notify_user_if_linked
+
+                try:
+                    notify_user_if_linked(invitation)
+                except Exception:
+                    logger.exception(
+                        "Failed to deliver telegram invitation %s", invitation.id
+                    )
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
