@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 load_dotenv(".env.production", override=True)
+load_dotenv(Path(__file__).resolve().parent.parent / "config" / ".env", override=True)
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -198,18 +199,22 @@ STORAGES = {
     },
 }
 
+MEDIA_URL = os.getenv("MEDIA_URL", "/medias/")
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/var/www/medias"))
+
 if not os.getenv("AWS_STORAGE_BUCKET_NAME") or DEBUG:
     STORAGES["default"] = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {
+            "location": str(MEDIA_ROOT),
+            "base_url": MEDIA_URL,
+        },
     }
 
 STATIC_URL = os.getenv("STATIC_URL", "/static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
 
 STATIC_ROOT = Path(os.getenv("STATIC_ROOT", "/var/www/static"))
-
-# MEDIA_URL = "/medias/"
-# MEDIA_ROOT = Path("/var/www/medias")
 
 # WhiteNoise configuration
 WHITENOISE_USE_FINDERS = DEBUG  # Use finders in development, storage in production

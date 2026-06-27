@@ -189,29 +189,32 @@ class OrderViewset(ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="receipt")
     def receipt(self, request, *args, **kwargs):
-        from django.http import HttpResponse
+        from django.http import HttpResponseRedirect
 
         from orders.tasks import generate_order_receipt_task
 
         order = self.get_object()
 
         if not order.receipt:
-            # Kick off background generation and tell the client to retry shortly.
             generate_order_receipt_task.delay(str(order.id))
             return Response(
                 {"detail": "Receipt is being generated. Please try again in a moment."},
                 status=status.HTTP_202_ACCEPTED,
             )
 
-        short_id = str(order.id)[:8]
-        with order.receipt.open("rb") as f:
-            pdf_bytes = f.read()
+        try:
+            url = order.receipt.url  # signed S3 URL (no file download through Django)
+        except Exception:
+            Order.objects.filter(pk=order.pk).update(receipt="")
+            generate_order_receipt_task.delay(str(order.id))
+            return Response(
+                {
+                    "detail": "Receipt is being regenerated. Please try again in a moment."
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
 
-        response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = (
-            f'attachment; filename="receipt-{short_id}.pdf"'
-        )
-        return response
+        return HttpResponseRedirect(url)
 
     @action(detail=True, methods=["get"])
     def checkout(self, request, *args, **kwargs):
