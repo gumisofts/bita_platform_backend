@@ -214,7 +214,7 @@ class OrderViewset(ModelViewSet):
 
         return Response({"url": url}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["get"])
     def checkout(self, request, *args, **kwargs):
         import logging
 
