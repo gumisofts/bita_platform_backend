@@ -158,3 +158,4 @@ whitenoise==6.11.0
 zappa==0.60.2
 zope.interface==7.2
 zstandard==0.23.0
+reportlab

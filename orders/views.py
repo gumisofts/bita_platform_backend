@@ -187,6 +187,51 @@ class OrderViewset(ModelViewSet):
 
         return response
 
+    @action(detail=True, methods=["get"], url_path="receipt")
+    def receipt(self, request, *args, **kwargs):
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+        from django.http import HttpResponse
+
+        from orders.receipt import generate_order_receipt
+
+        order = self.get_object()
+        short_id = str(order.id)[:8]
+        ts = int(order.updated_at.timestamp())
+        filename = f"receipts/{order.id}_{ts}.pdf"
+
+        if default_storage.exists(filename):
+            with default_storage.open(filename) as f:
+                pdf_bytes = f.read()
+        else:
+            order = (
+                Order.objects.select_related(
+                    "business__address",
+                    "branch",
+                    "customer",
+                    "employee__user",
+                    "payment_method__payment",
+                )
+                .prefetch_related("items__variant__item")
+                .get(pk=order.pk)
+            )
+            pdf_bytes = generate_order_receipt(order)
+            default_storage.save(filename, ContentFile(pdf_bytes))
+
+            # Delete stale receipts for this order (older timestamps)
+            try:
+                _, files = default_storage.listdir("receipts")
+                stale_prefix = f"{order.id}_"
+                for name in files:
+                    if name.startswith(stale_prefix) and name != f"{order.id}_{ts}.pdf":
+                        default_storage.delete(f"receipts/{name}")
+            except (FileNotFoundError, NotADirectoryError, OSError):
+                pass
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="receipt-{short_id}.pdf"'
+        return response
+
     @action(detail=True, methods=["get"])
     def checkout(self, request, *args, **kwargs):
         from django.core.exceptions import ValidationError as DjangoValidationError
