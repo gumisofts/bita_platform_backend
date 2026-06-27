@@ -18,6 +18,8 @@ class ItemSerializer(serializers.ModelSerializer):
     quantity = serializers.SerializerMethodField(read_only=True)
 
     def get_quantity(self, obj):
+        if hasattr(obj, "total_quantity"):
+            return obj.total_quantity
         return sum(
             supplied_item.quantity
             for variant in obj.variants.all()
@@ -33,6 +35,8 @@ class ItemReadSerializer(serializers.ModelSerializer):
     quantity = serializers.SerializerMethodField(read_only=True)
 
     def get_quantity(self, obj):
+        if hasattr(obj, "total_quantity"):
+            return obj.total_quantity
         return sum(
             supplied_item.quantity
             for variant in obj.variants.all()

@@ -119,7 +119,7 @@ class OrderViewset(ModelViewSet):
                 "business",
                 "branch",
             )
-            .prefetch_related("items__variant__item")
+            .prefetch_related("items__variant__item", "items__supplied_item")
             .order_by("-created_at")
         )
 
@@ -299,6 +299,16 @@ class OrderViewset(ModelViewSet):
             str(oi.id): oi for oi in order.items.select_related("variant__item").all()
         }
 
+        # Batch-fetch already-returned quantities for every order item in one query.
+        already_returned_map = {
+            str(r["order_item_id"]): r["total"]
+            for r in OrderReturnItem.objects.filter(
+                order_item_id__in=order_items_map.keys()
+            )
+            .values("order_item_id")
+            .annotate(total=Sum("quantity_returned"))
+        }
+
         # Resolve refund method
         refund_method = order.payment_method
         if data["refund_method"]:
@@ -327,12 +337,7 @@ class OrderViewset(ModelViewSet):
                 continue
 
             order_item = order_items_map[oi_id]
-            already_returned = (
-                OrderReturnItem.objects.filter(order_item=order_item).aggregate(
-                    total=Sum("quantity_returned")
-                )["total"]
-                or 0
-            )
+            already_returned = already_returned_map.get(oi_id, 0) or 0
             available = order_item.quantity - already_returned
             if qty > available:
                 errors.append(
@@ -352,14 +357,9 @@ class OrderViewset(ModelViewSet):
         if errors:
             return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Determine full vs partial
+        # Determine full vs partial (already_returned_map covers all order items)
         total_ordered = sum(oi.quantity for oi in order_items_map.values())
-        total_already_returned = (
-            OrderReturnItem.objects.filter(order_item__order=order).aggregate(
-                total=Sum("quantity_returned")
-            )["total"]
-            or 0
-        )
+        total_already_returned = sum(already_returned_map.values())
         total_now_returning = sum(l["quantity_returned"] for l in validated_lines)
         return_status = (
             OrderReturn.StatusChoices.FULL
@@ -469,6 +469,11 @@ class OrderViewset(ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        order_return = (
+            OrderReturn.objects.prefetch_related("items__order_item__variant__item")
+            .select_related("processed_by", "refund_method")
+            .get(pk=order_return.pk)
+        )
         return Response(
             OrderReturnReadSerializer(order_return).data,
             status=status.HTTP_201_CREATED,
@@ -776,22 +781,18 @@ class HomeStatsViewSet(GenericViewSet):
             created_at__lte=end,
         )
 
-        # Aggregate order items by variant/item and calculate revenue (quantity * selling_price)
-        # Use Coalesce to handle NULL selling_price values (treat as 0)
-        best_seller = (
+        top_2 = list(
             OrderItem.objects.filter(order__in=completed_orders)
-            .select_related("variant", "variant__item")
             .values("variant__item__id", "variant__item__name")
             .annotate(
                 total_sales=Sum(
                     F("quantity") * Coalesce(F("price"), Value(Decimal("0")))
                 )
             )
-            .order_by("-total_sales")
-            .first()
+            .order_by("-total_sales")[:2]
         )
 
-        if not best_seller:
+        if not top_2:
             return {
                 "item_id": None,
                 "item_name": "N/A",
@@ -800,20 +801,8 @@ class HomeStatsViewSet(GenericViewSet):
                 "progress_percent": 0,
             }
 
-        # Calculate progress percent (compare with second best seller)
-        second_best = (
-            OrderItem.objects.filter(order__in=completed_orders)
-            .select_related("variant", "variant__item")
-            .values("variant__item__id")
-            .annotate(
-                total_sales=Sum(
-                    F("quantity") * Coalesce(F("price"), Value(Decimal("0")))
-                )
-            )
-            .order_by("-total_sales")
-            .exclude(variant__item__id=best_seller["variant__item__id"])
-            .first()
-        )
+        best_seller = top_2[0]
+        second_best = top_2[1] if len(top_2) > 1 else None
 
         if second_best and second_best["total_sales"] > 0:
             progress_percent = int(
@@ -984,16 +973,15 @@ class HomeStatsViewSet(GenericViewSet):
         """Get summary statistics"""
         start, end = self._get_date_range(range_type, start_date, end_date)
 
-        # Total sales from completed orders
+        # Total sales and count from completed orders — one query.
         completed_orders = Order.objects.filter(
             base_filter,
             status=Order.StatusChoices.COMPLETED,
             created_at__gte=start,
             created_at__lte=end,
         )
-        total_sales = completed_orders.aggregate(total=Sum("total_payable"))[
-            "total"
-        ] or Decimal("0")
+        agg = completed_orders.aggregate(total=Sum("total_payable"), count=Count("id"))
+        total_sales = agg["total"] or Decimal("0")
 
         # Low stock items (quantity <= notify_below)
         # Mirror inventories.views.inventory_summary's low_stock_count: only
@@ -1030,8 +1018,8 @@ class HomeStatsViewSet(GenericViewSet):
             )
         expiring_items = expiring_items_queryset.values("item").distinct().count()
 
-        # Sales logged (number of completed orders)
-        sales_logged = completed_orders.count()
+        # Reuse the count from the aggregate above — no extra query.
+        sales_logged = agg["count"]
 
         return {
             "range": range_type,

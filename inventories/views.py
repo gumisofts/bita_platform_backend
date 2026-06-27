@@ -5,8 +5,17 @@ import logging
 import openpyxl
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import transaction
-from django.db.models import Count, F, Prefetch, Q, Sum
-from django.db.models.functions import Lower
+from django.db.models import (
+    Count,
+    F,
+    IntegerField,
+    OuterRef,
+    Prefetch,
+    Q,
+    Subquery,
+    Sum,
+)
+from django.db.models.functions import Coalesce, Lower
 from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
@@ -59,10 +68,22 @@ class ItemViewset(ModelViewSet):
         return self.serializer_class
 
     def get_queryset(self):
+        total_qty_subquery = (
+            SuppliedItem.objects.filter(variant__item=OuterRef("pk"))
+            .values("variant__item")
+            .annotate(total=Sum("quantity"))
+            .values("total")
+        )
         queryset = (
             super()
             .get_queryset()
-            .prefetch_related("categories", "variants__supplied_items")
+            .select_related("group", "business", "branch")
+            .prefetch_related("categories")
+            .annotate(
+                total_quantity=Coalesce(
+                    Subquery(total_qty_subquery, output_field=IntegerField()), 0
+                )
+            )
         )
         return filter_queryset_by_branch(queryset, self.request, "item")
 
