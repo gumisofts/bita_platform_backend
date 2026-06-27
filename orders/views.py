@@ -21,6 +21,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 import inventories.models as inventories_models
 from business.models import Branch, Business, Employee, biz_perm
 from business.permissions import BranchLevelPermission
+from core.idempotency import idempotent
 from core.utils import is_valid_uuid
 from finances.models import BusinessPaymentMethod, Transaction
 from inventories.models import Item, ItemVariant, SuppliedItem
@@ -42,6 +43,7 @@ class OrderItemViewset(ModelViewSet):
     http_method_names = ["post"]
     permission_classes = [IsAuthenticated, BranchLevelPermission]
 
+    @idempotent
     def create(self, request, *args, **kwargs):
         with db_transaction.atomic():
             serializer = self.get_serializer(data=request.data)
@@ -125,6 +127,10 @@ class OrderViewset(ModelViewSet):
         if self.action == "retrieve":
             return OrderListSerializer
         return self.serializer_class
+
+    @idempotent
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         """Ensure the employee is always set from the authenticated user."""
@@ -256,6 +262,7 @@ class OrderViewset(ModelViewSet):
         return Response(OrderListSerializer(order).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="return")
+    @idempotent
     def return_order(self, request, *args, **kwargs):
         """
         Initiate a (partial or full) return for a completed order.

@@ -32,6 +32,7 @@ from business.permissions import (
     accessible_branches,
     filter_queryset_by_branch,
 )
+from core.idempotency import idempotent
 from core.utils import is_valid_uuid
 
 from .filters import (
@@ -616,6 +617,7 @@ class SupplyViewset(
         )
 
     @action(detail=True, methods=["post"], url_path="settle_debt")
+    @idempotent
     def settle_debt(self, request, *args, **kwargs):
         """
         Settle an outstanding supply debt by recording an actual PURCHASE payment.
@@ -982,6 +984,7 @@ class InventoryMovementViewSet(ModelViewSet):
         return queryset
 
     @action(detail=True, methods=["post"])
+    @idempotent
     def approve(self, request, pk=None):
         """Approve a pending inventory movement"""
         movement = self.get_object()
@@ -1002,6 +1005,7 @@ class InventoryMovementViewSet(ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
+    @idempotent
     def ship(self, request, pk=None):
         """Mark movement as shipped and reduce inventory from source"""
         movement = self.get_object()
@@ -1046,6 +1050,7 @@ class InventoryMovementViewSet(ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
+    @idempotent
     def receive(self, request, pk=None):
         """Mark movement as received and add inventory to destination"""
         movement = self.get_object()
@@ -1126,6 +1131,7 @@ class InventoryMovementViewSet(ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
+    @idempotent
     def cancel(self, request, pk=None):
         """Cancel a movement (only if pending or approved)"""
         movement = self.get_object()

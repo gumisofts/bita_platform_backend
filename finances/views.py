@@ -22,6 +22,7 @@ from business.permissions import (
     accessible_branches,
     filter_queryset_by_branch,
 )
+from core.idempotency import idempotent
 from core.utils import is_valid_uuid
 from finances.filters import BusinessPaymentMethodFilter, TransactionFilter
 from inventories.models import SuppliedItem
@@ -68,6 +69,10 @@ class TransactionViewset(
             .order_by("-created_at")
         )
 
+    @idempotent
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         branch = serializer.validated_data.get("branch")
         business = serializer.validated_data.get("business")
@@ -86,6 +91,7 @@ class TransactionViewset(
         serializer.save(branch=branch, business=business, created_by=self.request.user)
 
     @action(detail=True, methods=["post"], url_path="settle")
+    @idempotent
     def settle(self, request, pk=None):
         """
         POST /finances/transactions/{id}/settle/

@@ -22,6 +22,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
 from business.models import Business, Category, Industry
+from core.idempotency import idempotent
 from inventories.models import ItemImage, ItemVariant
 
 from .models import (
@@ -420,6 +421,7 @@ class MarketplaceBusinessViewSet(ReadOnlyModelViewSet):
         return Response(ReviewSerializer(qs, many=True).data)
 
     @action(detail=True, methods=["post"], permission_classes=[AllowAny])
+    @idempotent
     def place_order(self, request, pk=None):
         business = self.get_object()
         serializer = PlaceOrderSerializer(data=request.data)
