@@ -2,11 +2,14 @@ from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from core.models import BaseModel
 
 
 class Order(BaseModel):
+    created_at = models.DateTimeField(default=timezone.now)
+
     class StatusChoices(models.TextChoices):
         PENDING = "PENDING", "Pending"
         PROCESSING = "PROCESSING", "Processing"

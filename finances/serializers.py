@@ -48,6 +48,7 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             "created_by",
             "type",
             "total_paid_amount",
+            "created_at",
         ]
         read_only_fields = ["id", "created_by"]
         extra_kwargs = {

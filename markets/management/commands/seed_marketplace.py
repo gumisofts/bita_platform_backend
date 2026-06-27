@@ -401,7 +401,6 @@ class Command(BaseCommand):
                             defaults={
                                 "item": item,
                                 "name": vname,
-                                "selling_price": price,
                                 "quantity": dchoice(
                                     f"qty-{sku}", [0, 8, 25, 60, 140, 300]
                                 ),
@@ -505,7 +504,12 @@ class Command(BaseCommand):
                 total = Decimal("0")
                 for v in biz0_variants:
                     qty = 25
-                    price = Decimal(v.selling_price or 0)
+                    price = Decimal(
+                        v.pricings.filter(min_selling_quota=1)
+                        .values_list("price", flat=True)
+                        .first()
+                        or 0
+                    )
                     total += price * qty
                     MarketplaceOrderItem.objects.create(
                         order=order, variant=v, quantity=qty, price=price

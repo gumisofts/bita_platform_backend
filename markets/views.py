@@ -102,8 +102,6 @@ def _price_for_quantity(variant, quantity):
     for tier in tiers:
         if quantity >= tier.min_selling_quota:
             return Decimal(tier.price)
-    if variant.selling_price is not None:
-        return Decimal(variant.selling_price)
     return Decimal(tiers[-1].price) if tiers else Decimal("0")
 
 
@@ -118,7 +116,7 @@ class MarketplaceProductViewSet(ReadOnlyModelViewSet):
         filters.OrderingFilter,
     ]
     search_fields = ["name", "item__name", "item__description", "sku"]
-    ordering_fields = ["created_at", "selling_price", "quantity", "name"]
+    ordering_fields = ["created_at", "quantity", "name"]
     ordering = ["-created_at"]
 
     def get_serializer_class(self):
@@ -150,10 +148,6 @@ class MarketplaceProductViewSet(ReadOnlyModelViewSet):
             queryset = queryset.filter(item__business__id__in=businesses)
         if business_types:
             queryset = queryset.filter(item__business__business_type__in=business_types)
-        if min_price:
-            queryset = queryset.filter(selling_price__gte=min_price)
-        if max_price:
-            queryset = queryset.filter(selling_price__lte=max_price)
         if in_stock_only:
             queryset = queryset.filter(quantity__gt=0)
         if min_quantity:
@@ -289,10 +283,6 @@ class MarketplaceProductViewSet(ReadOnlyModelViewSet):
             queryset = queryset.filter(
                 item__business__business_type__in=data["business_types"]
             )
-        if data.get("min_price"):
-            queryset = queryset.filter(selling_price__gte=data["min_price"])
-        if data.get("max_price"):
-            queryset = queryset.filter(selling_price__lte=data["max_price"])
         if data.get("in_stock_only"):
             queryset = queryset.filter(quantity__gt=0)
         if data.get("verified_businesses_only"):

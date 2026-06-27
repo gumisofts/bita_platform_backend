@@ -295,7 +295,6 @@ class MarketplaceItemVariantListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "selling_price",
             "quantity",
             "sku",
             "item_id",
@@ -488,8 +487,6 @@ class MarketplaceSearchSerializer(serializers.Serializer):
         choices=[
             "created_at",
             "-created_at",
-            "selling_price",
-            "-selling_price",
             "name",
             "-name",
             "quantity",

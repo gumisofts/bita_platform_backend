@@ -401,14 +401,12 @@ class ItemViewset(ModelViewSet):
                         # Quantity is populated through a supplied batch below,
                         # not set directly on the variant.
                         if variant:
-                            variant.selling_price = selling_price
                             variant.sku = sku
-                            variant.save(update_fields=["selling_price", "sku"])
+                            variant.save(update_fields=["sku"])
                         else:
                             variant = ItemVariant.objects.create(
                                 item=item,
                                 name=variant_name,
-                                selling_price=selling_price,
                                 quantity=0,
                                 sku=sku,
                                 is_default=is_first_variant,
@@ -506,13 +504,10 @@ class ItemViewset(ModelViewSet):
         )
 
         def variant_selling_price(variant):
-            """Selling price from the latest supply batch, falling back to the
-            variant's own price when the variant has never been supplied."""
+            """Selling price from the latest supply batch."""
             latest = next(iter(variant.supplied_items.all()), None)
             if latest and latest.selling_price:
                 return str(latest.selling_price)
-            if variant.selling_price:
-                return str(variant.selling_price)
             return ""
 
         # Build flat rows — one per variant

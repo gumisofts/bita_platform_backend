@@ -287,11 +287,16 @@ class ItemVariantReadSerializer(serializers.ModelSerializer):
     pricings = InnerPricingSerializer(many=True, read_only=True)
     supplied_items = InnerSuppliedItemSerializer(many=True, read_only=True)
     quantity = serializers.SerializerMethodField()
+    selling_price = serializers.SerializerMethodField()
 
     def get_quantity(self, obj):
         return sum(
             [supplied_item.quantity for supplied_item in obj.supplied_items.all()]
         )
+
+    def get_selling_price(self, obj):
+        latest = obj.supplied_items.order_by("-created_at").first()
+        return latest.selling_price if latest else None
 
     class Meta:
         model = ItemVariant
@@ -318,13 +323,17 @@ class ItemVariantSerializer(serializers.ModelSerializer):
     properties = InnerPropertySerializer(many=True, required=False)
     pricings = InnerPricingSerializer(many=True, required=False)
     item_details = ItemSerializer(source="item", read_only=True)
+    selling_price = serializers.SerializerMethodField()
+
+    def get_selling_price(self, obj):
+        latest = obj.supplied_items.order_by("-created_at").first()
+        return latest.selling_price if latest else None
 
     class Meta:
         model = ItemVariant
         exclude = []
         read_only_fields = [
             "id",
-            "selling_price",
             "created_at",
             "updated_at",
             "item_details",

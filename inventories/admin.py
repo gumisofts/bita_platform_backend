@@ -233,7 +233,7 @@ try:
             "name",
             "item_name",
             "quantity",
-            "selling_price",
+            # "selling_price",
             "property_count",
             "created_at",
         ]
@@ -244,7 +244,17 @@ try:
         inlines = [PropertyInline]
 
         fieldsets = (
-            (None, {"fields": ("id", "name", "item", "quantity", "selling_price")}),
+            (
+                None,
+                {
+                    "fields": (
+                        "id",
+                        "name",
+                        "item",
+                        "quantity",  # "selling_price"
+                    )
+                },
+            ),
             (
                 _("Product Details"),
                 {"fields": ("sku",)},

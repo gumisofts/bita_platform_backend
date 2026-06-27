@@ -93,7 +93,6 @@ class ItemFilter(FilterSet):
 
 class ItemVariantFilter(FilterSet):
     sku = CharFilter(field_name="sku", lookup_expr="icontains")
-    selling_price = RangeFilter(field_name="selling_price")
     name = CharFilter(field_name="name", lookup_expr="icontains")
     item = ModelChoiceFilter(field_name="item", queryset=Item.objects.all())
     item__name = CharFilter(field_name="item__name", lookup_expr="icontains")
@@ -121,7 +120,7 @@ class ItemVariantFilter(FilterSet):
 
     class Meta:
         model = ItemVariant
-        fields = ["name", "item", "selling_price", "sku"]
+        fields = ["name", "item", "sku"]
 
     def filter_low_stock(self, queryset, name, value):
         """

@@ -52,7 +52,11 @@ class OrderItemViewset(ModelViewSet):
             # Get the associated Order
             order = order_item.order
 
-            item_unit_price = order_item.price or order_item.variant.selling_price
+            item_unit_price = order_item.price or (
+                order_item.supplied_item.selling_price
+                if order_item.supplied_item
+                else None
+            )
             if item_unit_price is None:
                 return Response(
                     {
@@ -172,6 +176,7 @@ class OrderViewset(ModelViewSet):
                             branch=order.branch,
                             business=order.business,
                             created_by=request.user,
+                            created_at=order.created_at,
                         )
 
         except Exception as e:

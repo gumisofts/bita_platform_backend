@@ -184,7 +184,6 @@ class SuppliedItemViewSetTest(APITestCase):
             item=self.item,
             name="Variant A",
             quantity=10,
-            selling_price=20,
             sku="SKU123",
         )
 
@@ -248,7 +247,6 @@ class PricingViewSetTest(APITestCase):
             item=self.item,
             name="Variant A",
             quantity=10,
-            selling_price=20,
             sku="SKU123",
         )
 
@@ -326,7 +324,6 @@ class ItemVariantViewSetTest(APITestCase):
             item=self.item,
             name="Variant 1",
             quantity=5,
-            selling_price=100,
             sku="VARSKU001",
         )
 
@@ -342,7 +339,6 @@ class ItemVariantViewSetTest(APITestCase):
             "item": str(self.item.id),
             "name": "New Variant",
             "quantity": 10,
-            "selling_price": 200,
             "batch_number": "NEWBATCH",
             "sku": "NEWSKU",
         }
@@ -391,7 +387,6 @@ class InventoryMovementTest(APITestCase):
             item=self.item,
             name="Variant A",
             quantity=10,
-            selling_price=20,
             sku="SKU123",
         )
         self.supplied_item = SuppliedItem.objects.create(

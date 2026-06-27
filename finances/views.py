@@ -567,7 +567,11 @@ def _get_income_by_category(order_filter):
     for item in items:
         categories = list(item.variant.item.categories.all())
         category_name = categories[0].name if categories else "Other"
-        price = item.price or item.variant.selling_price or Decimal("0")
+        price = (
+            item.price
+            or (item.supplied_item.selling_price if item.supplied_item else None)
+            or Decimal("0")
+        )
         income_by_category[category_name] += item.quantity * price
 
     return dict(income_by_category)
@@ -608,7 +612,11 @@ def _get_income_by_item_category(transaction_filter):
             category_name = categories[0].name if categories else "Other"
         except AttributeError:
             category_name = "Other"
-        price = oi.price or oi.variant.selling_price or Decimal("0")
+        price = (
+            oi.price
+            or (oi.supplied_item.selling_price if oi.supplied_item else None)
+            or Decimal("0")
+        )
         income_by_category[category_name] += oi.quantity * price
 
     # --- 2. All other income transactions → "Other" bucket ---

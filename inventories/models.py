@@ -64,13 +64,13 @@ class Item(BaseModel):
 class ItemVariant(BaseModel):
     item = models.ForeignKey(Item, related_name="variants", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
-    selling_price = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        validators=[MinValueValidator(1)],
-        null=True,
-        blank=True,
-    )
+    # selling_price = models.DecimalField(
+    #     max_digits=12,
+    #     decimal_places=2,
+    #     validators=[MinValueValidator(1)],
+    #     null=True,
+    #     blank=True,
+    # )
     quantity = models.PositiveIntegerField(default=0)
     sku = models.CharField(max_length=255, unique=True, null=True)
     is_default = models.BooleanField(default=False)
