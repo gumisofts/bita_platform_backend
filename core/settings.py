@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 load_dotenv(".env.production", override=True)
-load_dotenv(Path(__file__).resolve().parent.parent / "config" / ".env", override=True)
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -184,7 +183,7 @@ USE_TZ = True
 
 STORAGES = {
     "default": {
-        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        "BACKEND": "core.storage.PublicMinIOStorage",
         "OPTIONS": {
             "bucket_name": os.getenv("AWS_STORAGE_BUCKET_NAME"),
             "region_name": os.getenv("AWS_S3_REGION_NAME"),
@@ -215,6 +214,9 @@ STATIC_URL = os.getenv("STATIC_URL", "/static/")
 STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
 
 STATIC_ROOT = Path(os.getenv("STATIC_ROOT", "/var/www/static"))
+
+# MEDIA_URL = "/medias/"
+# MEDIA_ROOT = Path("/var/www/medias")
 
 # WhiteNoise configuration
 WHITENOISE_USE_FINDERS = DEBUG  # Use finders in development, storage in production
@@ -355,6 +357,10 @@ AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "eu-north-1")
 AWS_S3_ENDPOINT_URL = os.getenv(
     "AWS_S3_ENDPOINT_URL", "https://s3.eu-north-1.amazonaws.com"
 )
+# Public URL clients receive in presigned links (MinIO behind a reverse proxy).
+# When set, PublicMinIOStorage rewrites signed URLs from AWS_S3_ENDPOINT_URL
+# to this value so clients never see the internal address.
+AWS_S3_PUBLIC_URL = os.getenv("AWS_S3_PUBLIC_URL", "")
 
 GOOGLE_WEB_CLIENT_ID = os.getenv("GOOGLE_WEB_CLIENT_ID")
 
