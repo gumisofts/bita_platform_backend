@@ -44,31 +44,26 @@ def on_order_completed(sender, instance, **kwargs):
     if insufficient:
         raise ValidationError("Insufficient stock for: " + "; ".join(insufficient))
 
-    if item.supplied_item:
-        supplied_item = item.supplied_item
-        supplied_item.quantity -= item.quantity
-        supplied_item.save()
-    else:
-        # All checks passed — decrement variant totals and drain supplied batches FIFO
-        for item in items:
-            variant = locked_variants[item.variant_id]
-            variant.quantity -= item.quantity
-            variant.save()
+    # All checks passed — decrement variant totals and drain supplied batches FIFO
+    for item in items:
+        variant = locked_variants[item.variant_id]
+        variant.quantity -= item.quantity
+        variant.save()
 
-            # Drain SuppliedItem batches oldest-first so per-batch quantity stays accurate
-            remaining = item.quantity
-            batches = (
-                SuppliedItem.objects.select_for_update()
-                .filter(variant=variant, quantity__gt=0)
-                .order_by("created_at")
-            )
-            for batch in batches:
-                if remaining <= 0:
-                    break
-                deduct = min(batch.quantity, remaining)
-                batch.quantity -= deduct
-                batch.save(update_fields=["quantity", "updated_at"])
-                remaining -= deduct
+        # Drain SuppliedItem batches oldest-first so per-batch quantity stays accurate
+        remaining = item.quantity
+        batches = (
+            SuppliedItem.objects.select_for_update()
+            .filter(variant=variant, quantity__gt=0)
+            .order_by("created_at")
+        )
+        for batch in batches:
+            if remaining <= 0:
+                break
+            deduct = min(batch.quantity, remaining)
+            batch.quantity -= deduct
+            batch.save(update_fields=["quantity", "updated_at"])
+            remaining -= deduct
 
 
 @receiver(pre_save, sender=Order)

@@ -201,7 +201,7 @@ STORAGES = {
 MEDIA_URL = os.getenv("MEDIA_URL", "/medias/")
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/var/www/medias"))
 
-if not os.getenv("AWS_STORAGE_BUCKET_NAME") or DEBUG:
+if not os.getenv("AWS_STORAGE_BUCKET_NAME"):
     STORAGES["default"] = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
         "OPTIONS": {

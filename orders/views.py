@@ -214,9 +214,14 @@ class OrderViewset(ModelViewSet):
 
         return Response({"url": url}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["get"])
+    @action(detail=True, methods=["post"])
     def checkout(self, request, *args, **kwargs):
+        import logging
+
         from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.db import IntegrityError
+
+        logger = logging.getLogger(__name__)
 
         order = self.get_object()
         if order.status == Order.StatusChoices.COMPLETED:
@@ -233,6 +238,18 @@ class OrderViewset(ModelViewSet):
         except DjangoValidationError as e:
             return Response(
                 {"error": e.message},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except IntegrityError as e:
+            logger.exception("Checkout IntegrityError for order %s", order.id)
+            return Response(
+                {"error": f"Could not complete order due to a data conflict: {e}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.exception("Checkout failed for order %s", order.id)
+            return Response(
+                {"error": f"Checkout failed: {e}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -125,51 +125,59 @@ def create_notification(
     if "deep_link" not in payload:
         payload["deep_link"] = deep_link_for_notification(event_type, payload)
 
+    # Wrap ALL db work in a single savepoint so any failure here never
+    # poisons the caller's transaction (e.g. order checkout).  A bare
+    # `except IntegrityError` without a savepoint leaves PostgreSQL's
+    # transaction in an aborted state even though Python swallowed the
+    # exception — the outer COMMIT then silently becomes a ROLLBACK.
     try:
-        notification = Notification.objects.create(
-            title=title,
-            message=message,
-            message_format="text",
-            notification_type=notification_type,
-            event_type=event_type,
-            business=business,
-            data=payload,
-            delivery_method="push",
-        )
-    except IntegrityError:
+        with transaction.atomic():
+            notification = Notification.objects.create(
+                title=title,
+                message=message,
+                message_format="text",
+                notification_type=notification_type,
+                event_type=event_type,
+                business=business,
+                data=payload,
+                delivery_method="push",
+            )
+
+            notification.data = {
+                **notification.data,
+                "notification_id": str(notification.id),
+            }
+            notification.save(update_fields=["data"])
+
+            if recipient_user_ids is None:
+                recipient_user_ids = _get_business_user_ids(business)
+
+            user_id_strings = [str(uid) for uid in recipient_user_ids]
+
+            NotificationRecipient.objects.bulk_create(
+                [
+                    NotificationRecipient(notification=notification, recipient_id=uid)
+                    for uid in recipient_user_ids
+                ]
+            )
+
+            transaction.on_commit(
+                lambda: send_push_notification_task.delay(
+                    str(notification.id), user_id_strings
+                )
+            )
+            transaction.on_commit(
+                lambda: send_telegram_notification_task.delay(
+                    str(notification.id), user_id_strings
+                )
+            )
+    except Exception:
         logger.warning(
-            "create_notification: skipping '%s' notification — business %s no longer exists",
+            "create_notification: failed to create '%s' notification for business %s",
             event_type,
             business.pk if business else None,
+            exc_info=True,
         )
         return None
-
-    notification.data = {
-        **notification.data,
-        "notification_id": str(notification.id),
-    }
-    notification.save(update_fields=["data"])
-
-    if recipient_user_ids is None:
-        recipient_user_ids = _get_business_user_ids(business)
-
-    user_id_strings = [str(uid) for uid in recipient_user_ids]
-
-    NotificationRecipient.objects.bulk_create(
-        [
-            NotificationRecipient(notification=notification, recipient_id=uid)
-            for uid in recipient_user_ids
-        ]
-    )
-
-    transaction.on_commit(
-        lambda: send_push_notification_task.delay(str(notification.id), user_id_strings)
-    )
-    # Deliver the same notification to recipients who have linked Telegram.
-    transaction.on_commit(
-        lambda: send_telegram_notification_task.delay(
-            str(notification.id), user_id_strings
-        )
-    )
 
     return notification
