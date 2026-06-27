@@ -126,6 +126,15 @@ class OrderListSerializer(ModelSerializer):
     items = InternalOrderItemSerializer(many=True, read_only=True)
     employee_name = serializers.CharField(read_only=True, source="employee.full_name")
     customer_name = serializers.CharField(read_only=True, source="customer.full_name")
+    receipt_url = serializers.SerializerMethodField()
+
+    def get_receipt_url(self, obj):
+        if not obj.receipt:
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.receipt.url)
+        return obj.receipt.url
 
     class Meta:
         model = Order

@@ -10,6 +10,13 @@ order_completed = Signal()
 
 
 @receiver(order_completed)
+def on_order_completed_receipt(sender, instance, **kwargs):
+    from orders.tasks import generate_order_receipt_task
+
+    generate_order_receipt_task.delay(str(instance.id))
+
+
+@receiver(order_completed)
 def on_order_completed(sender, instance, **kwargs):
     from inventories.models import ItemVariant, SuppliedItem
 
@@ -157,3 +164,11 @@ def create_order_history(sender, instance, created, **kwargs):
         # Clean up the stored old instance
         if hasattr(instance, "_old_instance"):
             delattr(instance, "_old_instance")
+
+    # Regenerate receipt whenever the order is created or meaningfully updated.
+    # Skip the update_fields=["receipt"] save the task does itself to avoid loops.
+    update_fields = kwargs.get("update_fields")
+    if update_fields is None or "receipt" not in update_fields:
+        from orders.tasks import generate_order_receipt_task
+
+        generate_order_receipt_task.delay(str(instance.id))

@@ -189,47 +189,28 @@ class OrderViewset(ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="receipt")
     def receipt(self, request, *args, **kwargs):
-        from django.core.files.base import ContentFile
-        from django.core.files.storage import default_storage
         from django.http import HttpResponse
 
-        from orders.receipt import generate_order_receipt
+        from orders.tasks import generate_order_receipt_task
 
         order = self.get_object()
-        short_id = str(order.id)[:8]
-        ts = int(order.updated_at.timestamp())
-        filename = f"receipts/{order.id}_{ts}.pdf"
 
-        if default_storage.exists(filename):
-            with default_storage.open(filename) as f:
-                pdf_bytes = f.read()
-        else:
-            order = (
-                Order.objects.select_related(
-                    "business__address",
-                    "branch",
-                    "customer",
-                    "employee__user",
-                    "payment_method__payment",
-                )
-                .prefetch_related("items__variant__item")
-                .get(pk=order.pk)
+        if not order.receipt:
+            # Kick off background generation and tell the client to retry shortly.
+            generate_order_receipt_task.delay(str(order.id))
+            return Response(
+                {"detail": "Receipt is being generated. Please try again in a moment."},
+                status=status.HTTP_202_ACCEPTED,
             )
-            pdf_bytes = generate_order_receipt(order)
-            default_storage.save(filename, ContentFile(pdf_bytes))
 
-            # Delete stale receipts for this order (older timestamps)
-            try:
-                _, files = default_storage.listdir("receipts")
-                stale_prefix = f"{order.id}_"
-                for name in files:
-                    if name.startswith(stale_prefix) and name != f"{order.id}_{ts}.pdf":
-                        default_storage.delete(f"receipts/{name}")
-            except (FileNotFoundError, NotADirectoryError, OSError):
-                pass
+        short_id = str(order.id)[:8]
+        with order.receipt.open("rb") as f:
+            pdf_bytes = f.read()
 
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'inline; filename="receipt-{short_id}.pdf"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="receipt-{short_id}.pdf"'
+        )
         return response
 
     @action(detail=True, methods=["get"])

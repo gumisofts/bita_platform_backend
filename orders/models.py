@@ -46,6 +46,8 @@ class Order(BaseModel):
 
     transaction_id = models.CharField(max_length=100, null=True, blank=True)
 
+    receipt = models.FileField(upload_to="receipts/", null=True, blank=True)
+
     additional_info = models.JSONField(default=dict, blank=True, null=True)
 
     def __str__(self):
