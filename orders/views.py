@@ -323,26 +323,23 @@ class OrderViewset(ModelViewSet):
 
         try:
             with db_transaction.atomic():
-                # Lock variants and supplied items that will be restocked
-                returnable_lines = [l for l in validated_lines if l["is_returnable"]]
-                returnable_variant_ids = [
-                    l["order_item"].variant_id for l in returnable_lines
-                ]
-                returnable_supplied_item_ids = [
+                # Lock all variants and supplied items being restocked
+                all_variant_ids = [l["order_item"].variant_id for l in validated_lines]
+                all_supplied_item_ids = [
                     l["order_item"].supplied_item_id
-                    for l in returnable_lines
+                    for l in validated_lines
                     if l["order_item"].supplied_item_id
                 ]
                 locked_variants = {
                     v.pk: v
                     for v in inventories_models.ItemVariant.objects.select_for_update().filter(
-                        pk__in=returnable_variant_ids
+                        pk__in=all_variant_ids
                     )
                 }
                 locked_supplied_items = {
                     s.pk: s
                     for s in inventories_models.SuppliedItem.objects.select_for_update().filter(
-                        pk__in=returnable_supplied_item_ids
+                        pk__in=all_supplied_item_ids
                     )
                 }
 
@@ -355,29 +352,25 @@ class OrderViewset(ModelViewSet):
                     line_refund = (order_item.price or Decimal("0")) * qty
                     total_refund += line_refund
 
-                    is_restocked = False
-                    if line["is_returnable"]:
-                        variant = locked_variants[order_item.variant_id]
-                        variant.quantity += qty
-                        variant.save(update_fields=["quantity", "updated_at"])
+                    variant = locked_variants[order_item.variant_id]
+                    variant.quantity += qty
+                    variant.save(update_fields=["quantity", "updated_at"])
 
-                        if (
+                    if (
+                        order_item.supplied_item_id
+                        and order_item.supplied_item_id in locked_supplied_items
+                    ):
+                        supplied_item = locked_supplied_items[
                             order_item.supplied_item_id
-                            and order_item.supplied_item_id in locked_supplied_items
-                        ):
-                            supplied_item = locked_supplied_items[
-                                order_item.supplied_item_id
-                            ]
-                            supplied_item.quantity += qty
-                            supplied_item.save(update_fields=["quantity", "updated_at"])
-
-                        is_restocked = True
+                        ]
+                        supplied_item.quantity += qty
+                        supplied_item.save(update_fields=["quantity", "updated_at"])
 
                     return_item_payloads.append(
                         {
                             "order_item": order_item,
                             "quantity_returned": qty,
-                            "is_restocked": is_restocked,
+                            "is_restocked": True,
                             "refund_amount": line_refund,
                         }
                     )
