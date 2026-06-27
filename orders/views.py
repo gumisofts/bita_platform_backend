@@ -189,8 +189,6 @@ class OrderViewset(ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="receipt")
     def receipt(self, request, *args, **kwargs):
-        from django.http import HttpResponseRedirect
-
         from orders.tasks import generate_order_receipt_task
 
         order = self.get_object()
@@ -203,7 +201,7 @@ class OrderViewset(ModelViewSet):
             )
 
         try:
-            url = order.receipt.url  # signed S3 URL (no file download through Django)
+            url = order.receipt.url
         except Exception:
             Order.objects.filter(pk=order.pk).update(receipt="")
             generate_order_receipt_task.delay(str(order.id))
@@ -214,7 +212,7 @@ class OrderViewset(ModelViewSet):
                 status=status.HTTP_202_ACCEPTED,
             )
 
-        return HttpResponseRedirect(url)
+        return Response({"url": url}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"])
     def checkout(self, request, *args, **kwargs):
