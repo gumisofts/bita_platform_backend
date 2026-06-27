@@ -33,7 +33,9 @@ def generate_order_receipt_task(order_id):
     try:
         pdf_bytes = generate_order_receipt(order)
     except Exception:
-        logger.exception("generate_order_receipt_task: PDF generation failed for order %s", order_id)
+        logger.exception(
+            "generate_order_receipt_task: PDF generation failed for order %s", order_id
+        )
         return
 
     filename = f"order_{order.id}.pdf"

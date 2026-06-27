@@ -208,8 +208,8 @@ STATICFILES_DIRS = [BASE_DIR / "staticfiles"]
 
 STATIC_ROOT = Path(os.getenv("STATIC_ROOT", "/var/www/static"))
 
-MEDIA_URL = "/medias/"
-MEDIA_ROOT = Path("/var/www/medias")
+# MEDIA_URL = "/medias/"
+# MEDIA_ROOT = Path("/var/www/medias")
 
 # WhiteNoise configuration
 WHITENOISE_USE_FINDERS = DEBUG  # Use finders in development, storage in production
