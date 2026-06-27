@@ -11,9 +11,12 @@ order_completed = Signal()
 
 @receiver(order_completed)
 def on_order_completed_receipt(sender, instance, **kwargs):
+    from django.db import transaction
+
     from orders.tasks import generate_order_receipt_task
 
-    generate_order_receipt_task.delay(str(instance.id))
+    order_id = str(instance.id)
+    transaction.on_commit(lambda: generate_order_receipt_task.delay(order_id))
 
 
 @receiver(order_completed)
@@ -97,6 +100,12 @@ def create_order_history(sender, instance, created, **kwargs):
             old_value=None,
             new_value="Order created",
         )
+        from django.db import transaction
+
+        from orders.tasks import generate_order_receipt_task
+
+        order_id = str(instance.id)
+        transaction.on_commit(lambda: generate_order_receipt_task.delay(order_id))
         return
 
     # For updates, track field changes
@@ -167,8 +176,14 @@ def create_order_history(sender, instance, created, **kwargs):
 
     # Regenerate receipt whenever the order is created or meaningfully updated.
     # Skip the update_fields=["receipt"] save the task does itself to avoid loops.
+    # Use on_commit so the task only fires after the transaction commits — dispatching
+    # Celery inside an atomic block causes the whole transaction to roll back if
+    # the broker is momentarily unavailable.
     update_fields = kwargs.get("update_fields")
     if update_fields is None or "receipt" not in update_fields:
+        from django.db import transaction
+
         from orders.tasks import generate_order_receipt_task
 
-        generate_order_receipt_task.delay(str(instance.id))
+        order_id = str(instance.id)
+        transaction.on_commit(lambda: generate_order_receipt_task.delay(order_id))
