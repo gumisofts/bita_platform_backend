@@ -46,5 +46,9 @@ def generate_order_receipt_task(order_id):
         except Exception:
             pass
 
-    order.receipt.save(filename, ContentFile(pdf_bytes), save=True)
+    # Save ONLY the receipt field. A full save (save=True) would write the
+    # entire in-memory row — including a stale `status` loaded before a
+    # concurrent checkout committed — clobbering COMPLETED back to PROCESSING.
+    order.receipt.save(filename, ContentFile(pdf_bytes), save=False)
+    order.save(update_fields=["receipt", "updated_at"])
     logger.info("generate_order_receipt_task: receipt saved for order %s", order_id)

@@ -74,7 +74,7 @@ class OrderItemViewset(ModelViewSet):
             order.total_payable = (order.total_payable or Decimal("0")) + (
                 item_unit_price * order_item.quantity
             )
-            order.save()
+            order.save(update_fields=["total_payable", "updated_at"])
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -239,7 +239,7 @@ class OrderViewset(ModelViewSet):
         try:
             with db_transaction.atomic():
                 order.status = Order.StatusChoices.COMPLETED
-                order.save()
+                order.save(update_fields=["status", "updated_at"])
                 order_completed.send(sender=Order, instance=order)
         except DjangoValidationError as e:
             return Response(
@@ -461,7 +461,7 @@ class OrderViewset(ModelViewSet):
                 # Update order status only on a full return
                 if return_status == OrderReturn.StatusChoices.FULL:
                     order.status = Order.StatusChoices.RETURNED
-                    order.save()
+                    order.save(update_fields=["status", "updated_at"])
 
         except Exception as exc:
             return Response(

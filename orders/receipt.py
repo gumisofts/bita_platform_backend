@@ -15,6 +15,13 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+# ── Branding ──────────────────────────────────────────────────────────────────
+# Edit these to change what appears in the footer of every generated receipt.
+BITA_BRAND = "Powered by Bita"
+BITA_TAGLINE = "Smart business & inventory management"
+BITA_WEBSITE = "www.bita.et"
+BITA_SUPPORT = "support@bita.et"
+
 
 def _draw_returned_watermark(canvas, doc):
     canvas.saveState()
@@ -27,6 +34,43 @@ def _draw_returned_watermark(canvas, doc):
     canvas.restoreState()
 
 
+def _draw_footer(canvas, doc):
+    """Pinned branding footer drawn at the bottom of every page."""
+    canvas.saveState()
+    width, _ = A4
+    center_x = width / 2
+
+    # Separator line above the footer.
+    canvas.setStrokeColor(colors.HexColor("#cccccc"))
+    canvas.setLineWidth(0.5)
+    canvas.line(15 * mm, 16 * mm, width - 15 * mm, 16 * mm)
+
+    # "Powered by Bita" brand line.
+    canvas.setFont("Helvetica-Bold", 8)
+    canvas.setFillColor(colors.HexColor("#333333"))
+    canvas.drawCentredString(center_x, 12 * mm, BITA_BRAND)
+
+    # Tagline + contact details.
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.HexColor("#888888"))
+    canvas.drawCentredString(center_x, 8.5 * mm, BITA_TAGLINE)
+    contact = "  |  ".join(p for p in [BITA_WEBSITE, BITA_SUPPORT] if p)
+    if contact:
+        canvas.drawCentredString(center_x, 5.5 * mm, contact)
+
+    # Generation timestamp (left) and page number (right).
+    generated_at = timezone.localtime(timezone.now()).strftime("%d %b %Y %H:%M")
+    canvas.drawString(15 * mm, 5.5 * mm, f"Generated {generated_at}")
+    canvas.drawRightString(width - 15 * mm, 5.5 * mm, f"Page {doc.page}")
+
+    canvas.restoreState()
+
+
+def _draw_footer_with_watermark(canvas, doc):
+    _draw_returned_watermark(canvas, doc)
+    _draw_footer(canvas, doc)
+
+
 def generate_order_receipt(order) -> bytes:
     """Return PDF bytes for a given Order instance."""
     buffer = io.BytesIO()
@@ -37,7 +81,7 @@ def generate_order_receipt(order) -> bytes:
         rightMargin=15 * mm,
         leftMargin=15 * mm,
         topMargin=15 * mm,
-        bottomMargin=15 * mm,
+        bottomMargin=22 * mm,  # leave room for the pinned branding footer
     )
 
     styles = getSampleStyleSheet()
@@ -250,9 +294,9 @@ def generate_order_receipt(order) -> bytes:
     if is_returned:
         doc.build(
             story,
-            onFirstPage=_draw_returned_watermark,
-            onLaterPages=_draw_returned_watermark,
+            onFirstPage=_draw_footer_with_watermark,
+            onLaterPages=_draw_footer_with_watermark,
         )
     else:
-        doc.build(story)
+        doc.build(story, onFirstPage=_draw_footer, onLaterPages=_draw_footer)
     return buffer.getvalue()
