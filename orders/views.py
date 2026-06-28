@@ -256,18 +256,17 @@ class OrderViewset(ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST,
                         )
 
-                if payment_method:
-                    with db_transaction.atomic():
-                        Transaction.objects.create(
-                            order=order,
-                            type=Transaction.TransactionType.SALE,
-                            total_paid_amount=order.total_payable,
-                            payment_method=payment_method,
-                            branch=order.branch,
-                            business=order.business,
-                            created_by=request.user,
-                            created_at=order.created_at,
-                        )
+                with db_transaction.atomic():
+                    Transaction.objects.create(
+                        order=order,
+                        type=Transaction.TransactionType.SALE,
+                        total_paid_amount=order.total_payable,
+                        payment_method=payment_method,
+                        branch=order.branch,
+                        business=order.business,
+                        created_by=request.user,
+                        created_at=order.created_at,
+                    )
 
         except Exception as e:
             return Response(

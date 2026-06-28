@@ -1028,6 +1028,37 @@ def finance_report(request):
             }
         )
 
+    # Transactions with no payment method (e.g. orders completed without one)
+    # are grouped under an "Unknown" entry. Skipped when filtering to specific
+    # payment methods, since "unknown" can't match a requested id.
+    if not payment_method_ids:
+        unknown_txs = transactions.filter(payment_method__isnull=True)
+        unknown_count = unknown_txs.count()
+        if unknown_count:
+            unknown_income = unknown_txs.filter(
+                type__in=Transaction.INCOME_TYPES
+            ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+            unknown_expense = unknown_txs.filter(
+                type__in=Transaction.EXPENSE_TYPES
+            ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+            unknown_refunds = unknown_txs.filter(
+                type=Transaction.TransactionType.REFUND
+            ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+            by_payment_method.append(
+                {
+                    "payment_method_id": None,
+                    "payment_method_name": "Unknown",
+                    "total_income": unknown_income,
+                    "total_expense": unknown_expense,
+                    "total_refunds": unknown_refunds,
+                    "net_balance": unknown_income - unknown_expense,
+                    "transaction_count": unknown_count,
+                    "is_credit": False,
+                    "pending_receivables": Decimal("0"),
+                    "pending_payables": Decimal("0"),
+                }
+            )
+
     # --- Income by category (from completed order items) ----------------
     order_filter = Q(
         order__business=business,
