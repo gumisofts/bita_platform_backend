@@ -262,6 +262,19 @@ DEFAULT_FROM_EMAIL = os.getenv(
 # Use the real SMTP backend only when a host is configured and we're not in
 # DEBUG; otherwise print emails (incl. verification codes) to the console so
 # local development doesn't require an SMTP server.
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.getenv("DJANGO_REDIS_URL", "redis://localhost:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "bita_platform_backend",
+    }
+}
+
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND",
     (
