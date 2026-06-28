@@ -319,12 +319,18 @@ class OrderViewset(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        from orders.tasks import generate_order_receipt_task
+
         try:
             with db_transaction.atomic():
                 decrement_order_inventory(order)
                 order.status = Order.StatusChoices.COMPLETED
                 order.save(update_fields=["status", "updated_at"])
                 order_completed.send(sender=Order, instance=order)
+                order_id = str(order.id)
+                db_transaction.on_commit(
+                    lambda: generate_order_receipt_task.delay(order_id)
+                )
         except DjangoValidationError as e:
             return Response(
                 {"error": e.message},

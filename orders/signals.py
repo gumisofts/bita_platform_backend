@@ -7,16 +7,6 @@ from orders.models import Order, OrderHistory
 order_completed = Signal()
 
 
-@receiver(order_completed)
-def on_order_completed_receipt(sender, instance, **kwargs):
-    from django.db import transaction
-
-    from orders.tasks import generate_order_receipt_task
-
-    order_id = str(instance.id)
-    transaction.on_commit(lambda: generate_order_receipt_task.delay(order_id))
-
-
 @receiver(pre_save, sender=Order)
 def track_order_changes(sender, instance, **kwargs):
     """

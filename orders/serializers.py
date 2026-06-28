@@ -4,7 +4,6 @@ from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
 from business.models import Employee
-from inventories.models import ItemVariant, SuppliedItem
 from orders.models import Order, OrderItem, OrderReturn, OrderReturnItem
 
 
@@ -117,44 +116,14 @@ class OrderSerializer(ModelSerializer):
         return instance
 
 
-class SuppliedItemSummarySerializer(ModelSerializer):
-    class Meta:
-        model = SuppliedItem
-        fields = [
-            "id",
-            "batch_number",
-            "product_number",
-            "selling_price",
-            "purchase_price",
-            "expire_date",
-            "man_date",
-            "quantity",
-            "initial_quantity",
-            "is_returnable",
-            "is_visible_online",
-        ]
-
-
-class VariantSummarySerializer(ModelSerializer):
-    item_name = serializers.CharField(source="item.name", read_only=True)
-    item_id = serializers.UUIDField(source="item.id", read_only=True)
-
-    class Meta:
-        model = ItemVariant
-        fields = ["id", "name", "sku", "quantity", "is_default", "item_id", "item_name"]
-
-
-class OrderItemDetailSerializer(ModelSerializer):
-    variant = VariantSummarySerializer(read_only=True)
-    supplied_item = SuppliedItemSummarySerializer(read_only=True)
-
-    class Meta:
-        model = OrderItem
-        fields = ["id", "variant", "supplied_item", "quantity", "price", "created_at"]
-
-
 class OrderListSerializer(ModelSerializer):
-    items = OrderItemDetailSerializer(many=True, read_only=True)
+    class InternalOrderItemSerializer(ModelSerializer):
+        class Meta:
+            model = OrderItem
+            exclude = ["order"]
+            depth = 1
+
+    items = InternalOrderItemSerializer(many=True, read_only=True)
     employee_name = serializers.CharField(read_only=True, source="employee.full_name")
     customer_name = serializers.CharField(read_only=True, source="customer.full_name")
     receipt_url = serializers.SerializerMethodField()
@@ -169,24 +138,8 @@ class OrderListSerializer(ModelSerializer):
 
     class Meta:
         model = Order
-        fields = [
-            "id",
-            "status",
-            "customer",
-            "customer_name",
-            "employee",
-            "employee_name",
-            "business",
-            "branch",
-            "payment_method",
-            "transaction_id",
-            "total_payable",
-            "receipt_url",
-            "additional_info",
-            "items",
-            "created_at",
-            "updated_at",
-        ]
+        fields = "__all__"
+        depth = 1
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
