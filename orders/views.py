@@ -37,6 +37,90 @@ from orders.serializers import (
 from orders.signals import order_completed
 
 
+def decrement_order_inventory(order):
+    """
+    Decrement inventory for a completed order. Must be called inside an
+    atomic transaction so the SELECT ... FOR UPDATE locks are held.
+
+    Locks every relevant variant and batch row upfront, validates stock,
+    then decrements variant totals and the correct batch quantities
+    (direct batch deduction when a supplied_item is set, otherwise FIFO).
+    """
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    items = list(order.items.select_related("variant", "supplied_item").all())
+    variant_ids = [item.variant_id for item in items]
+
+    # Lock all variant rows upfront in one query.
+    locked_variants = {
+        v.pk: v
+        for v in ItemVariant.objects.select_for_update().filter(pk__in=variant_ids)
+    }
+
+    # Lock supplied items that are explicitly set on order items (direct batch deduction).
+    direct_supplied_ids = [
+        item.supplied_item_id for item in items if item.supplied_item_id
+    ]
+    locked_direct = (
+        {
+            s.pk: s
+            for s in SuppliedItem.objects.select_for_update().filter(
+                pk__in=direct_supplied_ids
+            )
+        }
+        if direct_supplied_ids
+        else {}
+    )
+
+    # For items with no specific batch, lock all non-empty batches for those variants
+    # upfront (FIFO drain, oldest first). One query for all FIFO variants.
+    fifo_variant_ids = [item.variant_id for item in items if not item.supplied_item_id]
+    fifo_batches_by_variant: dict = {}
+    if fifo_variant_ids:
+        for batch in (
+            SuppliedItem.objects.select_for_update()
+            .filter(variant_id__in=fifo_variant_ids, quantity__gt=0)
+            .order_by("variant_id", "created_at")
+        ):
+            fifo_batches_by_variant.setdefault(batch.variant_id, []).append(batch)
+
+    # Validate stock availability before touching anything.
+    insufficient = []
+    for item in items:
+        variant = locked_variants[item.variant_id]
+        if variant.quantity < item.quantity:
+            insufficient.append(
+                f"'{variant.name}': need {item.quantity}, have {variant.quantity}"
+            )
+
+    if insufficient:
+        raise DjangoValidationError(
+            "Insufficient stock for: " + "; ".join(insufficient)
+        )
+
+    # All checks passed — decrement variant totals and the correct batch quantities.
+    for item in items:
+        variant = locked_variants[item.variant_id]
+        variant.quantity -= item.quantity
+        variant.save(update_fields=["quantity", "updated_at"])
+
+        if item.supplied_item_id and item.supplied_item_id in locked_direct:
+            # Deduct directly from the specific batch linked to this order item.
+            batch = locked_direct[item.supplied_item_id]
+            batch.quantity = max(0, batch.quantity - item.quantity)
+            batch.save(update_fields=["quantity", "updated_at"])
+        else:
+            # No specific batch — drain FIFO across the variant's batches.
+            remaining = item.quantity
+            for batch in fifo_batches_by_variant.get(item.variant_id, []):
+                if remaining <= 0:
+                    break
+                deduct = min(batch.quantity, remaining)
+                batch.quantity -= deduct
+                batch.save(update_fields=["quantity", "updated_at"])
+                remaining -= deduct
+
+
 class OrderItemViewset(ModelViewSet):
     queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
@@ -238,6 +322,7 @@ class OrderViewset(ModelViewSet):
 
         try:
             with db_transaction.atomic():
+                decrement_order_inventory(order)
                 order.status = Order.StatusChoices.COMPLETED
                 order.save(update_fields=["status", "updated_at"])
                 order_completed.send(sender=Order, instance=order)

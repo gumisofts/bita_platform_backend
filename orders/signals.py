@@ -1,9 +1,7 @@
 # Signal for creating a transaction when an order is completed
-from django.core.exceptions import ValidationError
 from django.db.models.signals import Signal, post_save, pre_save
 from django.dispatch import receiver
 
-from inventories.signals import on_item_variant_sold
 from orders.models import Order, OrderHistory
 
 order_completed = Signal()
@@ -17,81 +15,6 @@ def on_order_completed_receipt(sender, instance, **kwargs):
 
     order_id = str(instance.id)
     transaction.on_commit(lambda: generate_order_receipt_task.delay(order_id))
-
-
-@receiver(order_completed)
-def on_order_completed(sender, instance, **kwargs):
-    from inventories.models import ItemVariant, SuppliedItem
-
-    items = list(instance.items.select_related("variant", "supplied_item").all())
-    variant_ids = [item.variant_id for item in items]
-
-    # Lock all variant rows upfront in one query.
-    locked_variants = {
-        v.pk: v
-        for v in ItemVariant.objects.select_for_update().filter(pk__in=variant_ids)
-    }
-
-    # Lock supplied items that are explicitly set on order items (direct batch deduction).
-    direct_supplied_ids = [
-        item.supplied_item_id for item in items if item.supplied_item_id
-    ]
-    locked_direct = (
-        {
-            s.pk: s
-            for s in SuppliedItem.objects.select_for_update().filter(
-                pk__in=direct_supplied_ids
-            )
-        }
-        if direct_supplied_ids
-        else {}
-    )
-
-    # For items with no specific batch, lock all non-empty batches for those variants
-    # upfront (FIFO drain, oldest first). One query for all FIFO variants.
-    fifo_variant_ids = [item.variant_id for item in items if not item.supplied_item_id]
-    fifo_batches_by_variant: dict = {}
-    if fifo_variant_ids:
-        for batch in (
-            SuppliedItem.objects.select_for_update()
-            .filter(variant_id__in=fifo_variant_ids, quantity__gt=0)
-            .order_by("variant_id", "created_at")
-        ):
-            fifo_batches_by_variant.setdefault(batch.variant_id, []).append(batch)
-
-    # Validate stock availability before touching anything.
-    insufficient = []
-    for item in items:
-        variant = locked_variants[item.variant_id]
-        if variant.quantity < item.quantity:
-            insufficient.append(
-                f"'{variant.name}': need {item.quantity}, have {variant.quantity}"
-            )
-
-    if insufficient:
-        raise ValidationError("Insufficient stock for: " + "; ".join(insufficient))
-
-    # All checks passed — decrement variant totals and the correct batch quantities.
-    for item in items:
-        variant = locked_variants[item.variant_id]
-        variant.quantity -= item.quantity
-        variant.save(update_fields=["quantity", "updated_at"])
-
-        if item.supplied_item_id and item.supplied_item_id in locked_direct:
-            # Deduct directly from the specific batch linked to this order item.
-            batch = locked_direct[item.supplied_item_id]
-            batch.quantity = max(0, batch.quantity - item.quantity)
-            batch.save(update_fields=["quantity", "updated_at"])
-        else:
-            # No specific batch — drain FIFO across the variant's batches.
-            remaining = item.quantity
-            for batch in fifo_batches_by_variant.get(item.variant_id, []):
-                if remaining <= 0:
-                    break
-                deduct = min(batch.quantity, remaining)
-                batch.quantity -= deduct
-                batch.save(update_fields=["quantity", "updated_at"])
-                remaining -= deduct
 
 
 @receiver(pre_save, sender=Order)
