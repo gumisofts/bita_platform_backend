@@ -937,13 +937,14 @@ def finance_report(request):
     )
     # Refunds are stored negative, so total_refunds is <= 0.
     total_refunds = totals_by_type.get(Transaction.TransactionType.REFUND, Decimal("0"))
+    total_income += total_refunds
     total_debt_issued = totals_by_type.get(
         Transaction.TransactionType.DEBT, Decimal("0")
     )
 
     # Refunds reduce profit. They are not in EXPENSE_TYPES (so not in
     # total_expense); fold them in via their negative sign instead.
-    net_profit = total_income - total_expense + total_refunds
+    net_profit = total_income - total_expense
     profit_margin = (
         (net_profit / total_income * 100).quantize(Decimal("0.01"))
         if total_income > 0
@@ -1010,6 +1011,8 @@ def finance_report(request):
         pm_refunds = pm_txs.filter(type=Transaction.TransactionType.REFUND).aggregate(
             total=Sum("total_paid_amount")
         )["total"] or Decimal("0")
+
+        pm_income += pm_refunds  # Refunds are negative, so add them to income
         is_credit_pm = pm.identifier == "CREDIT"
         pm_pending_receivables = pm_income if is_credit_pm else Decimal("0")
         pm_pending_payables = pm_expense if is_credit_pm else Decimal("0")
@@ -1044,6 +1047,9 @@ def finance_report(request):
             unknown_refunds = unknown_txs.filter(
                 type=Transaction.TransactionType.REFUND
             ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+            unknown_income += (
+                unknown_refunds  # Refunds are negative, so add them to income
+            )
             by_payment_method.append(
                 {
                     "payment_method_id": None,
@@ -1169,6 +1175,10 @@ def finance_report(request):
     previous_expense = sum(
         prev_totals_by_type.get(t, Decimal("0")) for t in Transaction.EXPENSE_TYPES
     )
+    previous_refunds = prev_totals_by_type.get(
+        Transaction.TransactionType.REFUND, Decimal("0")
+    )
+    previous_income += previous_refunds
     previous_net_profit = previous_income - previous_expense
 
     def _pct_change(current, previous):
