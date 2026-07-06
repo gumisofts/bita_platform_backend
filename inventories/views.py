@@ -190,10 +190,32 @@ class ItemViewset(ModelViewSet):
                 "100mg",
                 25.00,
                 "SKU-P100",
+                "BATCH-001",
+                "2024-12-31",
                 100,
             ],
-            ["Paracetamol", "", "piece", "500mg", 45.00, "SKU-P500", 50],
-            ["Vitamin C", "Immune support", "piece", "", 35.00, "", 200],
+            [
+                "Paracetamol",
+                "",
+                "piece",
+                "500mg",
+                45.00,
+                "SKU-P500",
+                "BATCH-002",
+                "2024-12-31",
+                50,
+            ],
+            [
+                "Vitamin C",
+                "Immune support",
+                "piece",
+                "",
+                35.00,
+                "",
+                "BATCH-003",
+                "2024-12-31",
+                200,
+            ],
             [
                 "Amoxicillin 250mg",
                 "Antibiotic capsule",
@@ -201,6 +223,8 @@ class ItemViewset(ModelViewSet):
                 "",
                 60.00,
                 "SKU-A250",
+                "BATCH-004",
+                "2024-12-31",
                 80,
             ],
         ]
@@ -400,6 +424,30 @@ class ItemViewset(ModelViewSet):
                         sku = str(row.get("sku", "")).strip() or None
                         quantity = self._parse_int(row.get("quantity"), default=0)
 
+                        batch_number = (
+                            str(row.get("batch_number", "")).strip()
+                            or import_supply_label
+                        )
+
+                        expired_date_str = str(row.get("expire_date", "")).strip()
+
+                        if expired_date_str:
+                            try:
+                                expire_date = timezone.datetime.strptime(
+                                    expired_date_str, "%Y-%m-%d"
+                                ).date()
+                            except ValueError:
+                                errors.append(
+                                    {
+                                        "row": row_num,
+                                        "name": product_name,
+                                        "errors": [
+                                            "'expire_date' must be in YYYY-MM-DD format."
+                                        ],
+                                    }
+                                )
+                                continue
+
                         # Upsert variant: match by SKU (if given) else by name+item
                         variant = None
                         if sku:
@@ -449,11 +497,14 @@ class ItemViewset(ModelViewSet):
                                     initial_quantity=quantity,
                                     selling_price=selling_price,
                                     purchase_price=None,
-                                    batch_number=import_supply_label,
+                                    batch_number=batch_number,
                                     product_number=(
                                         sku or f"{item.name} — {variant_name}"
                                     )[:255],
                                     business=business,
+                                    expire_date=(
+                                        expire_date if expired_date_str else None
+                                    ),
                                 )
                             else:
                                 variant.quantity = quantity

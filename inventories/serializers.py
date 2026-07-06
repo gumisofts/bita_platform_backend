@@ -533,6 +533,8 @@ BULK_IMPORT_COLUMNS = [
     "variant_name",
     "selling_price",
     "sku",
+    "batch_number",
+    "expire_date",
     "quantity",
     "groups",
 ]
@@ -544,6 +546,8 @@ BULK_IMPORT_COLUMN_NOTES = {
     "variant_name": "Optional. Variant label, e.g. '500mg' or 'Large'. Defaults to the product name when left blank.",
     "selling_price": "Required. Selling price — must be a positive number.",
     "sku": "Optional. Unique SKU code for this variant. Leave blank to auto-assign none.",
+    "batch_number": "Optional. Batch number for tracking purposes.",
+    "expire_date": "Optional. Expiry date for the product.",
     "quantity": "Optional. Starting stock quantity (default 0).",
     "groups": "Optional. Comma-separated group names, e.g. 'Antibiotics, Painkillers'. Groups are created automatically if they do not exist.",
 }
