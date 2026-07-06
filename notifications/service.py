@@ -88,6 +88,7 @@ def create_notification(
     recipient_user_ids=None,
     deduplicate_key=None,
     deduplicate_window_hours=24,
+    delivery_methods="platform, push, telegram",
 ):
     """
     Create a Notification + NotificationRecipient rows and dispatch push via Celery.
@@ -103,6 +104,7 @@ def create_notification(
         deduplicate_key: If set, skip creation when a notification with the same
                          event_type and this key in data was created within the window.
         deduplicate_window_hours: Hours to look back for deduplication.
+        delivery_methods: Comma-separated string of delivery methods (e.g., "platform, push, telegram").
     """
     from .tasks import send_push_notification_task, send_telegram_notification_task
 
@@ -130,6 +132,8 @@ def create_notification(
     # `except IntegrityError` without a savepoint leaves PostgreSQL's
     # transaction in an aborted state even though Python swallowed the
     # exception — the outer COMMIT then silently becomes a ROLLBACK.
+
+    delivery_methods = [m.strip() for m in delivery_methods.split(",") if m.strip()]
     try:
         with transaction.atomic():
             notification = Notification.objects.create(
@@ -161,16 +165,19 @@ def create_notification(
                 ]
             )
 
-            transaction.on_commit(
-                lambda: send_push_notification_task.delay(
-                    str(notification.id), user_id_strings
+            if "push" in delivery_methods:
+                transaction.on_commit(
+                    lambda: send_push_notification_task.delay(
+                        str(notification.id), user_id_strings
+                    )
                 )
-            )
-            transaction.on_commit(
-                lambda: send_telegram_notification_task.delay(
-                    str(notification.id), user_id_strings
+            if "telegram" in delivery_methods:
+                transaction.on_commit(
+                    lambda: send_telegram_notification_task.delay(
+                        str(notification.id), user_id_strings
+                    )
                 )
-            )
+
     except Exception:
         logger.warning(
             "create_notification: failed to create '%s' notification for business %s",

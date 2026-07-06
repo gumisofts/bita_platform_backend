@@ -42,6 +42,7 @@ def on_restocked(sender, instance, created, **kwargs):
             "quantity_added": instance.quantity,
             "supply_id": str(instance.supply_id),
         },
+        delivery_methods="platform, push, telegram",
     )
 
 
@@ -70,6 +71,7 @@ def on_price_changed(sender, instance, **kwargs):
             "new_price": str(supplied_item.selling_price),
             "supply_id": str(supplied_item.supply_id),
         },
+        delivery_methods="platform, push, telegram",
     )
 
 
@@ -107,6 +109,7 @@ def on_order_completed_notify(sender, instance, **kwargs):
             "order_id": str(order.id),
             "total_payable": str(order.total_payable),
         },
+        delivery_methods="platform, telegram",
     )
 
 

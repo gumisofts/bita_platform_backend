@@ -599,6 +599,8 @@ class ItemViewset(ModelViewSet):
                         "",  # variant_name (will default to product name on re-import)
                         "",  # selling_price — user must fill in
                         "",  # sku
+                        "",  # batch_number
+                        "",  # expire_date
                         "",  # quantity — no variants, no stock data
                         group_value,
                     ]
@@ -613,6 +615,8 @@ class ItemViewset(ModelViewSet):
                             "" if variant.name == item.name else variant.name,
                             variant_selling_price(variant),
                             variant.sku or "",
+                            "",  # batch_number — not exported
+                            "",  # expire_date — not exported
                             variant.quantity,
                             group_value,
                         ]

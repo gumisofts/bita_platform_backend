@@ -74,6 +74,7 @@ THIRD_PARTY_APPS = [
     "drf_spectacular",
     "rest_framework_simplejwt",
     "drf_spectacular_sidecar",
+    "django_filters",
     "guardian",
 ]
 
