@@ -294,13 +294,13 @@ class ItemVariantReadSerializer(serializers.ModelSerializer):
     selling_price = serializers.SerializerMethodField()
 
     def get_quantity(self, obj):
-        return sum(
-            [supplied_item.quantity for supplied_item in obj.supplied_items.all()]
-        )
+        return obj.total_quantity if hasattr(obj, "total_quantity") else 0
 
     def get_selling_price(self, obj):
-        latest = obj.supplied_items.order_by("-created_at").first()
-        return latest.selling_price if latest else None
+
+        return (
+            obj.latest_selling_price if hasattr(obj, "latest_selling_price") else None
+        )
 
     class Meta:
         model = ItemVariant
@@ -330,8 +330,10 @@ class ItemVariantSerializer(serializers.ModelSerializer):
     selling_price = serializers.SerializerMethodField()
 
     def get_selling_price(self, obj):
-        latest = obj.supplied_items.order_by("-created_at").first()
-        return latest.selling_price if latest else None
+
+        return (
+            obj.latest_selling_price if hasattr(obj, "latest_selling_price") else None
+        )
 
     class Meta:
         model = ItemVariant

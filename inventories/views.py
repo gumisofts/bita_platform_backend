@@ -982,16 +982,28 @@ class ItemVariantViewset(ModelViewSet):
         # ItemVariantReadSerializer nests properties/pricings/supplied_items and
         # uses depth=2 over item -> (group/business/branch/categories); pull them
         # all in so list/retrieve don't issue per-row queries.
-        return (
+
+        latest_supply = SuppliedItem.objects.filter(variant=OuterRef("pk")).order_by(
+            "-created_at"
+        )
+        queryset = (
             queryset.select_related("item__group", "item__business", "item__branch")
             .prefetch_related(
                 "supplied_items__supply",
                 "properties",
                 "pricings",
                 "item__categories",
+                "item__business__categories",
             )
             .order_by(Lower("name"), "id")
         )
+
+        queryset = queryset.annotate(
+            latest_selling_price=Subquery(latest_supply.values("selling_price")[:1]),
+            total_quantity=Sum("supplied_items__quantity"),
+        )
+
+        return queryset
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
