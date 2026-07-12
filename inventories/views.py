@@ -607,6 +607,9 @@ class ItemViewset(ModelViewSet):
                 )
             else:
                 for variant in variants:
+                    latest_supplied_item = (
+                        variant.supplied_items.first()
+                    )  # Prefetched, ordered by -created_at
                     data_rows.append(
                         [
                             item.name,
@@ -615,8 +618,16 @@ class ItemViewset(ModelViewSet):
                             "" if variant.name == item.name else variant.name,
                             variant_selling_price(variant),
                             variant.sku or "",
-                            "",  # batch_number — not exported
-                            "",  # expire_date — not exported
+                            (
+                                latest_supplied_item.batch_number
+                                if latest_supplied_item
+                                else ""
+                            ),
+                            (
+                                latest_supplied_item.expire_date
+                                if latest_supplied_item
+                                else ""
+                            ),
                             variant.quantity,
                             group_value,
                         ]
