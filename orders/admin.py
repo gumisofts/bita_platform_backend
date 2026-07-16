@@ -1,7 +1,10 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+
+from finances.models import Transaction
 
 from .models import Order, OrderHistory, OrderItem, OrderReturn, OrderReturnItem
 
@@ -51,6 +54,28 @@ class OrderItemInline(admin.TabularInline):
             .get_queryset(request)
             .select_related("variant__item", "supplied_item")
         )
+
+
+class TransactionInline(admin.TabularInline):
+    """Read-only view of every Transaction (SALE/REFUND/etc.) tied to this
+    order, so a support debugging a payment/refund issue doesn't have to
+    leave the order page to see what actually got recorded."""
+
+    model = Transaction
+    fk_name = "order"
+    extra = 0
+    fields = ("type", "total_paid_amount", "payment_method", "category", "created_at")
+    readonly_fields = fields
+    can_delete = False
+    show_change_link = True
+    verbose_name = "Transaction"
+    verbose_name_plural = "Transactions"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("payment_method")
 
 
 class OrderHistoryInline(admin.TabularInline):
@@ -156,6 +181,7 @@ _STATUS_COLORS = {
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
+    date_hierarchy = "created_at"
     list_display = [
         "short_id",
         "customer_info",
@@ -166,9 +192,15 @@ class OrderAdmin(admin.ModelAdmin):
         "item_count",
         "branch",
         "business",
+        "transactions_link",
         "created_at",
     ]
-    list_filter = ["status", "branch", "business", "created_at"]
+    list_filter = [
+        "status",
+        ("branch", admin.RelatedOnlyFieldListFilter),
+        ("business", admin.RelatedOnlyFieldListFilter),
+        "created_at",
+    ]
     search_fields = [
         "id",
         "customer__full_name",
@@ -176,11 +208,16 @@ class OrderAdmin(admin.ModelAdmin):
         "employee__user__first_name",
         "employee__user__last_name",
         "transaction_id",
+        "business__name",
+        "branch__name",
     ]
     readonly_fields = ["id", "created_at", "updated_at"]
     raw_id_fields = ["customer", "employee", "payment_method"]
-    inlines = [OrderItemInline, OrderHistoryInline]
+    autocomplete_fields = ["business", "branch"]
+    inlines = [OrderItemInline, TransactionInline, OrderHistoryInline]
     actions = ["mark_as_completed", "mark_as_cancelled"]
+    ordering = ["-created_at"]
+    list_per_page = 50
 
     fieldsets = (
         (
@@ -261,6 +298,16 @@ class OrderAdmin(admin.ModelAdmin):
         )
 
     colored_status.short_description = "Status"
+
+    def transactions_link(self, obj):
+        url = reverse("admin:finances_transaction_changelist")
+        return format_html(
+            '<a href="{}?order__id__exact={}">View transactions</a>',
+            url,
+            obj.id,
+        )
+
+    transactions_link.short_description = "Transactions"
 
     @admin.action(description="Mark selected orders as completed")
     def mark_as_completed(self, request, queryset):

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
@@ -134,6 +135,8 @@ class BusinessAdmin(admin.ModelAdmin):
         "owner_info",
         "employee_count",
         "branch_count",
+        "orders_link",
+        "transactions_link",
         "created_at",
     ]
     list_filter = ["business_type", "created_at"]
@@ -171,6 +174,26 @@ class BusinessAdmin(admin.ModelAdmin):
         return f"{count} branches"
 
     branch_count.short_description = "Branches"
+
+    def orders_link(self, obj):
+        url = reverse("admin:orders_order_changelist")
+        return format_html(
+            '<a href="{}?business__id__exact={}">View orders</a>',
+            url,
+            obj.id,
+        )
+
+    orders_link.short_description = "Orders"
+
+    def transactions_link(self, obj):
+        url = reverse("admin:finances_transaction_changelist")
+        return format_html(
+            '<a href="{}?business__id__exact={}">View transactions</a>',
+            url,
+            obj.id,
+        )
+
+    transactions_link.short_description = "Transactions"
 
 
 @admin.register(Role)
@@ -303,12 +326,15 @@ class BranchAdmin(admin.ModelAdmin):
         "business_name",
         "address_info",
         "employee_count",
+        "orders_link",
+        "transactions_link",
         "created_at",
     ]
-    list_filter = ["business", "created_at"]
+    list_filter = [("business", admin.RelatedOnlyFieldListFilter), "created_at"]
     search_fields = ["name", "business__name", "address__admin_1", "address__locality"]
     readonly_fields = ["id", "created_at", "updated_at"]
-    raw_id_fields = ["business", "address"]
+    raw_id_fields = ["address"]
+    autocomplete_fields = ["business"]
 
     fieldsets = (
         (None, {"fields": ("id", "name", "business", "address")}),
@@ -335,6 +361,26 @@ class BranchAdmin(admin.ModelAdmin):
         return f"{count} employees"
 
     employee_count.short_description = "Employees"
+
+    def orders_link(self, obj):
+        url = reverse("admin:orders_order_changelist")
+        return format_html(
+            '<a href="{}?branch__id__exact={}">View orders</a>',
+            url,
+            obj.id,
+        )
+
+    orders_link.short_description = "Orders"
+
+    def transactions_link(self, obj):
+        url = reverse("admin:finances_transaction_changelist")
+        return format_html(
+            '<a href="{}?branch__id__exact={}">View transactions</a>',
+            url,
+            obj.id,
+        )
+
+    transactions_link.short_description = "Transactions"
 
 
 @admin.register(EmployeeInvitation)
