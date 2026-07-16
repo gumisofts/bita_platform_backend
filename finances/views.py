@@ -608,6 +608,104 @@ def _get_inventory_value(business, branch):
     return value or Decimal("0.00")
 
 
+def _get_period_sales_refunds(
+    business,
+    branch,
+    start_date,
+    end_date,
+    payment_method_ids=None,
+    own_tx_filter=Q(),
+    end_inclusive=False,
+):
+    """
+    Sum of REFUND transactions recorded in this window whose underlying
+    order was itself sold within that same window — i.e. returns of *this
+    period's* sales, not returns processed now for older sales. Refunds
+    without a linked order are excluded (there's no sale date to match
+    against, so they can't be attributed to this period's sales).
+
+    end_inclusive controls whether end_date is treated as `<=` (e.g. a
+    month's `23:59:59.999999` end-of-day timestamp) or `<` (a plain
+    exclusive boundary like the next day's midnight).
+    """
+    date_lookup = "order__created_at__lte" if end_inclusive else "order__created_at__lt"
+    refund_filter = Q(
+        business=business,
+        branch=branch,
+        type=Transaction.TransactionType.REFUND,
+        order__created_at__gte=start_date,
+        **{date_lookup: end_date},
+    )
+    if payment_method_ids:
+        refund_filter &= Q(payment_method__in=payment_method_ids)
+    refund_filter &= own_tx_filter
+
+    return Transaction.objects.filter(refund_filter).aggregate(
+        total=Sum("total_paid_amount")
+    )["total"] or Decimal("0")
+
+
+def _get_cash_totals(
+    business,
+    branch,
+    start_date,
+    end_date,
+    payment_method_ids=None,
+    own_tx_filter=Q(),
+    end_inclusive=False,
+):
+    """
+    (periods_total_cash, periods_net_cash) through the business's literal
+    "Cash" payment method(s) for this window.
+
+    periods_total_cash = gross cash income (SALE + SERVICE_REVENUE +
+        OTHER_INCOME), not reduced by refunds or expenses.
+    periods_net_cash   = net cash movement: income + REFUND − EXPENSE_TYPES
+        − DEBT. Every refund transacted in this period counts here, even if
+        the original sale happened before the period started, because the
+        cash physically left the till during this period.
+
+    end_inclusive controls whether end_date is treated as `<=` or `<`
+    (see _get_period_sales_refunds).
+    """
+    cash_pm_filter = Q(business=business, identifier="CASH")
+    if branch:
+        cash_pm_filter &= Q(branch=branch) | Q(branch__isnull=True)
+    else:
+        cash_pm_filter &= Q(branch__isnull=True)
+    cash_payment_methods = BusinessPaymentMethod.objects.filter(cash_pm_filter)
+    if payment_method_ids:
+        cash_payment_methods = cash_payment_methods.filter(id__in=payment_method_ids)
+    if not cash_payment_methods.exists():
+        return Decimal("0.00"), Decimal("0.00")
+
+    date_lookup = "created_at__lte" if end_inclusive else "created_at__lt"
+    tx_filter = Q(
+        business=business,
+        payment_method__in=cash_payment_methods,
+        created_at__gte=start_date,
+        **{date_lookup: end_date},
+    )
+    if branch:
+        tx_filter &= Q(branch=branch)
+    tx_filter &= own_tx_filter
+
+    cash_transactions = Transaction.objects.filter(tx_filter)
+    income = cash_transactions.filter(type__in=Transaction.INCOME_TYPES).aggregate(
+        total=Sum("total_paid_amount")
+    )["total"] or Decimal("0.00")
+    refunds = cash_transactions.filter(
+        type=Transaction.TransactionType.REFUND
+    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
+    expense_debt = cash_transactions.filter(
+        type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT]
+    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
+
+    periods_total_cash = income
+    periods_net_cash = income + refunds - expense_debt
+    return periods_total_cash, periods_net_cash
+
+
 def _get_income_by_category(order_filter):
     """
     Aggregate sales revenue by item category from OrderItems.
@@ -809,6 +907,37 @@ def reports(request):
         else Decimal("0.00")
     )
 
+    # Sales-specific metrics for the report month.
+    total_sales = Transaction.objects.filter(
+        month_tx_filter, type=Transaction.TransactionType.SALE
+    ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+
+    # net_sales only deducts returns of sales that were themselves made
+    # within this same month — a refund recorded this month for an order
+    # sold last month reduces last month's net sales, not this one's.
+    period_sales_refunds = _get_period_sales_refunds(
+        business,
+        branch,
+        period_start,
+        period_end,
+        own_tx_filter=own_tx_filter,
+        end_inclusive=True,
+    )
+    net_sales = total_sales + period_sales_refunds
+
+    # Cash-specific totals for the report month. Unlike net_sales,
+    # periods_net_cash counts every refund transacted this month —
+    # including refunds of sales made in a previous month — because that
+    # cash still left the register this month.
+    periods_total_cash, periods_net_cash = _get_cash_totals(
+        business,
+        branch,
+        period_start,
+        period_end,
+        own_tx_filter=own_tx_filter,
+        end_inclusive=True,
+    )
+
     # Historical data: last N months ending at the report month
     historical_data = []
     for i in range(history_months - 1, -1, -1):
@@ -859,6 +988,10 @@ def reports(request):
         "monthly_expense": monthly_expense_by_category,
         "total_monthly_income": total_monthly_income,
         "total_monthly_expense": total_monthly_expense,
+        "total_sales": total_sales,
+        "net_sales": net_sales,
+        "periods_total_cash": periods_total_cash,
+        "periods_net_cash": periods_net_cash,
         "net_profit": net_profit,
         "profit_margin": profit_margin,
         "historical_data": historical_data,
@@ -991,12 +1124,6 @@ def finance_report(request):
     total_debt_issued = totals_by_type.get(
         Transaction.TransactionType.DEBT, Decimal("0")
     )
-
-    # Sales revenue specifically (as opposed to total_income, which also
-    # includes service revenue / other income). total_sales is the gross
-    # figure before refunds are deducted; net_sales nets them out.
-    total_sales = totals_by_type.get(Transaction.TransactionType.SALE, Decimal("0"))
-    net_sales = total_sales + total_refunds
 
     # Refunds reduce profit. They are not in EXPENSE_TYPES (so not in
     # total_expense); fold them in via their negative sign instead.
@@ -1262,10 +1389,6 @@ def finance_report(request):
     )
     previous_income += previous_refunds
     previous_net_profit = previous_income - previous_expense
-    previous_total_sales = prev_totals_by_type.get(
-        Transaction.TransactionType.SALE, Decimal("0")
-    )
-    previous_net_sales = previous_total_sales + previous_refunds
 
     def _pct_change(current, previous):
         if previous > 0:
@@ -1278,18 +1401,12 @@ def finance_report(request):
         "previous_income": previous_income,
         "previous_expense": previous_expense,
         "previous_net_profit": previous_net_profit,
-        "previous_total_sales": previous_total_sales,
-        "previous_net_sales": previous_net_sales,
         "income_change": total_income - previous_income,
         "expense_change": total_expense - previous_expense,
         "profit_change": net_profit - previous_net_profit,
-        "total_sales_change": total_sales - previous_total_sales,
-        "net_sales_change": net_sales - previous_net_sales,
         "income_change_pct": _pct_change(total_income, previous_income),
         "expense_change_pct": _pct_change(total_expense, previous_expense),
         "profit_change_pct": _pct_change(net_profit, previous_net_profit),
-        "total_sales_change_pct": _pct_change(total_sales, previous_total_sales),
-        "net_sales_change_pct": _pct_change(net_sales, previous_net_sales),
     }
 
     report_data = {
@@ -1299,8 +1416,6 @@ def finance_report(request):
         "total_expense": total_expense,
         "total_refunds": total_refunds,
         "total_debt_issued": total_debt_issued,
-        "total_sales": total_sales,
-        "net_sales": net_sales,
         "total_inventory_value": total_inventory_value,
         "net_profit": net_profit,
         "profit_margin": profit_margin,

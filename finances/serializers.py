@@ -195,6 +195,16 @@ class ReportsSerializer(serializers.Serializer):
     )
     total_monthly_income = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_monthly_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
+    # Sales-specific metrics for the report month: total_sales is gross SALE
+    # revenue (before refunds are deducted); net_sales deducts only refunds
+    # of sales made within this same month.
+    total_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
+    # Cash-payment-method-specific totals for this month. Unlike net_sales,
+    # periods_net_cash includes every refund transacted this month, even
+    # refunds of sales made in a previous month.
+    periods_total_cash = serializers.DecimalField(max_digits=12, decimal_places=2)
+    periods_net_cash = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)
     profit_margin = serializers.DecimalField(max_digits=8, decimal_places=2)
     historical_data = HistoricalMonthSerializer(many=True)
@@ -270,18 +280,12 @@ class PeriodComparisonSerializer(serializers.Serializer):
     previous_income = serializers.DecimalField(max_digits=12, decimal_places=2)
     previous_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
     previous_net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)
-    previous_total_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
-    previous_net_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
     income_change = serializers.DecimalField(max_digits=12, decimal_places=2)
     expense_change = serializers.DecimalField(max_digits=12, decimal_places=2)
     profit_change = serializers.DecimalField(max_digits=12, decimal_places=2)
-    total_sales_change = serializers.DecimalField(max_digits=12, decimal_places=2)
-    net_sales_change = serializers.DecimalField(max_digits=12, decimal_places=2)
     income_change_pct = serializers.DecimalField(max_digits=8, decimal_places=2)
     expense_change_pct = serializers.DecimalField(max_digits=8, decimal_places=2)
     profit_change_pct = serializers.DecimalField(max_digits=8, decimal_places=2)
-    total_sales_change_pct = serializers.DecimalField(max_digits=8, decimal_places=2)
-    net_sales_change_pct = serializers.DecimalField(max_digits=8, decimal_places=2)
 
 
 class FinanceReportSerializer(serializers.Serializer):
@@ -293,10 +297,6 @@ class FinanceReportSerializer(serializers.Serializer):
     total_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_refunds = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_debt_issued = serializers.DecimalField(max_digits=12, decimal_places=2)
-    # Sales-specific metrics: total_sales is gross SALE revenue (before
-    # refunds are deducted); net_sales nets refunds out of it.
-    total_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
-    net_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
     # In-store value of current inventory, valued at selling price.
     total_inventory_value = serializers.DecimalField(max_digits=14, decimal_places=2)
     net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)
