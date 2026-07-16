@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from business.models import Branch, Business, biz_perm
+from business.models import Branch, Business
 from business.permissions import (
     BranchLevelPermission,
     accessible_branches,
@@ -603,14 +603,14 @@ def _get_inventory_value(request, business, branch):
     supplied-item batches (i.e. what the inventory on hand would be worth
     if sold in full at current selling prices).
 
-    Returns 0 for callers who lack permission to view inventory (e.g. an
-    employee whose role was never granted item/inventory access) instead of
-    leaking the business's stock valuation to them.
+    Returns 0 for plain employees — this is a role check (not a permission
+    check): employees are routinely granted item/inventory view access for
+    their day-to-day work, but the business's total stock valuation should
+    only be visible to owners, business admins, and branch managers. See
+    `has_full_report_access` for the same gate used on sales/transaction
+    reports.
     """
-    # can_view_branch_business
-    if not request.user.has_perm(
-        biz_perm("branch", "view", "business"), branch or business
-    ):
+    if not has_full_report_access(request.user, business):
         return Decimal("0.00")
 
     items_qs = Item.objects.filter(business=business, is_active=True)
