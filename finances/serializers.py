@@ -254,11 +254,18 @@ class FinanceSummarySerializer(serializers.Serializer):
 
 
 class PaymentMethodBreakdownSerializer(serializers.Serializer):
-    payment_method_id = serializers.UUIDField()
+    payment_method_id = serializers.UUIDField(allow_null=True)
     payment_method_name = serializers.CharField()
     total_income = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_refunds = serializers.DecimalField(max_digits=12, decimal_places=2)
+    # total_sales is gross SALE revenue through this payment method; net_sales
+    # deducts only refunds of orders placed within this same period; net_cash
+    # deducts every refund transacted this period regardless of when the
+    # underlying order was placed.
+    total_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_cash = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
     transaction_count = serializers.IntegerField()
     is_credit = serializers.BooleanField()
@@ -297,6 +304,13 @@ class FinanceReportSerializer(serializers.Serializer):
     total_expense = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_refunds = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_debt_issued = serializers.DecimalField(max_digits=12, decimal_places=2)
+    # total_sales is gross SALE revenue for the period; net_sales deducts
+    # only refunds of orders placed within this same period; net_cash
+    # deducts every refund transacted this period regardless of when the
+    # underlying order was placed.
+    total_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_cash = serializers.DecimalField(max_digits=12, decimal_places=2)
     # In-store value of current inventory, valued at selling price.
     total_inventory_value = serializers.DecimalField(max_digits=14, decimal_places=2)
     net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)

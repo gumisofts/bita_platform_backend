@@ -1125,6 +1125,22 @@ def finance_report(request):
         Transaction.TransactionType.DEBT, Decimal("0")
     )
 
+    # Sales-specific metrics for this period.
+    total_sales = totals_by_type.get(Transaction.TransactionType.SALE, Decimal("0"))
+
+    # net_sales only deducts refunds of orders that were themselves placed
+    # within this period — a refund recorded today for an order placed last
+    # week reduces that week's net sales, not today's.
+    period_sales_refunds = _get_period_sales_refunds(
+        business, branch, start_date, end_date, payment_method_ids, own_tx_filter
+    )
+    net_sales = total_sales + period_sales_refunds
+
+    # net_cash deducts every refund transacted in this period, regardless of
+    # when the underlying order was placed — that cash left the till this
+    # period either way.
+    net_cash = total_sales + total_refunds
+
     # Refunds reduce profit. They are not in EXPENSE_TYPES (so not in
     # total_expense); fold them in via their negative sign instead.
     net_profit = total_income - total_expense
@@ -1204,6 +1220,28 @@ def finance_report(request):
     refund_transactions = Transaction.objects.filter(
         refund_scope_filter, type=Transaction.TransactionType.REFUND
     )
+    # Same reasoning as refund_transactions above: sales totals per payment
+    # method must also stay correct regardless of the optional
+    # `transaction_type` filter.
+    sales_transactions = Transaction.objects.filter(
+        refund_scope_filter, type=Transaction.TransactionType.SALE
+    )
+
+    # Refunds of orders placed *within this period*, grouped by payment
+    # method — used for each breakdown row's net_sales (see top-level
+    # net_sales for the same logic/rationale).
+    period_order_ids = Order.objects.filter(
+        business=business,
+        branch=branch,
+        created_at__gte=start_date,
+        created_at__lt=end_date,
+    ).values_list("id", flat=True)
+    period_refunds_by_pm = dict(
+        refund_transactions.filter(order_id__in=period_order_ids)
+        .values("payment_method")
+        .annotate(total=Sum("total_paid_amount"))
+        .values_list("payment_method", "total")
+    )
 
     by_payment_method = []
     for pm in payment_methods:
@@ -1217,6 +1255,12 @@ def finance_report(request):
         pm_refunds = refund_transactions.filter(payment_method=pm).aggregate(
             total=Sum("total_paid_amount")
         )["total"] or Decimal("0")
+        pm_total_sales = sales_transactions.filter(payment_method=pm).aggregate(
+            total=Sum("total_paid_amount")
+        )["total"] or Decimal("0")
+        pm_period_refunds = period_refunds_by_pm.get(pm.id, Decimal("0"))
+        pm_net_sales = pm_total_sales + pm_period_refunds
+        pm_net_cash = pm_total_sales + pm_refunds
 
         pm_income += pm_refunds  # Refunds are negative, so add them to income
         is_credit_pm = pm.identifier == "CREDIT"
@@ -1229,6 +1273,9 @@ def finance_report(request):
                 "total_income": pm_income,
                 "total_expense": pm_expense,
                 "total_refunds": pm_refunds,
+                "total_sales": pm_total_sales,
+                "net_sales": pm_net_sales,
+                "net_cash": pm_net_cash,
                 "net_balance": pm_income - pm_expense,
                 "transaction_count": pm_txs.count(),
                 "is_credit": is_credit_pm,
@@ -1245,11 +1292,14 @@ def finance_report(request):
         unknown_refunds = refund_transactions.filter(
             payment_method__isnull=True
         ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+        unknown_total_sales = sales_transactions.filter(
+            payment_method__isnull=True
+        ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
         unknown_count = unknown_txs.count()
         # Include this bucket if there are matching (possibly type-filtered)
-        # transactions OR real refunds, so refunds never get silently
-        # dropped when transaction_type filters out every other row.
-        if unknown_count or unknown_refunds:
+        # transactions, real refunds, or real sales, so neither ever gets
+        # silently dropped when transaction_type filters out every other row.
+        if unknown_count or unknown_refunds or unknown_total_sales:
             unknown_income = unknown_txs.filter(
                 type__in=Transaction.INCOME_TYPES
             ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
@@ -1259,6 +1309,9 @@ def finance_report(request):
             unknown_income += (
                 unknown_refunds  # Refunds are negative, so add them to income
             )
+            unknown_period_refunds = period_refunds_by_pm.get(None, Decimal("0"))
+            unknown_net_sales = unknown_total_sales + unknown_period_refunds
+            unknown_net_cash = unknown_total_sales + unknown_refunds
             by_payment_method.append(
                 {
                     "payment_method_id": None,
@@ -1266,6 +1319,9 @@ def finance_report(request):
                     "total_income": unknown_income,
                     "total_expense": unknown_expense,
                     "total_refunds": unknown_refunds,
+                    "total_sales": unknown_total_sales,
+                    "net_sales": unknown_net_sales,
+                    "net_cash": unknown_net_cash,
                     "net_balance": unknown_income - unknown_expense,
                     "transaction_count": unknown_count,
                     "is_credit": False,
@@ -1416,6 +1472,9 @@ def finance_report(request):
         "total_expense": total_expense,
         "total_refunds": total_refunds,
         "total_debt_issued": total_debt_issued,
+        "total_sales": total_sales,
+        "net_sales": net_sales,
+        "net_cash": net_cash,
         "total_inventory_value": total_inventory_value,
         "net_profit": net_profit,
         "profit_margin": profit_margin,
