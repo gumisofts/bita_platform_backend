@@ -858,19 +858,31 @@ def _get_income_by_item_category(transaction_filter):
 
 def _get_expense_by_category(transaction_filter):
     """
-    Aggregate expense transactions by their category field.
-    All EXPENSE_TYPES are included; transactions with no category are grouped under 'Other'.
+    Aggregate expense transactions by expense type (RENT, SALARY, UTILITY,
+    PURCHASE, MAINTENANCE, OTHER_EXPENSE, EXPENSE, DEBT) — i.e. the fixed
+    set of expense types in Transaction.EXPENSE_TYPES.
+
+    We intentionally do NOT group by the free-text `category` field: for
+    PURCHASE/DEBT transactions created from supplies, `category` holds a
+    per-supply reference (e.g. "supply:<id>"), which would fragment this
+    breakdown into one bucket per supply instead of a handful of meaningful
+    expense types.
     """
-    expense_transactions = Transaction.objects.filter(
-        transaction_filter, type__in=Transaction.EXPENSE_TYPES
-    ).values("category", "total_paid_amount")
+    expense_totals = (
+        Transaction.objects.filter(
+            transaction_filter, type__in=Transaction.EXPENSE_TYPES
+        )
+        .values("type")
+        .annotate(total=Sum("total_paid_amount"))
+    )
 
-    expense_by_category = defaultdict(Decimal)
-    for tx in expense_transactions:
-        category_name = tx["category"] or "Other"
-        expense_by_category[category_name] += tx["total_paid_amount"]
+    type_labels = dict(Transaction.TransactionType.choices)
+    expense_by_category = {
+        type_labels.get(row["type"], row["type"]): row["total"]
+        for row in expense_totals
+    }
 
-    return dict(expense_by_category)
+    return expense_by_category
 
 
 def _month_range(year, month):
