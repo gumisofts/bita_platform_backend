@@ -219,7 +219,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        from notifications.service import send_verification_code_email
+        from notifications.service import (
+            send_verification_code_email,
+            send_verification_code_sms,
+        )
 
         user = super().create(validated_data)
         email = validated_data.get("email")
@@ -236,13 +239,14 @@ class RegisterSerializer(serializers.ModelSerializer):
             )
             send_verification_code_email(email, code, purpose="verify your email")
         if phone_number:
-            # TODO: dispatch the raw code via SMS once an SMS provider is wired up.
+            code = generate_secure_six_digits()
             VerificationCode.objects.create(
                 user=user,
-                code=generate_secure_six_digits(),
+                code=code,
                 phone_number=phone_number,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
+            send_verification_code_sms(phone_number, code, purpose="verify your phone")
 
         return user
 
@@ -413,15 +417,22 @@ class ResetPasswordRequestSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        from notifications.service import send_verification_code_email
+        from notifications.service import (
+            send_verification_code_email,
+            send_verification_code_sms,
+        )
 
         email = validated_data.get("email")
+        phone_number = validated_data.get("phone_number")
         super().create(validated_data)
         if email:
             send_verification_code_email(
                 email, self._raw_code, purpose="reset your password"
             )
-        # TODO: dispatch the raw code via SMS when only a phone number is given.
+        elif phone_number:
+            send_verification_code_sms(
+                phone_number, self._raw_code, purpose="reset your password"
+            )
         return {"detail": "success"}
 
 
@@ -613,7 +624,10 @@ class SendVerificationCodeSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
-        from notifications.service import send_verification_code_email
+        from notifications.service import (
+            send_verification_code_email,
+            send_verification_code_sms,
+        )
 
         email = validated_data.get("email")
         phone_number = validated_data.get("phone_number")
@@ -628,13 +642,14 @@ class SendVerificationCodeSerializer(serializers.Serializer):
             )
             send_verification_code_email(email, code, purpose="verify your email")
         if phone_number:
-            # TODO: dispatch the raw code via SMS once an SMS provider is wired up.
+            code = generate_secure_six_digits()
             VerificationCode.objects.create(
                 user=user,
-                code=generate_secure_six_digits(),
+                code=code,
                 phone_number=phone_number,
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
+            send_verification_code_sms(phone_number, code, purpose="verify your phone")
         return {"detail": "success"}
 
 
@@ -685,13 +700,18 @@ class PhoneChangeRequestSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
+        from notifications.service import send_verification_code_sms
+
         code = generate_secure_six_digits()
-        # TODO: dispatch the raw code via SMS to validated_data["new_phone"].
+        new_phone = validated_data.get("new_phone")
         phone_change_request = PhoneChangeRequest.objects.create(
             user=validated_data.get("user"),
-            new_phone=validated_data.get("new_phone"),
+            new_phone=new_phone,
             code=make_password(code),
             expires_at=timezone.now() + timedelta(hours=1),
+        )
+        send_verification_code_sms(
+            new_phone, code, purpose="confirm your new phone number"
         )
 
         return {"detail": "success", "change_request_id": phone_change_request.id}

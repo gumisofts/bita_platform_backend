@@ -66,6 +66,58 @@ def send_verification_code_email(email, code, *, purpose="verify your account"):
     send_email_notification(subject, message, email)
 
 
+def send_sms_notification(phone_number, message):
+    """Send an SMS, asynchronously via Celery when enabled.
+
+    Mirrors :func:`send_email_notification`: when ``settings.SMS_USE_CELERY``
+    is true the work is queued on the ``user-verification`` queue; otherwise
+    (e.g. local development) it is sent synchronously through whichever
+    backend ``settings.SMS_BACKEND`` points at (console by default). If
+    enqueuing fails for any reason we fall back to a synchronous send so
+    OTP codes are never silently dropped.
+
+    Args:
+        phone_number: Recipient's phone number, in the app's local storage
+            form (e.g. "911639555").
+        message: Plain-text SMS body.
+    """
+    if not phone_number:
+        logger.warning("send_sms_notification: no phone_number (message=%r)", message)
+        return
+
+    from .tasks import send_sms_task
+
+    if getattr(settings, "SMS_USE_CELERY", False):
+        try:
+            send_sms_task.delay(phone_number, message)
+            return
+        except Exception:
+            logger.exception(
+                "Could not enqueue SMS to %s; sending synchronously", phone_number
+            )
+
+    from .sms import send_sms
+
+    send_sms(phone_number, message)
+
+
+def send_verification_code_sms(phone_number, code, *, purpose="verify your account"):
+    """SMS a 6-digit verification/one-time code to ``phone_number``.
+
+    Args:
+        phone_number: Recipient's phone number, in the app's local storage
+            form (e.g. "911639555").
+        code: The raw (un-hashed) verification code to display.
+        purpose: Short phrase describing what the code is for, e.g.
+            "verify your phone" or "reset your password".
+    """
+    message = (
+        f"Your Bita verification code is {code}. Use it to {purpose}. "
+        "This code expires in 5 minutes."
+    )
+    send_sms_notification(phone_number, message)
+
+
 def _get_business_user_ids(business):
     """Return a list of user ID strings for all employees in a business."""
     from business.models import Employee

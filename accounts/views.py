@@ -534,7 +534,12 @@ class ConfirmDeleteUserDeleteView(GenericViewSet):
             send_verification_code_email(
                 email, raw_code, purpose="confirm deleting your account"
             )
-        # TODO: dispatch the raw code via SMS when only a phone number is given.
+        elif phone_number:
+            from notifications.service import send_verification_code_sms
+
+            send_verification_code_sms(
+                phone_number, raw_code, purpose="confirm deleting your account"
+            )
         return Response(
             {"success": True, "message": "Code sent"}, status=status.HTTP_200_OK
         )

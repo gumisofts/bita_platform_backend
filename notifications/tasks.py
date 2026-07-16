@@ -78,6 +78,33 @@ def send_email_task(self, subject, message, recipients, html_message=None):
         raise self.retry(exc=exc)
 
 
+@shared_task(
+    queue=CeleryQueue.Definitions.USER_VERIFICATION,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_sms_task(self, phone_number, message):
+    """Deliver an SMS asynchronously, retrying on transient provider failures.
+
+    ``send_sms`` returns False (rather than raising) for ordinary delivery
+    failures, so we turn that into a retry here — same shape as
+    ``send_email_task``.
+    """
+    from .sms import send_sms
+
+    if send_sms(phone_number, message):
+        return
+
+    logger.warning(
+        "SMS to %s failed (attempt %d/%d)",
+        phone_number,
+        self.request.retries + 1,
+        self.max_retries + 1,
+    )
+    raise self.retry(exc=RuntimeError(f"SMS to {phone_number} failed"))
+
+
 @shared_task(queue=CeleryQueue.Definitions.REAL_TIME_NOTIFICATIONS)
 def send_telegram_notification_task(notification_id, user_ids):
     """DM a Notification to every recipient who has linked their Telegram.
