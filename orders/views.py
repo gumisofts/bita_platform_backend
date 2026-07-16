@@ -1067,6 +1067,23 @@ class HomeStatsViewSet(GenericViewSet):
         agg = completed_orders.aggregate(total=Sum("total_payable"), count=Count("id"))
         total_sales = agg["total"] or Decimal("0")
 
+        # Net sales = gross sales for this range minus returns of THOSE SAME
+        # sales (a partial return leaves the order COMPLETED, so its full
+        # original total_payable is still in total_sales above; a FULL
+        # return moves the order to RETURNED, which is already excluded from
+        # completed_orders — so it never gets subtracted twice here).
+        # Returns of orders sold in a *previous* period are intentionally
+        # excluded, even if processed today — they reduce that other
+        # period's net sales, not this one's.
+        period_returns = OrderReturn.objects.filter(
+            order__in=completed_orders
+        ).aggregate(total=Sum("total_refund_amount"))["total"] or Decimal("0")
+        net_sales = total_sales - period_returns
+
+        # Net cash = net movement (inflow − outflow) through the literal
+        # "Cash" payment method for this same range.
+        net_cash = self._get_net_cash(start, end)
+
         # Low stock items (quantity <= notify_below)
         # Mirror inventories.views.inventory_summary's low_stock_count: only
         # active items count, so the dashboard matches the dedicated low-stock page.
@@ -1108,10 +1125,48 @@ class HomeStatsViewSet(GenericViewSet):
         return {
             "range": range_type,
             "total_sales": {"value": float(total_sales), "currency": "ETB"},
+            "net_sales": {"value": float(net_sales), "currency": "ETB"},
+            "net_cash": {"value": float(net_cash), "currency": "ETB"},
             "low_stock_items": low_stock_items,
             "items_expiring": expiring_items,
             "sales_logged": sales_logged,
         }
+
+    def _get_net_cash(self, start, end):
+        """
+        Net cash movement (inflow minus outflow) through the business's
+        literal "Cash" payment method(s) within [start, end].
+
+        Inflow  = SALE + SERVICE_REVENUE + OTHER_INCOME + REFUND (refunds are
+                  stored negative, so they naturally reduce inflow).
+        Outflow = EXPENSE_TYPES + DEBT.
+        """
+        cash_pm_filter = Q(business=self._current_business, identifier="CASH")
+        if self._current_branch:
+            cash_pm_filter &= Q(branch=self._current_branch) | Q(branch__isnull=True)
+        else:
+            cash_pm_filter &= Q(branch__isnull=True)
+        cash_payment_methods = BusinessPaymentMethod.objects.filter(cash_pm_filter)
+        if not cash_payment_methods.exists():
+            return Decimal("0")
+
+        tx_filter = Q(
+            business=self._current_business,
+            payment_method__in=cash_payment_methods,
+            created_at__gte=start,
+            created_at__lte=end,
+        )
+        if self._current_branch:
+            tx_filter &= Q(branch=self._current_branch)
+
+        cash_transactions = Transaction.objects.filter(tx_filter)
+        inflow = cash_transactions.filter(
+            type__in=[*Transaction.INCOME_TYPES, Transaction.TransactionType.REFUND]
+        ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+        outflow = cash_transactions.filter(
+            type__in=[*Transaction.EXPENSE_TYPES, Transaction.TransactionType.DEBT]
+        ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
+        return inflow - outflow
 
     @extend_schema(
         summary="Get home dashboard statistics",
@@ -1195,6 +1250,20 @@ class HomeStatsViewSet(GenericViewSet):
                         "properties": {
                             "range": {"type": "string"},
                             "total_sales": {
+                                "type": "object",
+                                "properties": {
+                                    "value": {"type": "number"},
+                                    "currency": {"type": "string"},
+                                },
+                            },
+                            "net_sales": {
+                                "type": "object",
+                                "properties": {
+                                    "value": {"type": "number"},
+                                    "currency": {"type": "string"},
+                                },
+                            },
+                            "net_cash": {
                                 "type": "object",
                                 "properties": {
                                     "value": {"type": "number"},
