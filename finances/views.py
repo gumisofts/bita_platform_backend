@@ -607,7 +607,10 @@ def _get_inventory_value(request, business, branch):
     employee whose role was never granted item/inventory access) instead of
     leaking the business's stock valuation to them.
     """
-    if not request.user.has_perm(biz_perm("item", "view", "branch"), branch or business):
+    # can_view_branch_business
+    if not request.user.has_perm(
+        biz_perm("branch", "view", "business"), branch or business
+    ):
         return Decimal("0.00")
 
     items_qs = Item.objects.filter(business=business, is_active=True)

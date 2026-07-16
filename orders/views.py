@@ -181,6 +181,7 @@ class OrderViewset(ModelViewSet):
         "employee__user__email",
         "employee__user__first_name",
         "employee__user__last_name",
+        "items__variant__item__name",
         "id",
     ]
 
@@ -209,6 +210,11 @@ class OrderViewset(ModelViewSet):
             )
             .prefetch_related("items__variant__item", "items__supplied_item")
             .order_by("-created_at")
+            # `items__variant__item__name` in search_fields joins through the
+            # reverse `items` FK; DRF's SearchFilter only auto-dedupes m2m
+            # joins, not one-to-many ones, so an order with several items
+            # would otherwise come back once per matching item.
+            .distinct()
         )
 
     def get_serializer_class(self):
