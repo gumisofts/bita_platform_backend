@@ -18,6 +18,11 @@ def create_transaction(sender, instance, **kwargs):
         business=instance.business,
         branch=instance.branch,
         created_by=created_by,
+        # Keep the SALE transaction's timestamp aligned with when the order
+        # was actually placed, not whenever checkout/completion happened to
+        # run — otherwise period-based reports (net_sales, daily breakdowns,
+        # etc.) would attribute the sale to the wrong day.
+        created_at=instance.created_at,
     )
 
 
