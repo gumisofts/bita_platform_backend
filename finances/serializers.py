@@ -266,6 +266,12 @@ class PaymentMethodBreakdownSerializer(serializers.Serializer):
     total_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_cash = serializers.DecimalField(max_digits=12, decimal_places=2)
+    # Split of the refunds behind net_sales/net_cash by whether the
+    # refunded order was itself placed in this period or outside it.
+    period_sales_refunds = serializers.DecimalField(max_digits=12, decimal_places=2)
+    outside_period_sales_refunds = serializers.DecimalField(
+        max_digits=12, decimal_places=2
+    )
     net_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
     transaction_count = serializers.IntegerField()
     is_credit = serializers.BooleanField()
@@ -311,6 +317,12 @@ class FinanceReportSerializer(serializers.Serializer):
     total_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_cash = serializers.DecimalField(max_digits=12, decimal_places=2)
+    # Split of the refunds behind net_sales/net_cash by whether the
+    # refunded order was itself placed in this period or outside it.
+    period_sales_refunds = serializers.DecimalField(max_digits=12, decimal_places=2)
+    outside_period_sales_refunds = serializers.DecimalField(
+        max_digits=12, decimal_places=2
+    )
     # In-store value of current inventory, valued at selling price.
     total_inventory_value = serializers.DecimalField(max_digits=14, decimal_places=2)
     net_profit = serializers.DecimalField(max_digits=12, decimal_places=2)

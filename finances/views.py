@@ -645,6 +645,52 @@ def _get_period_sales_refunds(
     )["total"] or Decimal("0")
 
 
+def _get_outside_period_sales_refunds(
+    business,
+    branch,
+    start_date,
+    end_date,
+    payment_method_ids=None,
+    own_tx_filter=Q(),
+    end_inclusive=False,
+):
+    """
+    Sum of REFUND transactions recorded *in this window* whose underlying
+    order was placed outside it — i.e. returns processed now for older (or,
+    in the unusual case a refund lands before its own order, later) sales,
+    as opposed to _get_period_sales_refunds' returns of this period's own
+    sales. Refunds without a linked order are excluded — there's no sale
+    date to compare against.
+
+    Unlike _get_period_sales_refunds (which only constrains the order's
+    date), this constrains the *refund's own* created_at to this window,
+    since that's the axis "outside period" is measured against.
+
+    end_inclusive controls whether end_date is treated as `<=` (e.g. a
+    month's `23:59:59.999999` end-of-day timestamp) or `<` (a plain
+    exclusive boundary like the next day's midnight).
+    """
+    refund_date_lookup = "created_at__lte" if end_inclusive else "created_at__lt"
+    order_end_lookup = (
+        "order__created_at__gt" if end_inclusive else "order__created_at__gte"
+    )
+    refund_filter = Q(
+        business=business,
+        branch=branch,
+        type=Transaction.TransactionType.REFUND,
+        order__isnull=False,
+        created_at__gte=start_date,
+        **{refund_date_lookup: end_date},
+    ) & (Q(order__created_at__lt=start_date) | Q(**{order_end_lookup: end_date}))
+    if payment_method_ids:
+        refund_filter &= Q(payment_method__in=payment_method_ids)
+    refund_filter &= own_tx_filter
+
+    return Transaction.objects.filter(refund_filter).aggregate(
+        total=Sum("total_paid_amount")
+    )["total"] or Decimal("0")
+
+
 def _get_cash_totals(
     business,
     branch,
@@ -1136,6 +1182,13 @@ def finance_report(request):
     )
     net_sales = total_sales + period_sales_refunds
 
+    # Same total, split by whether the refunded order was itself placed
+    # outside this window (returns of older/other-period sales, processed
+    # now).
+    outside_period_sales_refunds = _get_outside_period_sales_refunds(
+        business, branch, start_date, end_date, payment_method_ids, own_tx_filter
+    )
+
     # net_cash deducts every refund transacted in this period, regardless of
     # when the underlying order was placed — that cash left the till this
     # period either way.
@@ -1227,17 +1280,38 @@ def finance_report(request):
         refund_scope_filter, type=Transaction.TransactionType.SALE
     )
 
-    # Refunds of orders placed *within this period*, grouped by payment
-    # method — used for each breakdown row's net_sales (see top-level
-    # net_sales for the same logic/rationale).
     period_order_ids = Order.objects.filter(
         business=business,
         branch=branch,
         created_at__gte=start_date,
         created_at__lt=end_date,
     ).values_list("id", flat=True)
+
+    # Refunds whose *order* was placed within this period, regardless of
+    # when the refund itself was recorded — grouped by payment method,
+    # mirroring _get_period_sales_refunds' own (order-date-only) scope, used
+    # for each breakdown row's net_sales/period_sales_refunds.
+    order_scoped_refund_filter = Q(
+        business=business, branch=branch, type=Transaction.TransactionType.REFUND
+    )
+    if payment_method_ids:
+        order_scoped_refund_filter &= Q(payment_method__in=payment_method_ids)
+    order_scoped_refund_filter &= own_tx_filter
     period_refunds_by_pm = dict(
-        refund_transactions.filter(order_id__in=period_order_ids)
+        Transaction.objects.filter(
+            order_scoped_refund_filter, order_id__in=period_order_ids
+        )
+        .values("payment_method")
+        .annotate(total=Sum("total_paid_amount"))
+        .values_list("payment_method", "total")
+    )
+
+    # Refunds recorded *in this period* (same scope as refund_transactions)
+    # whose order was placed outside it — grouped by payment method, for
+    # each breakdown row's outside_period_sales_refunds/net_cash gap.
+    outside_period_refunds_by_pm = dict(
+        refund_transactions.exclude(order__isnull=True)
+        .exclude(order_id__in=period_order_ids)
         .values("payment_method")
         .annotate(total=Sum("total_paid_amount"))
         .values_list("payment_method", "total")
@@ -1259,6 +1333,9 @@ def finance_report(request):
             total=Sum("total_paid_amount")
         )["total"] or Decimal("0")
         pm_period_refunds = period_refunds_by_pm.get(pm.id, Decimal("0"))
+        pm_outside_period_refunds = outside_period_refunds_by_pm.get(
+            pm.id, Decimal("0")
+        )
         pm_net_sales = pm_total_sales + pm_period_refunds
         pm_net_cash = pm_total_sales + pm_refunds
 
@@ -1276,6 +1353,8 @@ def finance_report(request):
                 "total_sales": pm_total_sales,
                 "net_sales": pm_net_sales,
                 "net_cash": pm_net_cash,
+                "period_sales_refunds": pm_period_refunds,
+                "outside_period_sales_refunds": pm_outside_period_refunds,
                 "net_balance": pm_income - pm_expense,
                 "transaction_count": pm_txs.count(),
                 "is_credit": is_credit_pm,
@@ -1310,6 +1389,9 @@ def finance_report(request):
                 unknown_refunds  # Refunds are negative, so add them to income
             )
             unknown_period_refunds = period_refunds_by_pm.get(None, Decimal("0"))
+            unknown_outside_period_refunds = outside_period_refunds_by_pm.get(
+                None, Decimal("0")
+            )
             unknown_net_sales = unknown_total_sales + unknown_period_refunds
             unknown_net_cash = unknown_total_sales + unknown_refunds
             by_payment_method.append(
@@ -1322,6 +1404,8 @@ def finance_report(request):
                     "total_sales": unknown_total_sales,
                     "net_sales": unknown_net_sales,
                     "net_cash": unknown_net_cash,
+                    "period_sales_refunds": unknown_period_refunds,
+                    "outside_period_sales_refunds": unknown_outside_period_refunds,
                     "net_balance": unknown_income - unknown_expense,
                     "transaction_count": unknown_count,
                     "is_credit": False,
@@ -1475,6 +1559,8 @@ def finance_report(request):
         "total_sales": total_sales,
         "net_sales": net_sales,
         "net_cash": net_cash,
+        "period_sales_refunds": period_sales_refunds,
+        "outside_period_sales_refunds": outside_period_sales_refunds,
         "total_inventory_value": total_inventory_value,
         "net_profit": net_profit,
         "profit_margin": profit_margin,
