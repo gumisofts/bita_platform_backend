@@ -857,6 +857,22 @@ asgiref = ">=3.6"
 django = ">=4.2"
 
 [[package]]
+name = "django-debug-toolbar"
+version = "7.0.0"
+description = "A configurable set of panels that display various debug information about the current request/response."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "django_debug_toolbar-7.0.0-py3-none-any.whl", hash = "sha256:656161388ce48384276342eeb16d532113ec670816fa1546cc3753730aa51b3d"},
+    {file = "django_debug_toolbar-7.0.0.tar.gz", hash = "sha256:ef7494c5b459c149e87cc2da88d86e944064945e86bd7b2d879093586b5fefbf"},
+]
+
+[package.dependencies]
+django = ">=5.2"
+sqlparse = ">=0.2"
+
+[[package]]
 name = "django-filter"
 version = "25.2"
 description = "Django-filter is a reusable Django application for allowing users to filter querysets dynamically."
@@ -3289,4 +3305,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10.12"
-content-hash = "6d189684bf0409625abbd0bf9bea9a2b9205c2aa70b84778726f41985a8adddc"
+content-hash = "aeb9e1a176922c6bdec9474f39c7f17ed2cd2ddba9eaf5aa715bf9875154fefb"

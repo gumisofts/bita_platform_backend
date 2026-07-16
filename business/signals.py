@@ -181,7 +181,26 @@ def on_employee_invitation_resend(sender, instance, **kwargs):
         from business.telegram_invites import notify_user_if_linked
 
         notify_user_if_linked(instance)
-    # TODO: Implement actual email/SMS notification sending
+
+    business_name = instance.business.name if instance.business else "a business"
+    role_name = (
+        instance.role.role_name.replace("_", " ") if instance.role else "employee"
+    )
+    message = (
+        f"{business_name} invited you to join as {role_name} on Bita. "
+        "Open the Bita app to accept the invitation."
+    )
+
+    if instance.email:
+        from notifications.service import send_email_notification
+
+        send_email_notification(
+            f"You're invited to join {business_name}", message, instance.email
+        )
+    if instance.phone_number:
+        from notifications.service import send_sms_notification
+
+        send_sms_notification(instance.phone_number, message)
 
 
 @receiver(post_save, sender=Branch)

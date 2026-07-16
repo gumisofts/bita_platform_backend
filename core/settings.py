@@ -92,12 +92,14 @@ LOCAL_APPS = [
     "finances",
     "markets",
     "chat",
+    "debug_toolbar",
 ]
 
 INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -111,6 +113,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "core.urls"
 
+INTERNAL_IPS = ["127.0.0.1", "0.0.0.0"]
+
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: True,
+}
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -290,6 +297,31 @@ EMAIL_BACKEND = os.getenv(
 EMAIL_USE_CELERY = os.getenv(
     "EMAIL_USE_CELERY", "false" if DEBUG else "true"
 ).lower() in ("true", "1", "yes")
+
+# --- SMS ---------------------------------------------------------------
+# Swappable like EMAIL_BACKEND: set SMS_BACKEND to the dotted path of any
+# notifications.sms.base.BaseSmsBackend subclass. Defaults to printing to
+# the console (no live provider needed) unless a real provider key is set.
+SMS_ETHIOPIA_API_KEY = os.getenv("SMS_ETHIOPIA_API_KEY")
+SMS_ETHIOPIA_BASE_URL = os.getenv(
+    "SMS_ETHIOPIA_BASE_URL", "https://smsethiopia.et/api/sms/send"
+)
+SMS_BACKEND = os.getenv(
+    "SMS_BACKEND",
+    (
+        "notifications.sms.backends.sms_ethiopia.SmsEthiopiaBackend"
+        if (SMS_ETHIOPIA_API_KEY and not DEBUG)
+        else "notifications.sms.backends.console.ConsoleSmsBackend"
+    ),
+)
+
+# Deliver SMS asynchronously through Celery in production; send synchronously
+# in DEBUG so a running worker/broker isn't required locally.
+SMS_USE_CELERY = os.getenv("SMS_USE_CELERY", "false" if DEBUG else "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 ADMIN = ("Murad", "nuradhussen082@gmail.com")
 

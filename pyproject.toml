@@ -34,7 +34,8 @@ dependencies = [
     "redis (==7.4.0)",
     "openpyxl (>=3.1.5,<4.0.0)",
     "beautifulsoup4 (>=4.14.3,<5.0.0)",
-    "django-filter (>=25.2,<26.0)"
+    "django-filter (>=25.2,<26.0)",
+    "django-debug-toolbar (>=7.0.0,<8.0.0)"
 ]
 
 
