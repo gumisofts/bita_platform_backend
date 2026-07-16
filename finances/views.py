@@ -4,7 +4,7 @@ from datetime import timezone as dt_timezone
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Count, F, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
@@ -25,7 +25,7 @@ from business.permissions import (
 from core.idempotency import idempotent
 from core.utils import is_valid_uuid
 from finances.filters import BusinessPaymentMethodFilter, TransactionFilter
-from inventories.models import SuppliedItem
+from inventories.models import Item, SuppliedItem
 from orders.models import Order, OrderItem
 
 from .models import BusinessPaymentMethod, PaymentMethod, Transaction
@@ -399,6 +399,20 @@ def summary(request):
     # Net worth
     net_worth = total_assets - total_liabilities
 
+    def _sales_and_refunds(qs):
+        """Return (total_sales, net_sales) for a transaction queryset.
+
+        total_sales is gross SALE revenue; net_sales deducts refunds
+        (refunds are stored negative, so it's an addition).
+        """
+        sales = qs.filter(type=Transaction.TransactionType.SALE).aggregate(
+            total=Sum("total_paid_amount")
+        )["total"] or Decimal("0.00")
+        refunds = qs.filter(type=Transaction.TransactionType.REFUND).aggregate(
+            total=Sum("total_paid_amount")
+        )["total"] or Decimal("0.00")
+        return sales, sales + refunds
+
     # Current month calculations
     current_month_transactions = transactions.filter(
         created_at__gte=current_month_start
@@ -416,6 +430,9 @@ def summary(request):
         if monthly_income > 0
         else Decimal("0.00")
     )
+    monthly_total_sales, monthly_net_sales = _sales_and_refunds(
+        current_month_transactions
+    )
 
     # Previous month calculations
     previous_month_transactions = transactions.filter(
@@ -428,6 +445,9 @@ def summary(request):
         type__in=Transaction.EXPENSE_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     previous_month_profit = previous_month_income - previous_month_expense
+    previous_month_total_sales, previous_month_net_sales = _sales_and_refunds(
+        previous_month_transactions
+    )
 
     # Year to date calculations
     ytd_transactions = transactions.filter(created_at__gte=year_start)
@@ -438,6 +458,9 @@ def summary(request):
         type__in=Transaction.EXPENSE_TYPES
     ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0.00")
     year_to_date_profit = year_to_date_income - year_to_date_expense
+    year_to_date_total_sales, year_to_date_net_sales = _sales_and_refunds(
+        ytd_transactions
+    )
 
     # Monthly transactions count
     monthly_transactions = current_month_transactions.count()
@@ -447,22 +470,32 @@ def summary(request):
     completed_orders = orders.filter(status=Order.StatusChoices.COMPLETED).count()
     pending_orders = orders.filter(status=Order.StatusChoices.PENDING).count()
 
+    # In-store inventory value at selling price (current stock on hand).
+    total_inventory_value = _get_inventory_value(business, branch)
+
     # Prepare summary data
     summary_data = {
         "total_assets": total_assets,
         "total_liabilities": total_liabilities,
         "net_worth": net_worth,
+        "total_inventory_value": total_inventory_value,
         "monthly_income": monthly_income,
         "monthly_expense": monthly_expense,
         "monthly_cash_flow": monthly_cash_flow,
         "monthly_profit": monthly_profit,
         "monthly_profit_margin": monthly_profit_margin,
+        "monthly_total_sales": monthly_total_sales,
+        "monthly_net_sales": monthly_net_sales,
         "previous_month_income": previous_month_income,
         "previous_month_expense": previous_month_expense,
         "previous_month_profit": previous_month_profit,
+        "previous_month_total_sales": previous_month_total_sales,
+        "previous_month_net_sales": previous_month_net_sales,
         "year_to_date_income": year_to_date_income,
         "year_to_date_expense": year_to_date_expense,
         "year_to_date_profit": year_to_date_profit,
+        "year_to_date_total_sales": year_to_date_total_sales,
+        "year_to_date_net_sales": year_to_date_net_sales,
         "pending_receivables": pending_receivables,
         "pending_payables": pending_payables,
         "monthly_transactions": monthly_transactions,
@@ -556,6 +589,23 @@ def _report_transaction_scope(request, business, branch):
         Q(employee=employee),
         Q(order__employee=employee),
     )
+
+
+def _get_inventory_value(business, branch):
+    """
+    Total in-store value of current stock, valued at each supplied item's
+    selling price: sum(quantity * selling_price) across all active items'
+    supplied-item batches (i.e. what the inventory on hand would be worth
+    if sold in full at current selling prices).
+    """
+    items_qs = Item.objects.filter(business=business, is_active=True)
+    if branch:
+        items_qs = items_qs.filter(branch=branch)
+
+    value = SuppliedItem.objects.filter(item__in=items_qs).aggregate(
+        total=Sum(F("quantity") * F("selling_price"))
+    )["total"]
+    return value or Decimal("0.00")
 
 
 def _get_income_by_category(order_filter):
@@ -942,6 +992,12 @@ def finance_report(request):
         Transaction.TransactionType.DEBT, Decimal("0")
     )
 
+    # Sales revenue specifically (as opposed to total_income, which also
+    # includes service revenue / other income). total_sales is the gross
+    # figure before refunds are deducted; net_sales nets them out.
+    total_sales = totals_by_type.get(Transaction.TransactionType.SALE, Decimal("0"))
+    net_sales = total_sales + total_refunds
+
     # Refunds reduce profit. They are not in EXPENSE_TYPES (so not in
     # total_expense); fold them in via their negative sign instead.
     net_profit = total_income - total_expense
@@ -950,6 +1006,10 @@ def finance_report(request):
         if total_income > 0
         else Decimal("0.00")
     )
+
+    # In-store inventory value at selling price — a point-in-time figure
+    # (current stock on hand), not scoped to the report's date range.
+    total_inventory_value = _get_inventory_value(business, branch)
 
     transaction_count = transactions.count()
     total_amount = transactions.aggregate(total=Sum("total_paid_amount"))[
@@ -999,6 +1059,25 @@ def finance_report(request):
     payment_methods = BusinessPaymentMethod.objects.filter(pm_filter).select_related(
         "payment"
     )
+
+    # Refund totals must always reflect real REFUND transactions, independent
+    # of the optional `transaction_type` filter. That filter narrows which
+    # rows count as income/expense in `transactions` above (e.g.
+    # transaction_type=SALE,EXPENSE); without this separate, unfiltered-by-type
+    # queryset, any such filter would silently zero out total_refunds per
+    # payment method even when refunds exist for the period (this mirrors how
+    # the top-level total_refunds is already computed, unaffected by that
+    # filter).
+    refund_scope_filter = Q(business=business, branch=branch) & Q(
+        created_at__gte=start_date, created_at__lt=end_date
+    )
+    if payment_method_ids:
+        refund_scope_filter &= Q(payment_method__in=payment_method_ids)
+    refund_scope_filter &= own_tx_filter
+    refund_transactions = Transaction.objects.filter(
+        refund_scope_filter, type=Transaction.TransactionType.REFUND
+    )
+
     by_payment_method = []
     for pm in payment_methods:
         pm_txs = transactions.filter(payment_method=pm)
@@ -1008,7 +1087,7 @@ def finance_report(request):
         pm_expense = pm_txs.filter(type__in=Transaction.EXPENSE_TYPES).aggregate(
             total=Sum("total_paid_amount")
         )["total"] or Decimal("0")
-        pm_refunds = pm_txs.filter(type=Transaction.TransactionType.REFUND).aggregate(
+        pm_refunds = refund_transactions.filter(payment_method=pm).aggregate(
             total=Sum("total_paid_amount")
         )["total"] or Decimal("0")
 
@@ -1036,16 +1115,19 @@ def finance_report(request):
     # payment methods, since "unknown" can't match a requested id.
     if not payment_method_ids:
         unknown_txs = transactions.filter(payment_method__isnull=True)
+        unknown_refunds = refund_transactions.filter(
+            payment_method__isnull=True
+        ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
         unknown_count = unknown_txs.count()
-        if unknown_count:
+        # Include this bucket if there are matching (possibly type-filtered)
+        # transactions OR real refunds, so refunds never get silently
+        # dropped when transaction_type filters out every other row.
+        if unknown_count or unknown_refunds:
             unknown_income = unknown_txs.filter(
                 type__in=Transaction.INCOME_TYPES
             ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
             unknown_expense = unknown_txs.filter(
                 type__in=Transaction.EXPENSE_TYPES
-            ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
-            unknown_refunds = unknown_txs.filter(
-                type=Transaction.TransactionType.REFUND
             ).aggregate(total=Sum("total_paid_amount"))["total"] or Decimal("0")
             unknown_income += (
                 unknown_refunds  # Refunds are negative, so add them to income
@@ -1180,6 +1262,10 @@ def finance_report(request):
     )
     previous_income += previous_refunds
     previous_net_profit = previous_income - previous_expense
+    previous_total_sales = prev_totals_by_type.get(
+        Transaction.TransactionType.SALE, Decimal("0")
+    )
+    previous_net_sales = previous_total_sales + previous_refunds
 
     def _pct_change(current, previous):
         if previous > 0:
@@ -1192,12 +1278,18 @@ def finance_report(request):
         "previous_income": previous_income,
         "previous_expense": previous_expense,
         "previous_net_profit": previous_net_profit,
+        "previous_total_sales": previous_total_sales,
+        "previous_net_sales": previous_net_sales,
         "income_change": total_income - previous_income,
         "expense_change": total_expense - previous_expense,
         "profit_change": net_profit - previous_net_profit,
+        "total_sales_change": total_sales - previous_total_sales,
+        "net_sales_change": net_sales - previous_net_sales,
         "income_change_pct": _pct_change(total_income, previous_income),
         "expense_change_pct": _pct_change(total_expense, previous_expense),
         "profit_change_pct": _pct_change(net_profit, previous_net_profit),
+        "total_sales_change_pct": _pct_change(total_sales, previous_total_sales),
+        "net_sales_change_pct": _pct_change(net_sales, previous_net_sales),
     }
 
     report_data = {
@@ -1207,6 +1299,9 @@ def finance_report(request):
         "total_expense": total_expense,
         "total_refunds": total_refunds,
         "total_debt_issued": total_debt_issued,
+        "total_sales": total_sales,
+        "net_sales": net_sales,
+        "total_inventory_value": total_inventory_value,
         "net_profit": net_profit,
         "profit_margin": profit_margin,
         "transaction_count": transaction_count,
