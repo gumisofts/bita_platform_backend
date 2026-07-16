@@ -16,11 +16,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from business.models import Branch, Business, Employee, biz_perm
+from business.models import Branch, Business, biz_perm
 from business.permissions import (
     BranchLevelPermission,
     accessible_branches,
     filter_queryset_by_branch,
+    has_full_report_access,
+    resolve_employee,
 )
 from core.idempotency import idempotent
 from core.utils import is_valid_uuid
@@ -471,7 +473,7 @@ def summary(request):
     pending_orders = orders.filter(status=Order.StatusChoices.PENDING).count()
 
     # In-store inventory value at selling price (current stock on hand).
-    total_inventory_value = _get_inventory_value(business, branch)
+    total_inventory_value = _get_inventory_value(request, business, branch)
 
     # Prepare summary data
     summary_data = {
@@ -564,9 +566,13 @@ def _resolve_business_branch(request):
 def _report_transaction_scope(request, business, branch):
     """Return (tx_filter, order_filter) that scope data to the caller's access level.
 
-    - Full permission holders (can_view_transaction_branch): no extra filter → sees everything.
-    - Employees without that permission: sees only their own transactions (created_by)
-      and their own orders (employee field).
+    - Owners, business admins, and branch managers: no extra filter → sees
+      everything for the business/branch.
+    - Plain employees: sees only their own transactions (created_by) and
+      their own orders (employee field). This is a role check, not a
+      permission check — employees are also granted can_view_transaction_branch
+      / can_view_order_branch for their day-to-day work, so those permissions
+      alone can't be used to gate report visibility.
     - No employee record found: empty querysets.
 
     Returns a 3-tuple:
@@ -574,12 +580,11 @@ def _report_transaction_scope(request, business, branch):
       own_order_filter     — applied to Order querysets   (direct employee field)
       own_order_item_filter— applied to OrderItem querysets (traverses order__employee)
     """
-    if branch and request.user.has_perm(
-        biz_perm("transaction", "view", "branch"), branch
-    ):
+    employee = resolve_employee(request.user, business)
+
+    if has_full_report_access(request.user, business, employee=employee):
         return Q(), Q(), Q()
 
-    employee = Employee.objects.filter(user=request.user, business=business).first()
     if not employee:
         empty = Q(pk__in=[])
         return empty, empty, empty
@@ -591,13 +596,20 @@ def _report_transaction_scope(request, business, branch):
     )
 
 
-def _get_inventory_value(business, branch):
+def _get_inventory_value(request, business, branch):
     """
     Total in-store value of current stock, valued at each supplied item's
     selling price: sum(quantity * selling_price) across all active items'
     supplied-item batches (i.e. what the inventory on hand would be worth
     if sold in full at current selling prices).
+
+    Returns 0 for callers who lack permission to view inventory (e.g. an
+    employee whose role was never granted item/inventory access) instead of
+    leaking the business's stock valuation to them.
     """
+    if not request.user.has_perm(biz_perm("item", "view", "branch"), branch or business):
+        return Decimal("0.00")
+
     items_qs = Item.objects.filter(business=business, is_active=True)
     if branch:
         items_qs = items_qs.filter(branch=branch)
@@ -1205,7 +1217,7 @@ def finance_report(request):
 
     # In-store inventory value at selling price — a point-in-time figure
     # (current stock on hand), not scoped to the report's date range.
-    total_inventory_value = _get_inventory_value(business, branch)
+    total_inventory_value = _get_inventory_value(request, business, branch)
 
     transaction_count = transactions.count()
     total_amount = transactions.aggregate(total=Sum("total_paid_amount"))[

@@ -18,6 +18,51 @@ from business.models import (
     biz_perm,
 )
 
+# Roles that should see business/branch-wide reports & dashboard stats.
+# Plain employees (role_name == ROLES.EMPLOYEE, or no Employee record at
+# all) only see data scoped to themselves — see `has_full_report_access`.
+FULL_REPORT_ACCESS_ROLES = {
+    ROLES.OWNER.value,
+    ROLES.BUSINESS_ADMIN.value,
+    ROLES.BRANCH_MANAGER.value,
+}
+
+
+def resolve_employee(user, business):
+    """Return the caller's ``Employee`` record for this business, or None."""
+    if not business or not user or not getattr(user, "is_authenticated", False):
+        return None
+    return (
+        Employee.objects.filter(user=user, business=business)
+        .select_related("role")
+        .first()
+    )
+
+
+def has_full_report_access(user, business, employee=None):
+    """True if ``user`` should see business/branch-wide reports & dashboard
+    stats rather than being scoped to just their own orders/transactions.
+
+    Owners, business admins, and branch managers get the full view. Plain
+    employees (role_name == "employee") — and anyone with no Employee
+    record at all — only see their own data.
+
+    Note: this is intentionally *not* the same check as the
+    ``can_view_*_branch`` guardian permissions used elsewhere, since plain
+    employees are also granted those (to view/act on branch inventory,
+    orders, etc. day to day) — reports/stats need a stricter, role-based
+    gate instead of reusing that permission.
+    """
+    if business and getattr(business, "owner_id", None) == getattr(user, "id", None):
+        return True
+    if employee is None:
+        employee = resolve_employee(user, business)
+    return bool(
+        employee
+        and employee.role_id
+        and employee.role.role_name in FULL_REPORT_ACCESS_ROLES
+    )
+
 
 class BusinessModelObjectPermission(BasePermission):
 

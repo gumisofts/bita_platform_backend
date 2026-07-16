@@ -20,7 +20,11 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 import inventories.models as inventories_models
 from business.models import Branch, Business, Employee, biz_perm
-from business.permissions import BranchLevelPermission
+from business.permissions import (
+    BranchLevelPermission,
+    has_full_report_access,
+    resolve_employee,
+)
 from core.idempotency import idempotent
 from core.utils import is_valid_uuid
 from finances.models import BusinessPaymentMethod, Transaction
@@ -807,9 +811,22 @@ class HomeStatsViewSet(GenericViewSet):
             else:
                 base_filter = Q(pk__in=[])  # No access
 
+        # Owners, business admins, and branch managers see business/branch-
+        # wide stats; plain employees (role_name == "employee") only see
+        # stats built from their own orders — this is a role check, not a
+        # permission check, since employees are also granted
+        # can_view_order_branch for their day-to-day work.
+        employee = resolve_employee(self.request.user, business)
+        if not has_full_report_access(self.request.user, business, employee=employee):
+            if employee:
+                base_filter &= Q(employee=employee)
+            else:
+                base_filter = Q(pk__in=[])
+
         # Store for use in other methods
         self._current_business = business
         self._current_branch = branch
+        self._current_employee = employee
 
         return base_filter
 
@@ -1158,6 +1175,19 @@ class HomeStatsViewSet(GenericViewSet):
         )
         if self._current_branch:
             tx_filter &= Q(branch=self._current_branch)
+
+        # Mirror the same own-data scoping as _get_base_queryset: plain
+        # employees only see cash movement tied to their own orders (sales,
+        # refunds); non-order transactions (manual expenses/debts, etc.) are
+        # excluded for them entirely since they have no owning employee.
+        employee = getattr(self, "_current_employee", None)
+        if not has_full_report_access(
+            self.request.user, self._current_business, employee=employee
+        ):
+            if employee:
+                tx_filter &= Q(order__employee=employee)
+            else:
+                tx_filter &= Q(pk__in=[])
 
         cash_transactions = Transaction.objects.filter(tx_filter)
         inflow = cash_transactions.filter(
