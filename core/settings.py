@@ -92,14 +92,22 @@ LOCAL_APPS = [
     "finances",
     "markets",
     "chat",
-    "debug_toolbar",
 ]
+
+# django-debug-toolbar is a dev-only tool: it injects a panel into every HTML
+# response showing SQL queries, settings, request/response internals, etc.
+# It must never run outside DEBUG — besides the info-disclosure risk, its own
+# templates reference static assets that aren't guaranteed to be in the
+# collectstatic manifest, which turns into an unrelated-looking 500 the
+# moment DEBUG is off (see core/urls.py, which already gates its URLs).
+if DEBUG:
+    LOCAL_APPS = LOCAL_APPS + ["debug_toolbar"]
 
 INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
+    *(["debug_toolbar.middleware.DebugToolbarMiddleware"] if DEBUG else []),
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
