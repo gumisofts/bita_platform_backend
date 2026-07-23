@@ -82,7 +82,10 @@ class TelebirrVerifier(BaseVerifier):
                         pass
                 if amount_td:
                     amount_str = (
-                        amount_td.get_text(strip=True).replace("Birr", "").strip()
+                        amount_td.get_text(strip=True)
+                        .replace("Birr", "")
+                        .replace(",", "")
+                        .strip()
                     )
                     try:
                         data.amount = Decimal(amount_str)
