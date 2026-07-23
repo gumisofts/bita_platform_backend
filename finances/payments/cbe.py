@@ -6,7 +6,7 @@ from io import BytesIO
 import requests
 from dateutil import parser as dateutil_parser
 
-from .base import BaseVerifier, TransactionData
+from .base import BaseVerifier, TransactionData, names_match
 
 
 class CBEVerifier(BaseVerifier):
@@ -167,8 +167,4 @@ class CBEVerifier(BaseVerifier):
         return self.account_matches(data.receiver_account, expected_account)
 
     def does_the_name_match(self, provided: str | None, expected: str | None) -> bool:
-        if not expected:
-            return True
-        if not provided:
-            return False
-        return provided.strip().casefold() == expected.strip().casefold()
+        return names_match(provided, expected)

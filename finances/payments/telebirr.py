@@ -4,7 +4,7 @@ from decimal import Decimal
 from bs4 import BeautifulSoup
 from django.conf import settings
 
-from .base import BaseVerifier, TransactionData
+from .base import BaseVerifier, TransactionData, names_match
 
 _TELEBIRR_RECEIPT_URL = (
     "https://transactioninfo.ethiotelecom.et/receipt/{transaction_id}"
@@ -131,9 +131,4 @@ class TelebirrVerifier(BaseVerifier):
         return self.account_matches(data.receiver_account, expected_account)
 
     def does_the_name_match(self, provided: str | None, expected: str | None) -> bool:
-        if not expected:
-            # Not configured → fall back to account-only verification.
-            return True
-        if not provided:
-            return False
-        return provided.strip().casefold() == expected.strip().casefold()
+        return names_match(provided, expected)

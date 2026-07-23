@@ -1,3 +1,4 @@
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -5,6 +6,40 @@ from decimal import Decimal
 
 import requests
 from bs4 import BeautifulSoup
+
+# Ethiopian names are conventionally given as "First Father Grandfather...".
+# Many people only enter their first and father's name (the part they consider
+# their "full name" day-to-day), even though the name on their bank account
+# includes further ancestors. We therefore only require the first two name
+# parts to match, and simply compare however many parts are actually present
+# on the shorter side.
+NAME_PARTS_TO_MATCH = 2
+
+
+def names_match(provided: str | None, expected: str | None) -> bool:
+    """Return True if *provided* and *expected* agree on first + father name.
+
+    Only the leading ``NAME_PARTS_TO_MATCH`` words of each name are compared
+    (falling back to fewer words if a name is shorter), so extra trailing
+    name parts (e.g. grandfather's name) present on either side are ignored.
+    """
+    if not expected:
+        # Not configured → fall back to account-only verification.
+        return True
+    if not provided:
+        return False
+
+    def _leading_parts(name: str) -> list[str]:
+        normalized = re.sub(r"\s+", " ", name.strip()).casefold()
+        return normalized.split(" ")[:NAME_PARTS_TO_MATCH]
+
+    provided_parts = _leading_parts(provided)
+    expected_parts = _leading_parts(expected)
+    if not provided_parts or not expected_parts:
+        return False
+
+    compare_len = min(len(provided_parts), len(expected_parts))
+    return provided_parts[:compare_len] == expected_parts[:compare_len]
 
 
 @dataclass
@@ -74,14 +109,14 @@ class BaseVerifier(ABC):
 
     # ── concrete verify ──────────────────────────────────────────────────────
 
-    def does_the_name_match(self, data: TransactionData, expected_name: str) -> bool:
-        """Return True if the receiver name matches the expected name."""
-        if not expected_name:
-            # Not configured → fall back to account-only verification.
-            return True
-        if not data.receiver_name:
-            return False
-        return data.receiver_name.strip().casefold() == expected_name.strip().casefold()
+    def does_the_name_match(self, provided: str | None, expected: str | None) -> bool:
+        """Return True if the receiver name matches the expected name.
+
+        Only the first name and father's name (leading two words) need to
+        match, since people commonly omit their grandfather's name (and
+        beyond) even though it appears on their bank account.
+        """
+        return names_match(provided, expected)
 
     def does_the_account_match(
         self, data: TransactionData, expected_account: str
